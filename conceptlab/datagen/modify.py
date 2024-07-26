@@ -100,7 +100,7 @@ def add_noise(
         return concepts,indicator
     elif n_modified < 1:
         n_modified = int(np.ceil(n_concepts * n_modified))
-    elif n_modify > n_concepts:
+    elif n_modified > n_concepts:
         ValueError("Can't modify more concepts than number of concepts in data")
 
     mod_idx = np.random.choice(n_concepts, replace=False, size=n_modified)

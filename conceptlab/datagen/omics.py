@@ -1,9 +1,11 @@
-from conceptlab.datagen._base import BaseDataGenerator
+from conceptlab.datagen._base import DataGenerator
 from conceptlab.utils.types import *
 import conceptlab.utils.constants as _C
 from typing import Dict, Any, List
 import xarray as xr
 import numpy as np
+
+__all__ = ['OmicsDataGenerator']
 
 
 def idx_to_mask(idx_vec, size):
@@ -16,7 +18,7 @@ def categorical(p):
     return np.argmax(np.random.multinomial(1, p))
 
 
-class OmicsDataGenerator(BaseDataGenerator):
+class OmicsDataGenerator(DataGenerator):
     params_key = dict(
         gamma="batch_coef",
         omega="celltype_coef",
@@ -228,6 +230,34 @@ class OmicsDataGenerator(BaseDataGenerator):
         seed: int = 42,
         zero_inflate: bool = True,
     ) -> xr.Dataset:
+        """
+        Generate synthetic omics data.
+
+        Args:
+            n_obs (int): Number of observations (samples) to generate.
+            n_vars (int, optional): Number of variables (features) to generate. Defaults to 1000.
+            n_batches (int, optional): Number of batches to simulate. Defaults to 3.
+            n_tissues (int, optional): Number of tissue types to simulate. Defaults to 2.
+            n_celltypes (int, optional): Number of cell types to simulate. Defaults to 4.
+            n_concepts (int, optional): Number of concepts to simulate. Defaults to 8.
+            baseline_lower (float, optional): Lower bound for baseline expression levels. Defaults to 1.
+            baseline_upper (float, optional): Upper bound for baseline expression levels. Defaults to 5.
+            std_batch (float, optional): Standard deviation for batch effects. Defaults to 0.08.
+            std_celltype (float, optional): Standard deviation for cell type effects. Defaults to 0.08.
+            std_tissue (float, optional): Standard deviation for tissue type effects. Defaults to 0.07.
+            std_concept (float, optional): Standard deviation for concept effects. Defaults to 0.05.
+            std_libsize_lower (float, optional): Lower bound for standard deviation of library size. Defaults to 0.01.
+            std_libsize_upper (float, optional): Upper bound for standard deviation of library size. Defaults to 0.03.
+            std_noise (float, optional): Standard deviation for noise. Defaults to 0.01.
+            beta_a (float, optional): Alpha parameter for beta distribution in zero inflation. Defaults to 0.5.
+            beta_b (float, optional): Beta parameter for beta distribution in zero inflation. Defaults to 10.
+            seed (int, optional): Seed for random number generator. Defaults to 42.
+            zero_inflate (bool, optional): Whether to add zero inflation to the data. Defaults to True.
+
+        Returns:
+            xr.Dataset: An xarray dataset containing the generated synthetic omics data.
+
+        """
 
         rng = np.random.default_rng(seed)
 
