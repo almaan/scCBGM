@@ -17,18 +17,18 @@ def categorical(p):
 
 
 class OmicsDataGenerator(BaseDataGenerator):
-    params_key = dict(gamma = 'batch_coef',
-                             omega = "celltype_coef",
-                             tau = 'tissue_coef',
-                             cs = 'concept_coef',
-                             ws = 'baseline',
-                             std_l = 'std_libsize',
-                             p_N = 'p_batch',
-                             p_Q = 'p_tissue',
-                             p_T = 'p_celltype_in_tissue',
-                            p_C = 'p_concept_in_celltype',
-                             )
-
+    params_key = dict(
+        gamma="batch_coef",
+        omega="celltype_coef",
+        tau="tissue_coef",
+        cs="concept_coef",
+        ws="baseline",
+        std_l="std_libsize",
+        p_N="p_batch",
+        p_Q="p_tissue",
+        p_T="p_celltype_in_tissue",
+        p_C="p_concept_in_celltype",
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -42,15 +42,44 @@ class OmicsDataGenerator(BaseDataGenerator):
         tau: np.ndarray,
         cs: np.ndarray,
         ws: np.ndarray,
-            p_N : np.ndarray,
-            p_Q : np.ndarray,
-            p_T : np.ndarray,
-            p_C : np.ndarray,
+        p_N: np.ndarray,
+        p_Q: np.ndarray,
+        p_T: np.ndarray,
+        p_C: np.ndarray,
         std_l: np.ndarray,
         std_noise: float = 0.01,
-            rng: np.random._generator.Generator | None = None,
-            seed: int = 42,
+        rng: np.random._generator.Generator | None = None,
+        seed: int = 42,
     ) -> List[np.ndarray]:
+        """
+        Model for generating synthetic omics data.
+
+        Args:
+        ---
+            n_obs (int): Number of observations.
+            gamma (np.ndarray): Batch effects matrix.
+            omega (np.ndarray): Cell type-specific effects matrix.
+            tau (np.ndarray): Tissue type-specific effects matrix.
+            cs (np.ndarray): Concept indicators.
+            ws (np.ndarray): Baseline expression levels.
+            p_N (np.ndarray): Probabilities for batch ID.
+            p_Q (np.ndarray): Probabilities for tissue type.
+            p_T (np.ndarray): Probabilities for cell type given tissue type.
+            p_C (np.ndarray): Probabilities for concept indicator given cell type.
+            std_l (np.ndarray): Standard deviation for library size.
+            std_noise (float, optional): Standard deviation for noise. Defaults to 0.01.
+            rng (np.random.Generator, optional): Random number generator. Defaults to None.
+            seed (int, optional): Seed for random number generator if rng is None. Defaults to 42.
+
+        Returns:
+        ---
+            Dict[str, np.ndarray]: Dictionary containing generated synthetic data matrices:
+                - 'X_mat': Gene expression matrix.
+                - 'U_mat': Cell type indicators.
+                - 'B_mat': Batch IDs.
+                - 'C_mat': Concept indicators.
+                - 'T_mat': Tissue type indicators.
+        """
 
         if rng is None:
             rng = np.random.default_rng(seed)
@@ -105,7 +134,6 @@ class OmicsDataGenerator(BaseDataGenerator):
             "T_mat": T_mat,
         }
 
-
     @classmethod
     def _build_dataset(
         cls,
@@ -113,18 +141,19 @@ class OmicsDataGenerator(BaseDataGenerator):
         U_mat: np.ndarray,
         C_mat: np.ndarray,
         T_mat: np.ndarray,
-            B_mat: np.ndarray,
+        B_mat: np.ndarray,
         gamma: np.ndarray,
         omega: np.ndarray,
         tau: np.ndarray,
         ws: np.ndarray,
-            cs: np.ndarray,
+        cs: np.ndarray,
         std_l: np.ndarray,
-            p_N : np.ndarray,
-            p_Q : np.ndarray,
-            p_T : np.ndarray,
-            p_C : np.ndarray,
+        p_N: np.ndarray,
+        p_Q: np.ndarray,
+        p_T: np.ndarray,
+        p_C: np.ndarray,
     ):
+        """helper function to build dataset"""
 
         N, F = X_mat.shape
         B, C, T, U = gamma.shape[0], cs.shape[0], tau.shape[0], omega.shape[0]
@@ -156,19 +185,19 @@ class OmicsDataGenerator(BaseDataGenerator):
         data_vars = {
             "data": (("obs", "var"), X_mat),
             _C.DataVars.concept.value: (("obs", "concept"), C_mat),
-            cls.params_key['cs']: (("concept", "var"), cs),
+            cls.params_key["cs"]: (("concept", "var"), cs),
             _C.DataVars.tissue.value: (("obs",), T_mat),
-            cls.params_key['tau']: (("tissue", "var"), tau),
+            cls.params_key["tau"]: (("tissue", "var"), tau),
             _C.DataVars.batch.value: (("obs",), B_mat),
             "batch_coef": (("batch", "var"), gamma),
             _C.DataVars.celltype.value: (("obs",), U_mat),
-            cls.params_key['omega']: (("celltype", "var"), omega),
-            cls.params_key['std_l']: (("batch"), std_l),
-            cls.params_key['p_N'] : (('batch'),p_N),
-             cls.params_key['p_Q']: (('tissue'),p_Q),
-            cls.params_key['p_T'] : (('tissue','celltype'),p_T),
-            cls.params_key['p_C'] : (('celltype','concept'),p_C),
-            cls.params_key['ws'] : (('var'),ws),
+            cls.params_key["omega"]: (("celltype", "var"), omega),
+            cls.params_key["std_l"]: (("batch"), std_l),
+            cls.params_key["p_N"]: (("batch"), p_N),
+            cls.params_key["p_Q"]: (("tissue"), p_Q),
+            cls.params_key["p_T"]: (("tissue", "celltype"), p_T),
+            cls.params_key["p_C"]: (("celltype", "concept"), p_C),
+            cls.params_key["ws"]: (("var"), ws),
         }
 
         # create xarray dataset
@@ -248,53 +277,56 @@ class OmicsDataGenerator(BaseDataGenerator):
             omega=omega,
             tau=tau,
             cs=cs,
-            ws = ws,
-            p_N = p_N,
-            p_Q = p_Q,
-            p_T = p_T,
-            p_C = p_C,
-            std_l =std_l,
+            ws=ws,
+            p_N=p_N,
+            p_Q=p_Q,
+            p_T=p_T,
+            p_C=p_C,
+            std_l=std_l,
         )
 
-        data = cls._model(n_obs = N, **params, std_noise = std_noise, rng = rng)
+        data = cls._model(n_obs=N, **params, std_noise=std_noise, rng=rng)
 
         dataset = cls._build_dataset(**data, **params)
 
         return dataset
 
-
     @classmethod
-    def get_params_from_dataset(cls,dataset: xr.Dataset)->Dict[str,np.ndarray]:
-        params = {key:dataset[val].to_numpy() for key,val in cls.params_key.items()}
+    def get_params_from_dataset(cls, dataset: xr.Dataset) -> Dict[str, np.ndarray]:
+        """helper function to get model parameters from a dataset"""
+        params = {key: dataset[val].to_numpy() for key, val in cls.params_key.items()}
         return params
-
 
     @classmethod
     def generate_from_dataset(
-            cls,
-            n_obs: PositiveInt,
-            dataset: xr.Dataset,
-            new_params: Dict[str,np.ndarray] | None = None,
-            std_noise: float = 0.01,
-    )->xr.Dataset:
+        cls,
+        n_obs: PositiveInt,
+        dataset: xr.Dataset,
+        new_params: Dict[str, np.ndarray] | None = None,
+        std_noise: float = 0.01,
+    ) -> xr.Dataset:
+        """Generates a new dataset using the same parameters as were used to generte an existing dataset
+
+        Args:
+        ----
+          n_obs: number of observations
+          dataset : dataset to extract parameters from
+          new_params: dictionary specifying custom parameters (will overwrite those from the provided dataset)
+          std_noise: noise standard deviation (for additional stochasicity)
+
+        Returns:
+        ----
+          New xarray dataset with n_obs new datapoints
+
+        """
 
         input_params = cls.get_params_from_dataset(dataset)
 
         if new_params is not None:
-            for key,val in new_params.items():
+            for key, val in new_params.items():
                 input_params[key] = val
 
         new_data = cls._model(n_obs, **input_params)
-        new_dataset = cls._build_dataset(**new_data,**input_params)
+        new_dataset = cls._build_dataset(**new_data, **input_params)
 
         return new_dataset
-
-
-
-
-
-
-
-
-
-

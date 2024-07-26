@@ -16,3 +16,11 @@ class DimNames(Enum):
     tissue = 'tissue'
     celltype = 'celltype'
     batch = 'batch'
+
+
+class Mods:
+    none = 'original'
+    drop = 'dropped'
+    add = 'added'
+    noise = 'noisy'
+    duplicate = 'duplicate'
