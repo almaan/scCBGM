@@ -31,7 +31,6 @@ class OmicsDataGenerator(DataGenerator):
         p_Q="p_tissue",
         p_T="p_celltype_in_tissue",
         p_C="p_concept_in_celltype",
-        libsize="libsize",
     )
 
     def __init__(self, **kwargs):
@@ -419,6 +418,7 @@ class OmicsDataGenerator(DataGenerator):
         F = dataset.sizes["var"]
 
         X_mat = np.zeros((N, F))
+        libsize = dataset.libsize.to_dataframe()
 
         obs_names = dataset.obs.values
 
@@ -442,7 +442,7 @@ class OmicsDataGenerator(DataGenerator):
                 + params["omega"].loc[u_n].values.flatten()
                 + params["gamma"].loc[b_n].values.flatten()
                 + params["tau"].loc[t_n].values.flatten()
-                + params["libsize"].loc[obs, :].values.flatten()
+                + libsize.loc[obs, :].values.flatten()
                 + eps_n
             )
             # sample gene expression
