@@ -1,11 +1,12 @@
 from conceptlab.datagen._base import DataGenerator
 from conceptlab.utils.types import *
 import conceptlab.utils.constants as _C
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Literal
 import xarray as xr
 import numpy as np
+import pandas as pd
 
-__all__ = ['OmicsDataGenerator']
+__all__ = ["OmicsDataGenerator"]
 
 
 def idx_to_mask(idx_vec, size):
@@ -30,6 +31,7 @@ class OmicsDataGenerator(DataGenerator):
         p_Q="p_tissue",
         p_T="p_celltype_in_tissue",
         p_C="p_concept_in_celltype",
+        libsize="libsize",
     )
 
     def __init__(self, **kwargs):
@@ -52,6 +54,7 @@ class OmicsDataGenerator(DataGenerator):
         std_noise: float = 0.01,
         rng: np.random._generator.Generator | None = None,
         seed: int = 42,
+        **kwargs,
     ) -> List[np.ndarray]:
         """
         Model for generating synthetic omics data.
@@ -93,6 +96,7 @@ class OmicsDataGenerator(DataGenerator):
         U_mat = np.zeros(N)
         B_mat = np.zeros(N)
         T_mat = np.zeros(N)
+        L_mat = np.zeros(N)
 
         # -- Generate Data -- #
         for n in range(N):
@@ -127,6 +131,7 @@ class OmicsDataGenerator(DataGenerator):
             B_mat[n] = b_n
             C_mat[n] = v_n
             T_mat[n] = t_n
+            L_mat[n] = l_n
 
         return {
             "X_mat": X_mat,
@@ -134,6 +139,7 @@ class OmicsDataGenerator(DataGenerator):
             "B_mat": B_mat,
             "C_mat": C_mat,
             "T_mat": T_mat,
+            "L_mat": L_mat,
         }
 
     @classmethod
@@ -144,6 +150,7 @@ class OmicsDataGenerator(DataGenerator):
         C_mat: np.ndarray,
         T_mat: np.ndarray,
         B_mat: np.ndarray,
+        L_mat: np.ndarray,
         gamma: np.ndarray,
         omega: np.ndarray,
         tau: np.ndarray,
@@ -193,6 +200,7 @@ class OmicsDataGenerator(DataGenerator):
             _C.DataVars.batch.value: (("obs",), B_mat),
             "batch_coef": (("batch", "var"), gamma),
             _C.DataVars.celltype.value: (("obs",), U_mat),
+            "libsize": (("obs"), L_mat),
             cls.params_key["omega"]: (("celltype", "var"), omega),
             cls.params_key["std_l"]: (("batch"), std_l),
             cls.params_key["p_N"]: (("batch"), p_N),
@@ -322,9 +330,24 @@ class OmicsDataGenerator(DataGenerator):
         return dataset
 
     @classmethod
-    def get_params_from_dataset(cls, dataset: xr.Dataset) -> Dict[str, np.ndarray]:
+    def get_params_from_dataset(
+        cls, dataset: xr.Dataset, mode: Literal["dataframe", "numpy"] = "numpy"
+    ) -> Dict[str, np.ndarray]:
         """helper function to get model parameters from a dataset"""
-        params = {key: dataset[val].to_numpy() for key, val in cls.params_key.items()}
+
+        match mode:
+            case "numpy":
+                return {
+                    key: dataset[val].to_numpy() for key, val in cls.params_key.items()
+                }
+            case "dataframe":
+                return {
+                    key: dataset[val].to_dataframe()
+                    for key, val in cls.params_key.items()
+                }
+            case _:
+                raise ValueError("mode {} is not supported".format(mode))
+
         return params
 
     @classmethod
@@ -360,3 +383,72 @@ class OmicsDataGenerator(DataGenerator):
         new_dataset = cls._build_dataset(**new_data, **input_params)
 
         return new_dataset
+
+    @classmethod
+    def generate_intervention(
+        cls,
+        dataset,
+        concepts: np.ndarray | pd.DataFrame,
+        std_noise: float = 0.01,
+        seed: int = 42,
+    ):
+        """
+        Generate an intervention dataset based on provided concepts and a given dataset.
+
+        Args:
+        ----
+
+        dataset: The dataset to generate interventions for. Assumed to have specific structure and attributes.
+        concepts (np.ndarray or pd.DataFrame): The intervention concepts to apply. Can be a numpy array or pandas DataFrame.
+        std_noise (float): Standard deviation of the noise to add. Default is 0.01.
+        seed (int): Seed for the random number generator to ensure reproducibility. Default is 42.
+
+        Returns:
+        ----
+        pd.DataFrame: A DataFrame containing the generated intervention data with the same observation names and variable names as the input dataset.
+
+        """
+
+        rng = np.random.default_rng(seed)
+
+        params = cls.get_params_from_dataset(dataset, mode="dataframe")
+
+        cs = params["cs"].unstack().reindex()
+
+        N = dataset.sizes["obs"]
+        F = dataset.sizes["var"]
+
+        X_mat = np.zeros((N, F))
+
+        obs_names = dataset.obs.values
+
+        for k, obs in enumerate(obs_names):
+
+            u_n = dataset.celltypes.to_dataframe().loc[obs].values[0]
+            t_n = dataset.tissues.to_dataframe().loc[obs].values[0]
+            b_n = dataset.batches.to_dataframe().loc[obs].values[0]
+
+            if isinstance(concepts, pd.DataFrame):
+                v_n = concepts.loc[concept, :]
+            elif isinstance(concepts, np.ndarray):
+                v_n = concepts[k, :]
+
+            eps_n = np.random.normal(0, std_noise)
+
+            # log lambda
+            log_lambda = (
+                params["ws"].values.flatten()
+                + np.sum(cs.values * v_n[:, None], axis=0).flatten()
+                + params["omega"].loc[u_n].values.flatten()
+                + params["gamma"].loc[b_n].values.flatten()
+                + params["tau"].loc[t_n].values.flatten()
+                + params["libsize"].loc[obs, :].values.flatten()
+                + eps_n
+            )
+            # sample gene expression
+            x_n = rng.poisson(np.exp(log_lambda))
+            X_mat[k, :] = x_n
+
+        X_mat = pd.DataFrame(X_mat, index=obs_names, columns=dataset["var"].values)
+
+        return X_mat
