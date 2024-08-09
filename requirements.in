@@ -1,0 +1,12 @@
+lightning
+torch
+torchvision
+pandas
+torchdata
+wandb
+scikit-learn
+matplotlib
+seaborn
+timm
+xarray
+anndata
