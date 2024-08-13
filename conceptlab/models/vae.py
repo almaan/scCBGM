@@ -9,7 +9,7 @@ import torch as t
 
 # Define the VAE model
 class VAE(pl.LightningModule):
-    def __init__(self, input_dim, hidden_dim, latent_dim, learning_rate=1e-3, beta: float = 1):
+    def __init__(self, input_dim=34455, hidden_dim=1024, latent_dim=512, learning_rate=1e-3, beta: float = 1):
         super(VAE, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -25,6 +25,8 @@ class VAE(pl.LightningModule):
         self.fc3 = nn.Linear(latent_dim, hidden_dim)
         self.fc4 = nn.Linear(hidden_dim, input_dim)
         self.beta = beta
+
+        self.save_hyperparameters()
 
     def encode(self, x):
         h1 = F.relu(self.fc1(x))

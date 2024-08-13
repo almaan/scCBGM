@@ -10,3 +10,5 @@ seaborn
 timm
 xarray
 anndata
+scanpy
+umap-learn

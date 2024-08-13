@@ -9,7 +9,7 @@ import torch as t
 
 # Define the VAE model
 class CB_VAE(pl.LightningModule):
-    def __init__(self, input_dim, hidden_dim, latent_dim, n_concepts, learning_rate=1e-3, beta: float = 1,
+    def __init__(self, input_dim=34455, hidden_dim=1024, latent_dim=512, n_concepts=8, learning_rate=1e-3, beta: float = 1,
                 concepts_hp: float = 1.0,
                 orthogonality_hp: float = 1,
         ):
