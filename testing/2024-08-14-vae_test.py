@@ -105,7 +105,7 @@ wandb_logger = WandbLogger(project='conceptlab_sync', # group runs in "MNIST" pr
 
 checkpoint_callback = pl.callbacks.ModelCheckpoint(
     dirpath=checkpoint_dir,
-    filename='vae_real',
+    filename='vae_small',
     save_top_k=1,
     verbose=True,
     monitor='val_Total_loss',
