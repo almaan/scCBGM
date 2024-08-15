@@ -20,13 +20,12 @@ if __name__ == "__main__":
     checkpoint_dir = "/data/bucket/ismaia11/conceptlab/models/"
 
     # n_obs = 50000
-    n_vars = 34455
-    n_tissues = 3
-    n_celltypes = 10
-    n_batches = 2
-    n_concepts = 8
+    # n_vars = 5000
+    # n_tissues = 3
+    # n_celltypes = 10
+    # n_batches = 2
+    # n_concepts = 8
 
- 
     # dataset = clab.datagen.omics.OmicsDataGenerator.generate(n_obs = n_obs,
     #                                                          n_vars = n_vars,
     #                                                          n_tissues=n_tissues,
@@ -39,7 +38,6 @@ if __name__ == "__main__":
     # dataset.to_netcdf('./data/complete_set_dataset.nc')
 
 
-    
     # data_pth = "./data/5a611776-aae0-41b9-9f2b-aaf5f83771a3.h5ad"
 
     # adata = ad.read_h5ad(data_pth) 
@@ -47,6 +45,8 @@ if __name__ == "__main__":
 
     # # subset_cells.write("./data/subset_cells.h5ad")
 
+    adata = ad.read_h5ad(data_pth) 
+    subset_cells = adata[0:50000, 0:5000]
 
 
     # # print(adata.shape)
@@ -71,8 +71,8 @@ if __name__ == "__main__":
 
     print("Training")
     vae = clab.models.VAE(input_dim=n_vars,
-                hidden_dim=1024, #these numbers are quite arbitrary
-                latent_dim=512,
+                hidden_dim=128, #these numbers are quite arbitrary
+                latent_dim=64,
                 beta = 0.01,
                 learning_rate=1e-3)
 
@@ -104,8 +104,8 @@ if __name__ == "__main__":
 
     # print("Training")
     # vae = clab.models.CB_VAE(input_dim=n_vars,
-    #             hidden_dim=1024, #these numbers are quite arbitrary
-    #             latent_dim=512,
+    #             hidden_dim=128, #these numbers are quite arbitrary
+    #             latent_dim=64,
     #             n_concepts=n_concepts,
     #             beta = 1e-3,
     #             learning_rate=1e-4)
