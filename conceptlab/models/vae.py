@@ -60,7 +60,6 @@ class VAE(pl.LightningModule):
         return loss_dict
 
 
-
     def _step(self,batch,batch_idx, prefix = 'train'):
         x = batch
         out = self(x)
@@ -78,3 +77,4 @@ class VAE(pl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+
