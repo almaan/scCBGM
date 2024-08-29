@@ -7,13 +7,13 @@ from typing import Literal
 
 
 def binarize_concepts(concepts: pd.DataFrame,
-                      threhold: float,
+                      threshold: float,
                       ):
 
-    Cn = C.copy()
+    Cn = concepts.copy()
     ix = Cn < threshold
-    Cn = Cn[ix] = 0
-    Cn = Cn[~ix] = 1
+    Cn[ix] = 0
+    Cn[~ix] = 1
     return Cn
 
 
@@ -23,8 +23,8 @@ def annotate_set_concepts( data : ad.AnnData | pd.DataFrame,
                            set_matrix: pd.DataFrame,
                            layer: str | None = None,
                            inplace: bool = False,
-                           unit_interval: bool = True,
-                           thres: float = 0.0,
+                           unit_interval: bool = False,
+                           temp: float = 1.0,
                           )-> pd.DataFrame:
 
     # check data type and cast into pd.DataFrame representation of data
@@ -42,6 +42,7 @@ def annotate_set_concepts( data : ad.AnnData | pd.DataFrame,
     M = M.loc[inter,:]
     X = X.loc[:,inter]
 
+    # get variance across cells
     Xv = X.values.var(axis=1,keepdims = True)
 
     # compute difference from mean squared
@@ -57,8 +58,7 @@ def annotate_set_concepts( data : ad.AnnData | pd.DataFrame,
     C  = C / Ms / Xv
 
     if unit_interval:
-        from scipy.special import expit
-        C = 2 *expit(C-thres) - 1
+        C = np.tanh(C/temp)
 
     return C
 
