@@ -1,0 +1,6 @@
+type: CB_VAE
+has_cbm: True
+lr: 1e-3
+beta: 0.002
+hidden_dim: 128
+latent_dim: 64

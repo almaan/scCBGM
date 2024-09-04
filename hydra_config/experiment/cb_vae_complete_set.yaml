@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - override /model: cb_vae.yaml
+
+wandb:
+  project: conceptlab
+  experiment: cb_vae_small_complete_set
+
+
+trainer:
+  max_epochs: 200
+
+
+plotting:
+  plot: True
+  plot_path: "/plotting/"

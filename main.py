@@ -9,134 +9,207 @@ import argparse
 import os
 import pathlib
 from lightning.pytorch.loggers import WandbLogger
-
+from hydra.utils import get_original_cwd
 import pytorch_lightning as pl
 import anndata as ad
 import xarray as xr
+import torch
+import scanpy as sc
+from conceptlab.utils.seed import set_seed
+from omegaconf import DictConfig, OmegaConf
 
 
-if __name__ == "__main__":
-
-    checkpoint_dir = "/data/bucket/ismaia11/conceptlab/models/"
-
-    # n_obs = 50000
-    # n_vars = 5000
-    # n_tissues = 3
-    # n_celltypes = 10
-    # n_batches = 2
-    # n_concepts = 8
-
-    # dataset = clab.datagen.omics.OmicsDataGenerator.generate(n_obs = n_obs,
-    #                                                          n_vars = n_vars,
-    #                                                          n_tissues=n_tissues,
-    #                                                          n_celltypes=n_celltypes,
-    #                                                          n_batches = n_batches,
-    #                                                          n_concepts = n_concepts,
-    #                                                         )
-
-
-    # dataset.to_netcdf('./data/complete_set_dataset.nc')
-
-
-    # data_pth = "./data/5a611776-aae0-41b9-9f2b-aaf5f83771a3.h5ad"
-
-    # adata = ad.read_h5ad(data_pth) 
-    # subset_cells = adata[0:50000, :]
-
-    # # subset_cells.write("./data/subset_cells.h5ad")
-
-    adata = ad.read_h5ad(data_pth) 
-    subset_cells = adata[0:50000, 0:5000]
-
-
-    # # print(adata.shape)
-    # # print(subset_cells.shape)
-
-    # # print(stop)
-    # # data_pth = "./data/subset_cells.h5ad"
-    # # dataset = ad.read_h5ad(data_pth) 
-    # n_samples,n_vars = subset_cells.shape
-
-    # data_module = clab.datagen.dataloader.GeneExpressionDataModule(subset_cells, batch_size=512) 
+import os
 
 
 
-    print("Reading")
-    dataset = xr.open_dataset('./data/complete_set_dataset.nc')
+import hydra
+from omegaconf import DictConfig
 
-    print("Creating a data_module")
-    data_module = clab.datagen.dataloader.GeneExpressionDataModule(dataset, batch_size=512)
+@hydra.main(config_path="./hydra_config/", config_name="config.yaml")
 
+def main(cfg: DictConfig) -> None:
 
-
-    print("Training")
-    vae = clab.models.VAE(input_dim=n_vars,
-                hidden_dim=128, #these numbers are quite arbitrary
-                latent_dim=64,
-                beta = 0.01,
-                learning_rate=1e-3)
+    set_seed(cfg.constants.seed)
+    original_path = get_original_cwd() 
+    checkpoint_dir = cfg.constants.checkpoint_dir
+    adata_path = original_path+cfg.constants.data_path+cfg.data.dataset_name+".h5ad"
 
 
-    wandb_logger = WandbLogger(project='conceptlab_sync', # group runs in "MNIST" project
-                                name="vae",
+    if  not os.path.exists(adata_path):
+        dataset = clab.datagen.omics.OmicsDataGenerator.generate(n_obs = cfg.data.n_obs,
+                                                                 n_vars = cfg.data.n_vars,
+                                                                 n_tissues=cfg.data.n_tissues,
+                                                                 n_celltypes=cfg.data.n_celltypes,
+                                                                 n_batches = cfg.data.n_batches,
+                                                                 n_concepts =cfg.data.n_concepts,
+                                                                )
+
+
+
+        adata = ad.AnnData(dataset.data.values,
+                           var = pd.DataFrame([], index = dataset['var'].values),
+                           obs = pd.DataFrame([], index = dataset['obs'].values),
+                          )
+
+        adata.obs['tissue'] = dataset.tissues.values
+        adata.obs['celltype'] = dataset.celltypes.values
+        adata.obs['batch'] = dataset.batches.values
+        adata.obsm['concepts'] = dataset.concepts.values
+        adata.write_h5ad(adata_path)
+
+
+
+
+
+
+    adata = ad.read_h5ad(adata_path)
+
+
+
+    idx = np.arange(len(adata))
+    np.random.shuffle(idx)
+    p_test = 0.5
+    n_test = int(0.5 * len(adata))
+
+
+    adata_test, adata = adata[idx[0:n_test]].copy(),adata[idx[n_test::]].copy()
+
+    if cfg.model.has_cbm:
+        data_module = clab.data.dataloader.GeneExpressionDataModule(adata,add_concepts=True, batch_size=512)
+
+    else:
+        data_module = clab.data.dataloader.GeneExpressionDataModule(adata, batch_size=512)
+
+    n_obs, n_vars = adata.shape
+
+
+
+
+    try:
+        model_to_call = getattr(clab.models, cfg.model.type, None)
+        model =model_to_call(input_dim=n_vars,
+                hidden_dim=cfg.model.hidden_dim, #these numbers are quite arbitrary
+                latent_dim=cfg.model.latent_dim,
+                beta =cfg.model.beta,
+                learning_rate=cfg.model.lr)
+    except NotImplementedError as e:
+        print(f"Error: {e}")
+   
+
+
+    wandb_logger = WandbLogger(project=cfg.wandb.project, # group runs in "MNIST" project
+                                name=cfg.wandb.experiment,
                                 log_model='all') 
-
-
-
-    
 
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
-        filename='vae',
+        filename=cfg.wandb.experiment,
         save_top_k=1,
         verbose=True,
         monitor='val_Total_loss',
-        mode='min'
+        mode='min',
+        every_n_epochs = 10, 
         )
 
 
+    max_epochs = cfg.trainer.max_epochs
 
-
-
-    # data_module = clab.datagen.dataloader.GeneExpressionDataModule(dataset,add_concepts=True, batch_size=512) 
-
-
-    # print("Training")
-    # vae = clab.models.CB_VAE(input_dim=n_vars,
-    #             hidden_dim=128, #these numbers are quite arbitrary
-    #             latent_dim=64,
-    #             n_concepts=n_concepts,
-    #             beta = 1e-3,
-    #             learning_rate=1e-4)
-
-
-    # wandb_logger = WandbLogger(project='conceptlab_sync', # group runs in "MNIST" project
-    #                             name="vae_cbm",
-    #                             log_model='all') 
-
-
-
-
-    # checkpoint_callback = pl.callbacks.ModelCheckpoint(
-    #     dirpath=checkpoint_dir,
-    #     filename='vae_cbm',
-    #     save_top_k=1,
-    #     verbose=True,
-    #     monitor='val_Total_loss',
-    #     mode='min'
-    #     )
-
-
-
-
-    max_epochs = 100
     trainer = pl.Trainer(max_epochs=max_epochs, callbacks=[
                    checkpoint_callback], logger = wandb_logger)
 
-    trainer.fit(vae, data_module) 
+    trainer.fit(model, data_module) 
+
+
+
+    if cfg.plotting.plot:
+
+        model.to('cpu')
+        model.eval() 
+
+
+        x_true = adata_test.X.astype(np.float32).copy()
+        x_true = x_true / x_true.sum(axis=1, keepdims = True) * 1e4
+        x_true = np.log1p(x_true)
+
+
+
+
+
+        sub_idx = np.random.choice(x_true.shape[0], replace = False, size = 2000)
+
+
+        ad_true = ad.AnnData(x_true[sub_idx],
+                             obs = adata_test.obs.iloc[sub_idx],
+                            )
+
+
+        x_pred = model(torch.tensor(x_true) )['x_pred']
+        x_pred = x_pred.detach().numpy()
+
+
+        ad_pred = ad.AnnData(x_pred[sub_idx],
+                             obs = adata_test.obs.iloc[sub_idx],
+                            )
+
+
+        if cfg.model.has_cbm:
+
+            x_concepts = adata_test.obsm['concepts'].astype(np.float32).copy()
+
+
+            x_pred_withGT = model(torch.tensor(x_true),torch.tensor(x_concepts))['x_pred']
+            x_pred_withGT = x_pred_withGT.detach().numpy()
+
+            
+            ad_pred_withGT= ad.AnnData(x_pred_withGT[sub_idx],
+                             obs = adata_test.obs.iloc[sub_idx],
+                            )
+
+            ad_merge = ad.concat(dict(vae_cbm = ad_pred,vae_cbm_withGT = ad_pred_withGT,true = ad_true),axis = 0,label='ident')
+        else:
+            ad_merge = ad.concat(dict(vae = ad_pred,true = ad_true),axis = 0,label='ident')
+
+
+        ad_merge.obs_names_make_unique()
+
+
+        sc.pp.pca(ad_merge)
+        sc.pp.neighbors(ad_merge)
+        sc.tl.umap(ad_merge)
+
+        sc.pl.umap(ad_merge, color = ['ident','tissue','celltype','batch'], ncols=4)
+        
+
+
+
+
+        plotting_folder_path=original_path+cfg.plotting.plot_path
+        if not os.path.exists(plotting_folder_path):
+            os.makedirs(plotting_folder_path)
+
+
+
+        plot_filename= plotting_folder_path+cfg.wandb.experiment+'.png'
+        plt.savefig(plot_filename)
+
+
+
+
+        # Log the plot to wandb
+        wandb.log({"generation_plot": wandb.Image(plot_filename)})
+
+
+
 
 
 
     wandb.finish()
+
+
+
+
+if __name__ == "__main__":
+    main()
 

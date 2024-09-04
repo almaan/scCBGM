@@ -1,0 +1,6 @@
+defaults:
+  - _self_
+  - data: default.yaml
+  - constants: default.yaml
+  - model: vae.yaml
+  - experiment: null
