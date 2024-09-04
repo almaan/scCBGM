@@ -33,16 +33,21 @@ def main(cfg: DictConfig) -> None:
     set_seed(cfg.constants.seed)
     original_path = get_original_cwd() 
     checkpoint_dir = cfg.constants.checkpoint_dir
-    adata_path = original_path+cfg.constants.data_path+cfg.data.dataset_name+".h5ad"
+
+    if not os.path.exists(original_path+cfg.constants.data_path):
+            os.makedirs(original_path+cfg.constants.data_path)
+
+
+    adata_path = original_path+cfg.constants.data_path+cfg.dataset.dataset_name+".h5ad"
 
 
     if  not os.path.exists(adata_path):
-        dataset = clab.datagen.omics.OmicsDataGenerator.generate(n_obs = cfg.data.n_obs,
-                                                                 n_vars = cfg.data.n_vars,
-                                                                 n_tissues=cfg.data.n_tissues,
-                                                                 n_celltypes=cfg.data.n_celltypes,
-                                                                 n_batches = cfg.data.n_batches,
-                                                                 n_concepts =cfg.data.n_concepts,
+        dataset = clab.datagen.omics.OmicsDataGenerator.generate(n_obs = cfg.dataset.n_obs,
+                                                                 n_vars = cfg.dataset.n_vars,
+                                                                 n_tissues=cfg.dataset.n_tissues,
+                                                                 n_celltypes=cfg.dataset.n_celltypes,
+                                                                 n_batches = cfg.dataset.n_batches,
+                                                                 n_concepts =cfg.dataset.n_concepts,
                                                                 )
 
 
