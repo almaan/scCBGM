@@ -52,7 +52,10 @@ def main(cfg: DictConfig) -> None:
             n_concepts=cfg.dataset.n_concepts,
         )
 
-    adata = helpers.dataset_to_anndata(dataset, adata_path)
+        adata = helpers.dataset_to_anndata(dataset, adata_path)
+    else:
+        adata = ad.read_h5ad(adata_path)
+
     adata_test, adata = helpers.simple_adata_train_test_split(adata)
 
     if cfg.model.has_cbm:
