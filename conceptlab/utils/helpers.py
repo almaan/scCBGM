@@ -4,6 +4,7 @@ from conceptlab.utils.constants import DimNames, DataVars
 from conceptlab.utils.types import NonNegativeFloat
 from typing import Tuple
 import numpy as np
+import pandas as pd
 
 
 def dataset_to_anndata(
@@ -28,7 +29,7 @@ def dataset_to_anndata(
 
 def simple_adata_train_test_split(
     adata: ad.AnnData, p_test: NonNegativeFloat = 0.5
-) -> Tuple[ad.AnnData, ad.Anndata]:
+) -> Tuple[ad.AnnData, ad.AnnData]:
 
     if (p_test >= 1) or (p_test <= 0):
         raise ValueError(
