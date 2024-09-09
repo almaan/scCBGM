@@ -8,7 +8,9 @@ import pandas as pd
 
 
 def dataset_to_anndata(
-    dataset: xr.Dataset, adata_path: str | None = None
+    dataset: xr.Dataset,
+    concepts: np.ndarray | None = None,
+    adata_path: str | None = None
 ) -> ad.AnnData:
 
     adata = ad.AnnData(
@@ -20,7 +22,12 @@ def dataset_to_anndata(
     adata.obs["tissue"] = dataset[DataVars.tissue.value].values
     adata.obs["celltype"] = dataset[DataVars.celltype.value].values
     adata.obs["batch"] = dataset[DataVars.batch.value].values
-    adata.obsm["concepts"] = dataset[DataVars.concept.value].values
+
+    if concepts is None:
+        adata.obsm["concepts"] = dataset[DataVars.concept.value].values
+    else:
+        adata.obsm['concepts'] = concepts
+
 
     if adata_path is not None:
         adata.write_h5ad(adata_path)
