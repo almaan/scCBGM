@@ -29,6 +29,7 @@ def drop_concepts(
     dataset: xr.Dataset | None = None,
         concepts: np.ndarray | None = None,
     n_drop: PositiveInt | PositiveFloat = 1,
+        **kwargs,
 ) -> np.ndarray:
 
     concepts, n_concepts = _get_concepts(dataset, concepts)
@@ -55,6 +56,7 @@ def add_concepts(
     concepts: np.ndarray | None = None,
     n_add: PositiveInt | PositiveFloat = 1,
     p_active: float | List[float] = 0.5,
+        **kwargs,
 )->np.ndarray:
 
     concepts, n_concepts = _get_concepts(dataset, concepts)
@@ -86,6 +88,7 @@ def add_noise(
     concepts: np.ndarray | None = None,
     p_noise: float = 0.5,
     n_modified: PositiveInt | PositiveFloat | Literal["all"] = "all",
+        **kwargs,
 )->np.ndarray:
 
     concepts, n_concepts = _get_concepts(dataset,concepts)
@@ -120,6 +123,7 @@ def add_duplicate( dataset: xr.Dataset | None = None,
                    concepts: np.ndarray | None = None,
                    n_duplicate: PositiveInt = 1,
                    n_replica: PositiveInt = 1,
+                   **kwargs,
                   ):
 
 
@@ -146,8 +150,4 @@ def add_duplicate( dataset: xr.Dataset | None = None,
     indicator = np.append(indicator,add_indicator)
 
     return concepts, indicator
-
-
-
-
 

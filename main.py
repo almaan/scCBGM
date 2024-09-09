@@ -16,6 +16,8 @@ import torch
 import scanpy as sc
 from conceptlab.utils.seed import set_seed
 from conceptlab.utils import helpers
+from conceptlab.datagen import modify
+from conceptlab.utils import constants as C
 
 
 from omegaconf import DictConfig, OmegaConf
@@ -27,9 +29,17 @@ import os
 import hydra
 from omegaconf import DictConfig
 
+MODS = {'drop' : modify.drop_concepts ,
+        'add' : modify.add_concepts,
+        'noise': modify.add_noise,
+        'duplicate': modify.add_duplicate,
+        }
+
 
 @hydra.main(config_path="./hydra_config/", config_name="config.yaml")
-def main(cfg: DictConfig) -> None:
+def main(cfg: DictConfig,
+         ) -> None:
+
 
     set_seed(cfg.constants.seed)
     original_path = get_original_cwd()
@@ -42,7 +52,11 @@ def main(cfg: DictConfig) -> None:
         original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".h5ad"
     )
 
-    if not os.path.exists(adata_path):
+
+    generate_data = cfg.get("generate_data", False)
+
+    if not os.path.exists(adata_path) or generate_data:
+
         dataset = clab.datagen.omics.OmicsDataGenerator.generate(
             n_obs=cfg.dataset.n_obs,
             n_vars=cfg.dataset.n_vars,
@@ -52,7 +66,19 @@ def main(cfg: DictConfig) -> None:
             n_concepts=cfg.dataset.n_concepts,
         )
 
-        adata = helpers.dataset_to_anndata(dataset, adata_path)
+        mod = cfg.modify.mod
+        if mod is not None:
+            mod_fun = MODS[mod]
+            mod_prms = cfg.modify.params
+            concepts, indicator = mod_fun(dataset = dataset,**mod_prms)
+            adata = helpers.dataset_to_anndata(dataset, concepts, adata_path)
+            adata.uns['concept_indicator'] = indicator
+
+        else:
+
+            adata = helpers.dataset_to_anndata(dataset,concepts, adata_path)
+            adata.uns['concept_indicator'] = np.array([C.Mods.none] * adata.obsm['concepts'].shape[1], dtype = '<U64')
+
     else:
         adata = ad.read_h5ad(adata_path)
 
@@ -69,6 +95,7 @@ def main(cfg: DictConfig) -> None:
         )
 
     n_obs, n_vars = adata.shape
+    
 
     try:
         model_to_call = getattr(clab.models, cfg.model.type, None)

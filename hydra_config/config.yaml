@@ -4,3 +4,4 @@ defaults:
   - constants: default.yaml
   - model: vae.yaml
   - experiment: null
+  - modify: default.yaml
