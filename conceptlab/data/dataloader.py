@@ -72,18 +72,6 @@ class GeneExpressionDataModule(pl.LightningDataModule):
             self.data = data.to_df(layer=layer)
             if self.add_concepts:
                 self.concepts = pd.DataFrame(data.obsm['concepts'])
-
-                # # print(self.concepts.min())
-                # print(self.concepts[100:200])
-                # print(self.concepts.mean())
-                # # print(self.concepts.median())
-                # print(self.concepts.shape)
-                # non_zero_counts = self.concepts.apply(lambda col: np.count_nonzero(col))
-
-                # # Display the counts
-                # print(non_zero_counts)
-
-                # print(stop)
         elif isinstance(data,pd.DataFrame):
             self.data = data.copy()
         else:

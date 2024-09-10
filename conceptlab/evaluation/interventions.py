@@ -146,7 +146,9 @@ class DistributionShift(EvaluationClass):
                         dropped=True,
                     )
                     results[concept_name][f"1->0 : {direction}"] = stat_res[1]
-            results[concept_name]["score"] =  concept_score(results[concept_name])
+
+
+            results[concept_name]["score"] =  1-np.bitwise_xor(concept_score(results[concept_name]), [1,1,0])
            
         return results
 
