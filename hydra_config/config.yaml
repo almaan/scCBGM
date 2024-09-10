@@ -5,3 +5,17 @@ defaults:
   - model: vae.yaml
   - experiment: null
   - modify: default.yaml
+  
+  
+trainer:
+  max_epochs: 100
+
+
+plotting:
+  plot: False
+  plot_path: null
+
+
+
+
+test_intervention: False

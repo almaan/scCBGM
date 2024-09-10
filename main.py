@@ -21,6 +21,7 @@ from conceptlab.utils import constants as C
 
 
 from omegaconf import DictConfig, OmegaConf
+import pickle
 
 
 import os
@@ -52,6 +53,9 @@ def main(cfg: DictConfig,
         original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".h5ad"
     )
 
+    dataset_path = (
+        original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".pkl"
+    )
 
     generate_data = cfg.get("generate_data", False)
 
@@ -76,13 +80,22 @@ def main(cfg: DictConfig,
 
         else:
 
-            adata = helpers.dataset_to_anndata(dataset,concepts, adata_path)
+            adata = helpers.dataset_to_anndata(dataset, adata_path=adata_path)
             adata.uns['concept_indicator'] = np.array([C.Mods.none] * adata.obsm['concepts'].shape[1], dtype = '<U64')
+
+
+            # Saving the data object
+        with open(dataset_path, 'wb') as file:
+            pickle.dump(dataset, file)
+
 
     else:
         adata = ad.read_h5ad(adata_path)
+        # Loading the data object
+        with open(dataset_path, 'rb') as file:
+            dataset = pickle.load(file)
 
-    adata_test, adata = helpers.simple_adata_train_test_split(adata)
+    adata_test, adata,n_test,idx = helpers.simple_adata_train_test_split(adata)
 
     if cfg.model.has_cbm:
         data_module = clab.data.dataloader.GeneExpressionDataModule(
@@ -193,9 +206,138 @@ def main(cfg: DictConfig,
 
         plot_filename = plotting_folder_path + cfg.wandb.experiment + ".png"
         plt.savefig(plot_filename)
+        plt.show()
+        plt.close() 
+
 
         # Log the plot to wandb
         wandb.log({"generation_plot": wandb.Image(plot_filename)})
+
+
+
+    if cfg.model.has_cbm and cfg.test_intervention:
+        orignal_concepts = dataset.concepts.to_dataframe().unstack()['concepts'].copy()
+        test_index = ['obs_'+str(i) for i in idx[0:n_test]]
+        orignal_test_concepts=orignal_concepts.loc[test_index]
+        coefs = dataset.concept_coef.to_dataframe().unstack()['concept_coef'] 
+        genetrated_data =  pd.DataFrame(x_pred,columns=coefs.columns)
+        n_concepts = len(orignal_test_concepts.columns)
+
+
+        intervention_on_score = np.zeros((n_concepts, 3))
+        intervention_off_score = np.zeros((n_concepts, 3))
+
+        for c,concept_name in enumerate(orignal_test_concepts.columns):
+
+            pos_concept_vars = coefs.columns[(coefs.iloc[c,:] > 0).values]
+            neg_concept_vars = coefs.columns[(coefs.iloc[c,:] < 0).values]
+
+
+            
+            mask = np.zeros_like(x_concepts)
+            mask[:,c]=1
+
+            #Turn concept on ..
+            x_concepts_intervene =x_concepts.copy()
+            x_concepts_intervene[:,c]=1
+
+            x_pred_withIntervention = model.intervene(torch.tensor(x_true),torch.tensor(x_concepts_intervene),torch.tensor(mask))['x_pred']
+            x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
+
+        
+            
+            genetrated_data_after_intervention= pd.DataFrame(x_pred_withIntervention,columns=coefs.columns)
+            results = dict(values = [], data= [], coef_direction = [])
+            for data_name,data in zip(['perturbed','original'],[ genetrated_data_after_intervention,genetrated_data]):
+                for direction_name,genes in zip(['up','down'],[pos_concept_vars,neg_concept_vars]):
+                    ndata = data.loc[:,genes].copy()
+                    ndata = ndata.mean(axis=1).values
+                    results['values'] += ndata.tolist()
+                    results['data'] += len(ndata) * [data_name]
+                    results['coef_direction'] += len(ndata) * [direction_name]
+
+            results = pd.DataFrame(results)
+            # for visualization
+            results['data'] = pd.Categorical(results['data'], ['original','perturbed'])
+            if cfg.plotting.plot:
+                ax = sns.violinplot(results, y = 'values', x = 'coef_direction', hue = 'data', split=True, gap=.1, inner="quart")         
+                ax.set_title(concept_name+" On")
+                plot_filename_turnOn = plotting_folder_path + cfg.wandb.experiment +"_"+concept_name+'_turnOn.png'
+                plt.savefig(plot_filename_turnOn)
+                plt.show()
+                plt.close() 
+
+
+
+
+     
+            new_concepts = pd.DataFrame(x_concepts_intervene, index = orignal_test_concepts.index, columns = orignal_test_concepts.columns)
+
+
+            eval_res = clab.evaluation.interventions.DistributionShift.score(genetrated_data, genetrated_data_after_intervention, orignal_test_concepts, new_concepts, coefs)             
+            intervention_on_score[c,:] = eval_res[concept_name]["score"]
+
+
+            #Turn concept off ..
+            x_concepts_intervene =x_concepts.copy()
+            x_concepts_intervene[:,c]=0
+
+            x_pred_withIntervention = model.intervene(torch.tensor(x_true),torch.tensor(x_concepts_intervene),torch.tensor(mask))['x_pred']
+            x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
+
+        
+            
+            genetrated_data_after_intervention= pd.DataFrame(x_pred_withIntervention,columns=coefs.columns)
+            results = dict(values = [], data= [], coef_direction = [])
+            for data_name,data in zip(['perturbed','original'],[ genetrated_data_after_intervention,genetrated_data]):
+                for direction_name,genes in zip(['up','down'],[pos_concept_vars,neg_concept_vars]):
+                    ndata = data.loc[:,genes].copy()
+                    ndata = ndata.mean(axis=1).values
+                    results['values'] += ndata.tolist()
+                    results['data'] += len(ndata) * [data_name]
+                    results['coef_direction'] += len(ndata) * [direction_name]
+
+            results = pd.DataFrame(results)
+            # for visualization
+            results['data'] = pd.Categorical(results['data'], ['original','perturbed'])
+
+
+            if cfg.plotting.plot:
+                ax = sns.violinplot(results, y = 'values', x = 'coef_direction', hue = 'data', split=True, gap=.1, inner="quart")         
+                ax.set_title(concept_name+" Off")
+                plot_filename_turnOff = plotting_folder_path + cfg.wandb.experiment +"_"+concept_name+'_turnOff.png'
+                plt.savefig(plot_filename_turnOff)
+                plt.show()
+                plt.close() 
+
+
+
+     
+            new_concepts = pd.DataFrame(x_concepts_intervene, index = orignal_test_concepts.index, columns = orignal_test_concepts.columns)
+            eval_res = clab.evaluation.interventions.DistributionShift.score(genetrated_data, genetrated_data_after_intervention, orignal_test_concepts, new_concepts, coefs) 
+            intervention_off_score[c,:] = eval_res[concept_name]["score"]
+
+        intervention_score = intervention_on_score + intervention_off_score
+        intervention_score = intervention_score / 2
+        intervention_score = np.mean(intervention_score, axis=0)*100
+        if not os.path.exists('./results/'):
+                os.makedirs('./results/')
+
+        concept_names = np.array(orignal_test_concepts.columns).reshape(-1, 1)
+        array = np.hstack((concept_names, intervention_on_score,intervention_off_score))
+
+        column_names = ['concept name', 'on_pos','on_neg','on_neu','off_pos','off_neg','off_neu']
+        df = pd.DataFrame(array, columns=column_names)
+        df.to_csv('./results/'+cfg.wandb.experiment+'.csv', index=False)
+
+        wandb.log({"intervention pos acc":intervention_score[0]})
+        wandb.log({"intervention neg acc":intervention_score[1]})
+        wandb.log({"intervention neu acc":intervention_score[2]})
+        
+        if cfg.plotting.plot:
+            helpers.create_composite_image(plotting_folder_path + cfg.wandb.experiment, plotting_folder_path + cfg.wandb.experiment+"_intervention_results.png")
+            wandb.log({"intervention_plot": wandb.Image(plotting_folder_path + cfg.wandb.experiment+"_intervention_results.png")})
+
 
     wandb.finish()
 

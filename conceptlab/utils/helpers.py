@@ -5,7 +5,8 @@ from conceptlab.utils.types import NonNegativeFloat
 from typing import Tuple
 import numpy as np
 import pandas as pd
-
+from PIL import Image
+import os
 
 def dataset_to_anndata(
     dataset: xr.Dataset,
@@ -34,6 +35,41 @@ def dataset_to_anndata(
     return adata
 
 
+
+def create_composite_image(image_folder, output_image):
+    """
+    Create a composite image with two rows of images.
+    
+    Parameters:
+    - image_folder (str): The folder containing the images.
+    - output_image (str): The filename for the output composite image.
+    """
+
+    # Define the image filenames
+    turn_off_filenames = [f'_concept_{i}_turnOff.png' for i in range(8)]
+    turn_on_filenames = [f'_concept_{i}_turnOn.png' for i in range(8)]
+
+    # Load the images
+    turn_off_images = [Image.open(image_folder+filename) for filename in turn_off_filenames]
+    turn_on_images = [Image.open(image_folder+filename) for filename in turn_on_filenames]
+
+
+
+    # Assuming all images are of the same size
+    width, height = turn_off_images[0].size
+
+    # Create a new image with double the height and the same width for each row
+    composite_image = Image.new('RGB', (width * 8, height * 2))
+
+    # Paste the images into the composite image
+    for i in range(8):
+        composite_image.paste(turn_on_images[i], (i * width, 0))
+        composite_image.paste(turn_off_images[i], (i * width, height))
+
+    # Save the composite image
+    composite_image.save(output_image)
+
+
 def simple_adata_train_test_split(
     adata: ad.AnnData, p_test: NonNegativeFloat = 0.5
 ) -> Tuple[ad.AnnData, ad.AnnData]:
@@ -48,4 +84,4 @@ def simple_adata_train_test_split(
     n_test = int(0.5 * len(adata))
 
     adata_test, adata_train = adata[idx[0:n_test]].copy(), adata[idx[n_test::]].copy()
-    return adata_test, adata_train
+    return adata_test, adata_train, n_test,idx

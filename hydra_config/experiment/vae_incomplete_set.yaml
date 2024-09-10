@@ -5,7 +5,7 @@ defaults:
 
 wandb:
   project: conceptlab
-  experiment: vae_small_complete_set
+  experiment: vae_small_incomplete_set
 
 
 trainer:
@@ -15,3 +15,5 @@ trainer:
 plotting:
   plot: True
   plot_path: "/plotting/"
+
+

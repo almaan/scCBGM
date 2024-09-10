@@ -48,19 +48,23 @@ class CB_VAE(pl.LightningModule):
         eps = torch.randn_like(std)
         return mu + eps * std
 
-    def cbm (self, z,concepts=None):
+    def cbm (self, z,concepts=None,mask=None,intervene=False):
 
         known_concepts=F.relu(self.fcCB1(z))
         unknown=F.relu(self.fcCB2(z))
 
-        if(concepts==None):
-            h = torch.cat((known_concepts,unknown),1)
+        if intervene:
+            concepts_= known_concepts * (1 - mask) + concepts  * mask
+            h = torch.cat((concepts_,unknown),1)
         else:
-            h = torch.cat((concepts,unknown),1)
-
+            if(concepts==None):
+                h = torch.cat((known_concepts,unknown),1)
+            else:
+                h = torch.cat((concepts,unknown),1)
 
         return known_concepts,unknown, h
         
+
     def decode(self, z):
         h3 = F.relu(self.fc3(z))
         return self.fc4(h3)
@@ -71,6 +75,13 @@ class CB_VAE(pl.LightningModule):
         known_concepts,unknown, z =self.cbm(z,concepts)
         x_pred = self.decode(z)
         return {'x_pred':x_pred, 'z':z, 'mu':mu, 'logvar':logvar , 'pred_concept':known_concepts, 'unknown':unknown}
+
+    def intervene(self,x,concepts,mask):
+        mu, logvar = self.encode(x)
+        z = self.reparameterize(mu, logvar)
+        known_concepts,unknown, z =self.cbm(z,concepts,mask,True)
+        x_pred = self.decode(z)
+        return {'x_pred':x_pred}
 
     def orthogonality_loss(self, concept_emb,unk_emb):
         cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
