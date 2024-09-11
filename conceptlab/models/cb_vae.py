@@ -9,31 +9,29 @@ import torch as t
 
 # Define the VAE model
 class CB_VAE(pl.LightningModule):
-    def __init__(self, input_dim=34455, hidden_dim=1024, latent_dim=512, n_concepts=8, learning_rate=1e-3, beta: float = 1,
-                concepts_hp: float = 0.01,
-                orthogonality_hp: float = 0.1,
-        ):
+    def __init__(self,config):
         super(CB_VAE, self).__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.latent_dim = latent_dim
-        self.n_concepts=n_concepts
-        self.learning_rate = learning_rate
+        self.input_dim = config.input_dim
+        self.hidden_dim = config.hidden_dim
+        self.latent_dim = config.latent_dim
+        self.n_concepts=config.n_concepts
+        self.learning_rate = config.lr
+        self.independent_training =config.independent_training
 
         # Encoder
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc21 = nn.Linear(hidden_dim, latent_dim)  # Mean
-        self.fc22 = nn.Linear(hidden_dim, latent_dim)  # Log variance
+        self.fc1 = nn.Linear(self.input_dim, self.hidden_dim)
+        self.fc21 = nn.Linear(self.hidden_dim, self.latent_dim)  # Mean
+        self.fc22 = nn.Linear(self.hidden_dim, self.latent_dim)  # Log variance
 
-        self.fcCB1 = nn.Linear(latent_dim,  self.n_concepts)
-        self.fcCB2 = nn.Linear(latent_dim,  self.n_concepts)
+        self.fcCB1 = nn.Linear(self.latent_dim,  self.n_concepts)
+        self.fcCB2 = nn.Linear(self.latent_dim,  self.n_concepts)
         
         # Decoder
-        self.fc3 = nn.Linear(2*self.n_concepts, hidden_dim)
-        self.fc4 = nn.Linear(hidden_dim, input_dim)
-        self.beta = beta
-        self.concepts_hp =concepts_hp
-        self.orthogonality_hp =orthogonality_hp
+        self.fc3 = nn.Linear(2*self.n_concepts, self.hidden_dim)
+        self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
+        self.beta = config.beta
+        self.concepts_hp =config.concepts_hp
+        self.orthogonality_hp =config.orthogonality_hp
 
         self.save_hyperparameters()
 
@@ -142,7 +140,7 @@ class CB_VAE(pl.LightningModule):
 
     def _step(self,batch,batch_idx, prefix = 'train'):
         x,concepts = batch
-        if prefix == "train":
+        if prefix == "train" and self.independent_training:
             out = self(x,concepts)
 
         else:

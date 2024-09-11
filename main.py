@@ -112,12 +112,10 @@ def main(cfg: DictConfig,
 
     try:
         model_to_call = getattr(clab.models, cfg.model.type, None)
+        cfg.model.input_dim=cfg.dataset.n_vars
+        cfg.model.n_concepts=cfg.dataset.n_concepts
         model = model_to_call(
-            input_dim=n_vars,
-            hidden_dim=cfg.model.hidden_dim,  # these numbers are quite arbitrary
-            latent_dim=cfg.model.latent_dim,
-            beta=cfg.model.beta,
-            learning_rate=cfg.model.lr,
+            config=cfg.model
         )
     except NotImplementedError as e:
         print(f"Error: {e}")
@@ -171,24 +169,30 @@ def main(cfg: DictConfig,
         )
 
         if cfg.model.has_cbm:
-
+            
             x_concepts = adata_test.obsm["concepts"].astype(np.float32).copy()
+            if cfg.model.independent_training:
+                x_pred_withGT = model(torch.tensor(x_true), torch.tensor(x_concepts))[
+                    "x_pred"
+                ]
+                x_pred_withGT = x_pred_withGT.detach().numpy()
 
-            x_pred_withGT = model(torch.tensor(x_true), torch.tensor(x_concepts))[
-                "x_pred"
-            ]
-            x_pred_withGT = x_pred_withGT.detach().numpy()
+                ad_pred_withGT = ad.AnnData(
+                    x_pred_withGT[sub_idx],
+                    obs=adata_test.obs.iloc[sub_idx],
+                )
 
-            ad_pred_withGT = ad.AnnData(
-                x_pred_withGT[sub_idx],
-                obs=adata_test.obs.iloc[sub_idx],
-            )
-
-            ad_merge = ad.concat(
-                dict(vae_cbm=ad_pred, vae_cbm_withGT=ad_pred_withGT, true=ad_true),
-                axis=0,
-                label="ident",
-            )
+                ad_merge = ad.concat(
+                    dict(vae_cbm=ad_pred, vae_cbm_withGT=ad_pred_withGT, true=ad_true),
+                    axis=0,
+                    label="ident",
+                )
+            else:
+                ad_merge = ad.concat(
+                    dict(vae_cbm=ad_pred,true=ad_true),
+                    axis=0,
+                    label="ident",
+                )  
         else:
             ad_merge = ad.concat(dict(vae=ad_pred, true=ad_true), axis=0, label="ident")
 
@@ -213,8 +217,6 @@ def main(cfg: DictConfig,
         # Log the plot to wandb
         wandb.log({"generation_plot": wandb.Image(plot_filename)})
 
-
-
     if cfg.model.has_cbm and cfg.test_intervention:
         orignal_concepts = dataset.concepts.to_dataframe().unstack()['concepts'].copy()
         test_index = ['obs_'+str(i) for i in idx[0:n_test]]
@@ -229,7 +231,6 @@ def main(cfg: DictConfig,
         strict_intervention_score = 0
 
         for c,concept_name in enumerate(orignal_test_concepts.columns):
-
             pos_concept_vars = coefs.columns[(coefs.iloc[c,:] > 0).values]
             neg_concept_vars = coefs.columns[(coefs.iloc[c,:] < 0).values]
 

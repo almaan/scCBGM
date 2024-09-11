@@ -1,11 +1,11 @@
 # @package _global_
 
 defaults:
-  - override /model: cb_vae.yaml
+  - override /model: cem_vae.yaml
 
 wandb:
-  project: conceptlab
-  experiment: cb_vae_small_incomplete_set
+  project: conceptlab2
+  experiment: cem_vae_independent_incomplete_set
 
 
 trainer:
@@ -16,6 +16,9 @@ plotting:
   plot: True
   plot_path: "/plotting/"
 
+
+model:
+  independent_training: True
 
 
 test_intervention: True
