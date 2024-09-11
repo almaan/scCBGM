@@ -3,5 +3,6 @@ __pycache__/
 plotting/
 rsc/
 outputs/
+results/
 /data
 *.txt
