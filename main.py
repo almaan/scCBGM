@@ -69,11 +69,12 @@ def main(
             n_celltypes=cfg.dataset.n_celltypes,
             n_batches=cfg.dataset.n_batches,
             n_concepts=cfg.dataset.n_concepts,
-            beta_a = 1,
-            beta_b = 0.5,
+            beta_a=1,
+            beta_b=0.5,
         )
 
         mod = cfg.modify.mod
+
         if mod is not None:
             mod_fun = MODS[mod]
             mod_prms = cfg.modify.params
@@ -224,8 +225,8 @@ def main(
         genetrated_data = pd.DataFrame(x_pred, columns=coefs.columns)
         n_concepts = len(orignal_test_concepts.columns)
 
-        intervention_on_score = np.zeros((n_concepts, 3))
-        intervention_off_score = np.zeros((n_concepts, 3))
+        intervention_on_scores = dict()
+        intervention_off_scores = dict()
         strict_intervention_score = 0
 
         for c, concept_name in enumerate(orignal_test_concepts.columns):
@@ -302,11 +303,11 @@ def main(
                 orignal_test_concepts,
                 on_concepts,
                 coefs,
+                use_neutral=False,
             )
 
-            intervention_on_score[c, :] = scores
-            if scores.sum() == 3:
-                strict_intervention_score += 1
+            intervention_on_scores.update(scores)
+
             # Turn concept off ..
             x_concepts_intervene = x_concepts.copy()
             x_concepts_intervene[:, c] = 0
@@ -372,43 +373,50 @@ def main(
                 orignal_test_concepts,
                 off_concepts,
                 coefs,
+                use_neutral=False,
             )
-            intervention_off_score[c, :] = scores
-            if scores.sum() == 3:
-                strict_intervention_score += 1
 
-        intervention_score = intervention_on_score + intervention_off_score
-        intervention_score = intervention_score / 2
-        intervention_score = np.mean(intervention_score, axis=0) * 100
+            intervention_off_scores.update(scores)
 
-        strict_intervention_score = (strict_intervention_score / (2 * n_concepts)) * 100
+        # convert intervention score dict to dataframes
+        intervention_on_scores = pd.DataFrame(intervention_on_scores).T
+        intervention_off_scores = pd.DataFrame(intervention_off_scores).T
+
+        # merge on/off scores
+        intervention_score = pd.concat(
+            (intervention_on_scores, intervention_off_scores), axis=1
+        )
+
+        # compute stratified scores
+        for direction in ["pos", "neg", "neu"]:
+            d_col = [x for x in intervention_score if direction in x]
+            d_score = np.nanmean(intervention_score[d_col].values) * 100
+            wandb.log({f"intervention {direction} acc": d_score})
+
+        # compute number of non-nan elements for each concept
+        non_nan_on = np.sum(~np.isnan(intervention_on_scores.values), axis=1)
+        non_nan_off = np.sum(~np.isnan(intervention_off_scores.values), axis=1)
+
+        # calculate the on/off strict scores
+        strict_on_score = np.mean(
+            np.nansum(intervention_on_scores.values, axis=1) == non_nan_on
+        )
+        strict_off_score = np.mean(
+            np.nansum(intervention_off_scores.values, axis=1) == non_nan_off
+        )
+
+        # calculate global strict score
+        strict_intervention_score = (strict_on_score + strict_off_score) / 2 * 100
+
+        # log strict scores
+        wandb.log({"intervention strict acc": strict_intervention_score})
 
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
 
-        concept_names = np.array(orignal_test_concepts.columns).reshape(-1, 1)
-        array = np.hstack(
-            (concept_names, intervention_on_score, intervention_off_score)
-        )
-
-        column_names = [
-            "concept name",
-            "on_pos",
-            "on_neg",
-            "on_neu",
-            "off_pos",
-            "off_neg",
-            "off_neu",
-        ]
-        df = pd.DataFrame(array, columns=column_names)
-        df.to_csv(
+        intervention_score.to_csv(
             original_path + "/results/" + cfg.wandb.experiment + ".csv", index=False
         )
-
-        wandb.log({"intervention pos acc": intervention_score[0]})
-        wandb.log({"intervention neg acc": intervention_score[1]})
-        wandb.log({"intervention neu acc": intervention_score[2]})
-        wandb.log({"strict intervention acc": strict_intervention_score})
 
         if cfg.plotting.plot:
             helpers.create_composite_image(

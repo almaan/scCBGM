@@ -1,26 +1,55 @@
 from conceptlab.evaluation._base import EvaluationClass
 import pandas as pd
-from typing import Dict, Any
+from typing import Dict, Any, Literal
 import numpy as np
 
 
-def concept_score(data, pvalue=0.05,comparison_list=[1,1,0]):
+def concept_score(
+    pval: float, direction: Literal["pos", "neg", "neu"], alpha: float = 0.05
+):
     """
-    Compare dictionary values to a pvalue and return a list of 1s and 0s.
-    
-    Parameters:
-    - data (dict): Dictionary with numerical values.
-    - pvalue (float): Threshold for comparison.
-    
-    Returns:
-    - list: List of 1s and 0s based on the comparison.
+        Compute a score based on the p-value and the specified direction.
+
+        Parameters:
+        -----------
+        pval : float
+            The p-value to be compared against the significance threshold `alpha`.
+
+        direction : Literal["pos", "neg", "neu"]
+            The direction of the test. Can be:
+                - "pos" or "neg": If the p-value is less than `alpha`, the score is 1.0; otherwise, 0.0.
+                - "neu": If the p-value is greater than `alpha`, the score is 1.0; otherwise, 0.0.
+
+        alpha : float, optional, default=0.05
+            The significance threshold. This is the value against which the p-value is compared.
+
+        Returns:
+        --------
+        float
+            A score of 1.0 or 0.0 depending on the comparison between the p-value and `alpha`.
+            - For "pos" or "neg" directions, 1.0 if `pval < alpha`, else 0.0.
+            - For "neu", 1.0 if `pval > alpha`, else 0.0.
+
+        Raises:
+        -------
+        ValueError
+            If the `direction` is not one of "pos", "neg", or "neu".
     """
-    threshold = [1 if value < pvalue else 0 for value in data.values()]
-    return threshold
+
+    match direction:
+        case "pos" | "neg":
+            score = float(pval < alpha)
+        case "neu":
+            score = float(pval > alpha)
+        case _:
+            raise ValueError("Incorrect Direction")
+    return score
+
+
 
 class DistributionShift(EvaluationClass):
     """
-    A class to evaluate distribution shifts between two datasets by comparing 
+    A class to evaluate distribution shifts between two datasets by comparing
     their statistical properties and concept distributions.
 
     Inherits from:
@@ -73,10 +102,11 @@ class DistributionShift(EvaluationClass):
         concepts_old: pd.DataFrame,
         concepts_new: pd.DataFrame,
         concept_coefs: pd.DataFrame,
+        use_neutral: bool = True,
     ) -> Dict[str, Any]:
         """
-        Evaluates the distribution shift by calculating statistical 
-        significance of changes in concept distributions between 
+        Evaluates the distribution shift by calculating statistical
+        significance of changes in concept distributions between
         the old and new datasets.
 
         Args:
@@ -84,16 +114,18 @@ class DistributionShift(EvaluationClass):
             X_new (pd.DataFrame): The new dataset features.
             concepts_old (pd.DataFrame): Concept values in the original dataset.
             concepts_new (pd.DataFrame): Concept values in the new dataset.
-            concept_coefs (pd.DataFrame): Coefficients indicating the relationship 
+            concept_coefs (pd.DataFrame): Coefficients indicating the relationship
                                           between variables and concepts.
+            use_neutral: (bool): Only use genes for neutral that are not impacted by _any_ concept
 
         Returns:
-            results (Dict[str, Any]): A dictionary containing the statistical 
+            results (Dict[str, Any]): A dictionary containing the statistical
                                       test results for each concept shift.
         """
 
         concept_names = concepts_old.columns
         concept_uni_vars = (concept_coefs != 0).sum(axis=0)
+
         concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
 
         results = dict()
@@ -105,14 +137,13 @@ class DistributionShift(EvaluationClass):
                 concepts_new.loc[:, concept_name] - concepts_old.loc[:, concept_name]
             ).values
 
-
-
             concept_delta_mean = concept_delta.mean()
 
             if concept_delta_mean == 0:
                 continue
 
             results[concept_name] = dict()
+            scores[concept_name] = dict()
 
             var_names_dict = dict()
 
@@ -120,7 +151,10 @@ class DistributionShift(EvaluationClass):
 
             var_names_dict["pos"] = coefs_k.index[coefs_k.values > 0]
             var_names_dict["neg"] = coefs_k.index[coefs_k.values < 0]
-            var_names_dict["neu"] = concept_neutral_vars
+            if use_neutral:
+                var_names_dict["neu"] = concept_neutral_vars
+            else:
+                var_names_dict["neu"] = coefs_k.index[coefs_k.values == 0]
 
             for direction, var_names in var_names_dict.items():
 
@@ -137,6 +171,9 @@ class DistributionShift(EvaluationClass):
                         vals_new[pos_delta], vals_old[pos_delta], direction
                     )
                     results[concept_name][f"0->1 : {direction}"] = stat_res[1]
+                    scores[concept_name][f"0->1 : {direction}"] = concept_score(
+                        stat_res[1], direction
+                    )
 
                 neg_delta = concept_delta < 0
                 if np.any(neg_delta):
@@ -146,16 +183,18 @@ class DistributionShift(EvaluationClass):
                         direction,
                         dropped=True,
                     )
+
                     results[concept_name][f"1->0 : {direction}"] = stat_res[1]
+                    scores[concept_name][f"1->0 : {direction}"] = concept_score(
+                        stat_res[1], direction
+                    )
 
-            scores[concept_name] =  1-np.bitwise_xor(concept_score(results[concept_name]), [1,1,0])
-
-        return results,scores
+        return results, scores
 
     @classmethod
     def pretty_display(cls, results):
         """
-        Displays the results of the distribution shift evaluation in a 
+        Displays the results of the distribution shift evaluation in a
         well-formatted table.
 
         Args:
