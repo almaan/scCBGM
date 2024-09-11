@@ -97,6 +97,7 @@ class DistributionShift(EvaluationClass):
         concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
 
         results = dict()
+        scores = dict()
 
         for concept_name in concept_names:
 
@@ -147,10 +148,9 @@ class DistributionShift(EvaluationClass):
                     )
                     results[concept_name][f"1->0 : {direction}"] = stat_res[1]
 
+            scores[concept_name] =  1-np.bitwise_xor(concept_score(results[concept_name]), [1,1,0])
 
-            results[concept_name]["score"] =  1-np.bitwise_xor(concept_score(results[concept_name]), [1,1,0])
-           
-        return results
+        return results,scores
 
     @classmethod
     def pretty_display(cls, results):
