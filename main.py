@@ -69,6 +69,8 @@ def main(
             n_celltypes=cfg.dataset.n_celltypes,
             n_batches=cfg.dataset.n_batches,
             n_concepts=cfg.dataset.n_concepts,
+            beta_a = 1,
+            beta_b = 0.5,
         )
 
         mod = cfg.modify.mod
@@ -380,6 +382,7 @@ def main(
         intervention_score = np.mean(intervention_score, axis=0) * 100
 
         strict_intervention_score = (strict_intervention_score / (2 * n_concepts)) * 100
+
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
 
