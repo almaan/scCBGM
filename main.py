@@ -154,7 +154,8 @@ def main(
         x_true = x_true / x_true.sum(axis=1, keepdims=True) * 1e4
         x_true = np.log1p(x_true)
 
-        sub_idx = np.random.choice(x_true.shape[0], replace=False, size=2000)
+        # sub_idx = np.random.choice(x_true.shape[0], replace=False, size=2000)
+        sub_idx = np.arange(x_true.shape[0])
 
         ad_true = ad.AnnData(
             x_true[sub_idx],
@@ -225,13 +226,16 @@ def main(
         genetrated_data = pd.DataFrame(x_pred, columns=coefs.columns)
         n_concepts = len(orignal_test_concepts.columns)
 
-        intervention_on_scores = dict()
-        intervention_off_scores = dict()
+        intervention_scores = dict(on = dict(), off = dict())
         strict_intervention_score = 0
 
         for c, concept_name in enumerate(orignal_test_concepts.columns):
-            pos_concept_vars = coefs.columns[(coefs.iloc[c, :] > 0).values]
-            neg_concept_vars = coefs.columns[(coefs.iloc[c, :] < 0).values]
+            concept_vars = dict()
+            concept_vars['pos'] = coefs.columns[(coefs.iloc[c, :] > 0).values]
+            concept_vars['neg'] = coefs.columns[(coefs.iloc[c, :] < 0).values]
+            concept_vars['neu'] = coefs.columns[(coefs.iloc[c, :] == 0).values]
+            concept_vars['all'] = coefs.columns
+
 
             mask = np.zeros_like(x_concepts)
             mask[:, c] = 1
@@ -256,9 +260,7 @@ def main(
                 ["perturbed", "original"],
                 [genetrated_data_after_intervention, genetrated_data],
             ):
-                for direction_name, genes in zip(
-                    ["up", "down"], [pos_concept_vars, neg_concept_vars]
-                ):
+                for direction_name, genes in concept_vars.items():
                     ndata = data.loc[:, genes].copy()
                     ndata = ndata.mean(axis=1).values
                     results["values"] += ndata.tolist()
@@ -297,7 +299,7 @@ def main(
                 columns=orignal_test_concepts.columns,
             )
 
-            eval_res, scores = clab.evaluation.interventions.DistributionShift.score(
+            scores, curves = clab.evaluation.interventions.DistributionShift.score(
                 genetrated_data,
                 genetrated_data_after_intervention,
                 orignal_test_concepts,
@@ -306,7 +308,7 @@ def main(
                 use_neutral=False,
             )
 
-            intervention_on_scores.update(scores)
+            intervention_scores['on'].update(scores)
 
             # Turn concept off ..
             x_concepts_intervene = x_concepts.copy()
@@ -323,13 +325,12 @@ def main(
                 x_pred_withIntervention, columns=coefs.columns
             )
             results = dict(values=[], data=[], coef_direction=[])
+
             for data_name, data in zip(
                 ["perturbed", "original"],
                 [genetrated_data_after_intervention, genetrated_data],
             ):
-                for direction_name, genes in zip(
-                    ["up", "down"], [pos_concept_vars, neg_concept_vars]
-                ):
+                for direction_name, genes in concept_vars.items():
                     ndata = data.loc[:, genes].copy()
                     ndata = ndata.mean(axis=1).values
                     results["values"] += ndata.tolist()
@@ -367,7 +368,7 @@ def main(
                 index=orignal_test_concepts.index,
                 columns=orignal_test_concepts.columns,
             )
-            eval_res, scores = clab.evaluation.interventions.DistributionShift.score(
+            scores, curves = clab.evaluation.interventions.DistributionShift.score(
                 genetrated_data,
                 genetrated_data_after_intervention,
                 orignal_test_concepts,
@@ -376,47 +377,31 @@ def main(
                 use_neutral=False,
             )
 
-            intervention_off_scores.update(scores)
-
-        # convert intervention score dict to dataframes
-        intervention_on_scores = pd.DataFrame(intervention_on_scores).T
-        intervention_off_scores = pd.DataFrame(intervention_off_scores).T
-
-        # merge on/off scores
-        intervention_score = pd.concat(
-            (intervention_on_scores, intervention_off_scores), axis=1
-        )
-
-        # compute stratified scores
-        for direction in ["pos", "neg", "neu"]:
-            d_col = [x for x in intervention_score if direction in x]
-            d_score = np.nanmean(intervention_score[d_col].values) * 100
-            wandb.log({f"intervention {direction} acc": d_score})
-
-        # compute number of non-nan elements for each concept
-        non_nan_on = np.sum(~np.isnan(intervention_on_scores.values), axis=1)
-        non_nan_off = np.sum(~np.isnan(intervention_off_scores.values), axis=1)
-
-        # calculate the on/off strict scores
-        strict_on_score = np.mean(
-            np.nansum(intervention_on_scores.values, axis=1) == non_nan_on
-        )
-        strict_off_score = np.mean(
-            np.nansum(intervention_off_scores.values, axis=1) == non_nan_off
-        )
-
-        # calculate global strict score
-        strict_intervention_score = (strict_on_score + strict_off_score) / 2 * 100
-
-        # log strict scores
-        wandb.log({"intervention strict acc": strict_intervention_score})
+            intervention_scores['off'].update(scores)
 
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
 
-        intervention_score.to_csv(
+
+        flat_list = helpers.flatten_to_list_of_lists(intervention_scores)
+        df_long = pd.DataFrame(flat_list)
+        columns = ['intervention','concept','scoring','value']
+        df_long.columns = columns
+
+        df_long.to_csv(
             original_path + "/results/" + cfg.wandb.experiment + ".csv", index=False
         )
+
+        # Convert the DataFrame into a W&B table
+        table = wandb.Table(dataframe=df_long)
+
+        # Log the table to W&B
+        wandb.log({"results table": table})
+
+        av_scores = df_long[['scoring','value']].groupby('scoring').agg('mean')
+        wandb.log({f'AUPRC': av_scores.loc['auprc_joint'].value })
+        wandb.log({f'AUROC': av_scores.loc['auroc_joint'].value })
+
 
         if cfg.plotting.plot:
             helpers.create_composite_image(

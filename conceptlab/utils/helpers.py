@@ -36,6 +36,30 @@ def dataset_to_anndata(
 
 
 
+def flatten_to_list_of_lists(d, parent_keys=[]):
+    """
+    Recursively flatten a nested dictionary into a list of lists, 
+    where each list contains all keys followed by the final value.
+
+    Args:
+    - d: The nested dictionary to flatten.
+    - parent_keys: List of parent keys leading to the current level (used during recursion).
+
+    Returns:
+    - A list of lists, where each sublist contains the keys and the corresponding value.
+    """
+    result = []
+    for key, value in d.items():
+        current_keys = parent_keys + [key]
+        if isinstance(value, dict):
+            # Recurse if the value is another dictionary
+            result.extend(flatten_to_list_of_lists(value, current_keys))
+        else:
+            # Append the final value along with all the keys in a list
+            result.append(current_keys + [value])
+
+    return result
+
 def create_composite_image(image_folder, output_image):
     """
     Create a composite image with two rows of images.
