@@ -70,6 +70,8 @@ class GeneExpressionDataModule(pl.LightningDataModule):
                 self.concepts = data.concepts.to_dataframe().unstack()
         elif isinstance(data, ad.AnnData):
             self.data = data.to_df(layer=layer)
+            if self.add_concepts:
+                self.concepts = pd.DataFrame(data.obsm['concepts'])
         elif isinstance(data,pd.DataFrame):
             self.data = data.copy()
         else:

@@ -12,3 +12,5 @@ xarray
 anndata
 scanpy
 umap-learn
+hydra-core
+pyyaml
