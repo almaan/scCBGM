@@ -1,12 +1,88 @@
 from conceptlab.evaluation._base import EvaluationClass
 import pandas as pd
-from typing import Dict, Any
+from typing import Dict, Any, Literal
 import numpy as np
+from sklearn.metrics import precision_recall_curve, auc, accuracy_score, roc_curve, roc_auc_score, cohen_kappa_score
+
+
+
+def cohens_d(x, y):
+    """
+    Calculate Cohen's d for each column between two NxD arrays.
+    Args:
+    x: A numpy array of shape (N, D) representing the first group.
+    y: A numpy array of shape (N, D) representing the second group.
+
+    Returns:
+    A numpy array of Cohen's d values for each column.
+    """
+    # Means of each column for both groups
+    mean_x = np.mean(x, axis=0)
+    mean_y = np.mean(y, axis=0)
+
+    # Pooled standard deviation
+    pooled_std = np.sqrt(((np.std(x, axis=0, ddof=1) ** 2) + (np.std(y, axis=0, ddof=1) ** 2)) / 2)
+
+    # Cohen's d calculation for each column
+    d_values = (mean_x - mean_y) / pooled_std
+
+    return d_values
+
+
+def _concept_score(
+    pval: float, direction: Literal["pos", "neg", "neu"], alpha: float = 0.05
+):
+    """
+        Compute a score based on the p-value and the specified direction.
+
+        Parameters:
+        -----------
+        pval : float
+            The p-value to be compared against the significance threshold `alpha`.
+
+        direction : Literal["pos", "neg", "neu"]
+            The direction of the test. Can be:
+                - "pos" or "neg": If the p-value is less than `alpha`, the score is 1.0; otherwise, 0.0.
+                - "neu": If the p-value is greater than `alpha`, the score is 1.0; otherwise, 0.0.
+
+        alpha : float, optional, default=0.05
+            The significance threshold. This is the value against which the p-value is compared.
+
+        Returns:
+        --------
+        float
+            A score of 1.0 or 0.0 depending on the comparison between the p-value and `alpha`.
+            - For "pos" or "neg" directions, 1.0 if `pval < alpha`, else 0.0.
+            - For "neu", 1.0 if `pval > alpha`, else 0.0.
+
+        Raises:
+        -------
+        ValueError
+            If the `direction` is not one of "pos", "neg", or "neu".
+    """
+
+    match direction:
+        case "pos" | "neg":
+            score = float(pval < alpha)
+        case "neu":
+            score = float(pval > alpha)
+        case _:
+            raise ValueError("Incorrect Direction")
+
+    return score
+
+def concept_score(pvals: np.ndarray, direction: Literal["pos", "neg", "neu"], alpha: float = 0.05):
+
+    fun = np.vectorize(lambda x: _concept_score(x, direction, alpha))
+
+    return fun(pvals)
+
+
 
 
 class DistributionShift(EvaluationClass):
     """
-    A class to evaluate distribution shifts between two datasets by comparing 
+    A class to evaluate distribution shifts between two datasets by comparing
     their statistical properties and concept distributions.
 
     Inherits from:
@@ -46,10 +122,13 @@ class DistributionShift(EvaluationClass):
             neu="two-sided",
         )
 
-        if dropped:
-            return wilcoxon(Y, X, alternative=direction_alternatives[direction])
+        # set axis to compute statistic along
+        axis = 0
 
-        return wilcoxon(X, Y, alternative=direction_alternatives[direction])
+        if dropped:
+            return wilcoxon(Y, X, alternative=direction_alternatives[direction],axis=axis)
+
+        return wilcoxon(X, Y, alternative=direction_alternatives[direction],axis=axis)
 
     @classmethod
     def score(
@@ -63,6 +142,7 @@ class DistributionShift(EvaluationClass):
         """
         Evaluates the distribution shift by calculating statistical 
         significance of changes in concept distributions between 
+
         the old and new datasets.
 
         Args:
@@ -75,6 +155,12 @@ class DistributionShift(EvaluationClass):
 
         Returns:
             results (Dict[str, Any]): A dictionary containing the statistical 
+            concept_coefs (pd.DataFrame): Coefficients indicating the relationship
+                                          between variables and concepts.
+            use_neutral: (bool): Only use genes for neutral that are not impacted by _any_ concept
+
+        Returns:
+            results (Dict[str, Any]): A dictionary containing the statistical
                                       test results for each concept shift.
         """
 
@@ -85,6 +171,20 @@ class DistributionShift(EvaluationClass):
         results = dict()
 
         for concept_name in concept_names:
+
+        concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
+        direction_to_true = dict(neu = 0,
+                                 pos = 1,
+                                 neg = 1,
+                                 )
+
+        results = dict()
+        curves = dict()
+
+        for concept_name in concept_names:
+
+            results[concept_name] = dict()
+            curves[concept_name] = dict()
 
             concept_delta = (
                 concepts_new.loc[:, concept_name] - concepts_old.loc[:, concept_name]
@@ -103,40 +203,77 @@ class DistributionShift(EvaluationClass):
 
             var_names_dict["pos"] = coefs_k.index[coefs_k.values > 0]
             var_names_dict["neg"] = coefs_k.index[coefs_k.values < 0]
-            var_names_dict["neu"] = concept_neutral_vars
+
+            if use_neutral:
+                var_names_dict["neu"] = concept_neutral_vars
+            else:
+                var_names_dict["neu"] = coefs_k.index[coefs_k.values == 0]
+
+
+            pred_vals  = dict()
+            true_vals = dict()
 
             for direction, var_names in var_names_dict.items():
 
-                if len(var_names) < 1:
-                    continue
-
-                vals_new = X_new.loc[:, var_names].mean(axis=1).values
-                vals_old = X_old.loc[:, var_names].mean(axis=1).values
+                vals_new = X_new.loc[:, var_names].values
+                vals_old = X_old.loc[:, var_names].values
 
                 pos_delta = concept_delta > 0
-
-                if np.any(pos_delta):
-                    stat_res = cls.stat_test(
-                        vals_new[pos_delta], vals_old[pos_delta], direction
-                    )
-                    results[concept_name][f"0->1 : {direction}"] = stat_res[1]
-
                 neg_delta = concept_delta < 0
-                if np.any(neg_delta):
-                    stat_res = cls.stat_test(
-                        vals_new[neg_delta],
-                        vals_old[neg_delta],
-                        direction,
-                        dropped=True,
-                    )
-                    results[concept_name][f"1->0 : {direction}"] = stat_res[1]
 
-        return results
+                for delta, dropped, ivn in zip([pos_delta,neg_delta],[False,True],['0->1','1->0']):
+
+                    if np.any(delta):
+                        test_res = cls.diff_test(
+                            vals_new[delta], vals_old[delta], direction, dropped = dropped,
+                        )
+
+
+                        pred_vals[direction] += test_res.tolist()
+                        base = [direction_to_true[direction]] * len(test_res)
+                        true_vals[direction] += base
+
+
+                        diff_av = cohens_d(vals_new[delta], vals_old[delta]).mean()
+
+                        results[concept_name][f"{ivn} : {direction} cohen's d"] =  diff_av
+
+            true_vals_all = np.concatenate([v for v in true_vals.values()])
+            pred_vals_all = np.concatenate([v for v in pred_vals.values()])
+
+            # precision recall calculations
+            precision, recall, thresholds = precision_recall_curve(true_vals_all, pred_vals_all)
+            results[concept_name]['auprc_joint'] =  auc(recall,precision)
+            curves[concept_name]['auprc_joint'] = dict(y = precision, x = recall)
+
+            # roc calculations
+            fpr, tpr,_ = roc_curve(true_vals_all, pred_vals_all)
+            results[concept_name]['auroc_joint'] =  roc_auc_score(true_vals_all, pred_vals_all)
+            curves[concept_name]['auroc_joint'] = dict(y = tpr, x = fpr)
+
+
+        results = {key:val for key,val in results.items() if len(val) > 0}
+        curves = {key:val for key,val in curves.items() if len(val) > 0}
+
+
+        return results,curves
+
+    @classmethod
+    def diff_test(cls, X, Y, direction, dropped=False):
+
+        delta = np.mean(X - Y,axis =0)
+
+        if dropped:
+            delta = - delta
+        if direction == 'neg':
+            delta = -delta
+
+        return delta
 
     @classmethod
     def pretty_display(cls, results):
         """
-        Displays the results of the distribution shift evaluation in a 
+        Displays the results of the distribution shift evaluation in a
         well-formatted table.
 
         Args:
