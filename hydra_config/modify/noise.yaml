@@ -1,0 +1,5 @@
+mod: "noise"
+
+params:
+    n_modified: 1
+    p_noise: 0.5

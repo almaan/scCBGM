@@ -1,5 +1,8 @@
 notebooks_local/
 __pycache__/
 plotting/
-data/
 rsc/
+outputs/
+results/
+/data
+*.txt
