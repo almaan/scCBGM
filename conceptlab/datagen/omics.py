@@ -14,7 +14,6 @@ def idx_to_mask(idx_vec, size):
     vec[idx_vec] = 1
     return vec
 
-
 def categorical(p):
     return np.argmax(np.random.multinomial(1, p))
 
@@ -232,8 +231,8 @@ class OmicsDataGenerator(DataGenerator):
         std_libsize_lower: NonNegativeFloat = 0.01,
         std_libsize_upper: NonNegativeFloat = 0.03,
         std_noise: NonNegativeFloat = 0.01,
-        beta_a: PositiveFloat = 0.5,
-        beta_b: PositiveFloat = 10,
+        beta_a: PositiveFloat = 1,
+        beta_b: PositiveFloat = 0.5,
         seed: int = 42,
         zero_inflate: bool = True,
     ) -> xr.Dataset:
@@ -256,8 +255,8 @@ class OmicsDataGenerator(DataGenerator):
             std_libsize_lower (float, optional): Lower bound for standard deviation of library size. Defaults to 0.01.
             std_libsize_upper (float, optional): Upper bound for standard deviation of library size. Defaults to 0.03.
             std_noise (float, optional): Standard deviation for noise. Defaults to 0.01.
-            beta_a (float, optional): Alpha parameter for beta distribution in zero inflation. Defaults to 0.5.
-            beta_b (float, optional): Beta parameter for beta distribution in zero inflation. Defaults to 10.
+            beta_a (float, optional): Alpha parameter for beta distribution in zero inflation. Defaults to 1.
+            beta_b (float, optional): Beta parameter for beta distribution in zero inflation. Defaults to 0.5.
             seed (int, optional): Seed for random number generator. Defaults to 42.
             zero_inflate (bool, optional): Whether to add zero inflation to the data. Defaults to True.
 
@@ -303,7 +302,7 @@ class OmicsDataGenerator(DataGenerator):
 
         if zero_inflate:
             # zero inflation probability
-            pi = rng.beta(beta_a, beta_b, size=C)
+            pi = 1-rng.beta(beta_a, beta_b, size=C)
 
             # add zero inflation
             mask = np.vstack([rng.binomial(1, pi[i], size=F) for i in range(C)])

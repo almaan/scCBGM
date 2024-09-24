@@ -9,21 +9,21 @@ import torch as t
 
 # Define the VAE model
 class VAE(pl.LightningModule):
-    def __init__(self, input_dim=34455, hidden_dim=1024, latent_dim=512, learning_rate=1e-3, beta: float = 1):
+    def __init__(self, config):
         super(VAE, self).__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.latent_dim = latent_dim
-        self.learning_rate = learning_rate
+        self.input_dim = self.input_dim
+        self.hidden_dim = self.hidden_dim
+        self.latent_dim = self.latent_dim
+        self.learning_rate = self.learning_rate
 
         # Encoder
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc21 = nn.Linear(hidden_dim, latent_dim)  # Mean
-        self.fc22 = nn.Linear(hidden_dim, latent_dim)  # Log variance
+        self.fc1 = nn.Linear(self.input_dim, self.hidden_dim)
+        self.fc21 = nn.Linear(self.hidden_dim, self.latent_dim)  # Mean
+        self.fc22 = nn.Linear(self.hidden_dim, self.latent_dim)  # Log variance
 
         # Decoder
-        self.fc3 = nn.Linear(latent_dim, hidden_dim)
-        self.fc4 = nn.Linear(hidden_dim, input_dim)
+        self.fc3 = nn.Linear(self.latent_dim, self.hidden_dim)
+        self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
         self.beta = beta
 
         self.save_hyperparameters()
@@ -60,7 +60,6 @@ class VAE(pl.LightningModule):
         return loss_dict
 
 
-
     def _step(self,batch,batch_idx, prefix = 'train'):
         x = batch
         out = self(x)
@@ -78,3 +77,4 @@ class VAE(pl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+
