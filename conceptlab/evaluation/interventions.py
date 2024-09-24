@@ -1,6 +1,6 @@
 from conceptlab.evaluation._base import EvaluationClass
 import pandas as pd
-from typing import Dict, Any, Literal
+from typing import Dict, Any, Literal, Tuple
 import numpy as np
 from sklearn.metrics import precision_recall_curve, auc, accuracy_score, roc_curve, roc_auc_score, cohen_kappa_score
 
@@ -138,7 +138,8 @@ class DistributionShift(EvaluationClass):
         concepts_old: pd.DataFrame,
         concepts_new: pd.DataFrame,
         concept_coefs: pd.DataFrame,
-    ) -> Dict[str, Any]:
+            use_neutral: bool = False,
+    ) -> Tuple[Dict[str, Any],Dict[str,Any]]:
         """
         Evaluates the distribution shift by calculating statistical 
         significance of changes in concept distributions between 
@@ -153,26 +154,17 @@ class DistributionShift(EvaluationClass):
             concept_coefs (pd.DataFrame): Coefficients indicating the relationship 
                                           between variables and concepts.
 
-        Returns:
-            results (Dict[str, Any]): A dictionary containing the statistical 
-            concept_coefs (pd.DataFrame): Coefficients indicating the relationship
-                                          between variables and concepts.
-            use_neutral: (bool): Only use genes for neutral that are not impacted by _any_ concept
+            use_neutral: (bool):  Use shared neutral genes (across all concepts)
 
         Returns:
-            results (Dict[str, Any]): A dictionary containing the statistical
-                                      test results for each concept shift.
+            results (Dict[str, Any]): A dictionary containing the scores.
+            curves (Dict[str, Any]): A dictionary with the auroc and auprc curves
         """
 
         concept_names = concepts_old.columns
         concept_uni_vars = (concept_coefs != 0).sum(axis=0)
         concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
 
-        results = dict()
-
-        for concept_name in concept_names:
-
-        concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
         direction_to_true = dict(neu = 0,
                                  pos = 1,
                                  neg = 1,
@@ -214,6 +206,8 @@ class DistributionShift(EvaluationClass):
             true_vals = dict()
 
             for direction, var_names in var_names_dict.items():
+                pred_vals[direction] = []
+                true_vals[direction] = []
 
                 vals_new = X_new.loc[:, var_names].values
                 vals_old = X_old.loc[:, var_names].values
