@@ -18,7 +18,7 @@ from conceptlab.utils.seed import set_seed
 from conceptlab.utils import helpers
 from conceptlab.datagen import modify
 from conceptlab.utils import constants as C
-
+import conceptlab.evaluation.integration as ig
 
 from omegaconf import DictConfig, OmegaConf
 import pickle
@@ -198,6 +198,24 @@ def main(
         else:
             ad_merge = ad.concat(dict(vae=ad_pred, true=ad_true), axis=0, label="ident")
 
+        # this scales very poorly
+
+        if 'test_integration' in cfg:
+            ig_test_funs = dict(lisi = ig.lisi,
+                                modularity = ig.modularity,
+                                )
+
+            if isinstance(cfg.test_integration, str):
+                ig_tests = [cfg.test_integration]
+            else:
+                ig_tests = cfg.test_integration
+
+            for ig_test in ig_tests:
+                if ig_test in ig_test_funs:
+                    ig_scores = ig_test_funs[ig_test](ad_merge, label="ident")
+                    for key, val in ig_scores.items():
+                        wandb.log({f"{ig_test}_{key}": val})
+
         ad_merge.obs_names_make_unique()
 
         sc.pp.pca(ad_merge)
@@ -226,16 +244,15 @@ def main(
         genetrated_data = pd.DataFrame(x_pred, columns=coefs.columns)
         n_concepts = len(orignal_test_concepts.columns)
 
-        intervention_scores = dict(on = dict(), off = dict())
+        intervention_scores = dict(on=dict(), off=dict())
         strict_intervention_score = 0
 
         for c, concept_name in enumerate(orignal_test_concepts.columns):
             concept_vars = dict()
-            concept_vars['pos'] = coefs.columns[(coefs.iloc[c, :] > 0).values]
-            concept_vars['neg'] = coefs.columns[(coefs.iloc[c, :] < 0).values]
-            concept_vars['neu'] = coefs.columns[(coefs.iloc[c, :] == 0).values]
-            concept_vars['all'] = coefs.columns
-
+            concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
+            concept_vars["neg"] = coefs.columns[(coefs.iloc[c, :] < 0).values]
+            concept_vars["neu"] = coefs.columns[(coefs.iloc[c, :] == 0).values]
+            concept_vars["all"] = coefs.columns
 
             mask = np.zeros_like(x_concepts)
             mask[:, c] = 1
@@ -308,7 +325,7 @@ def main(
                 use_neutral=False,
             )
 
-            intervention_scores['on'].update(scores)
+            intervention_scores["on"].update(scores)
 
             # Turn concept off ..
             x_concepts_intervene = x_concepts.copy()
@@ -377,15 +394,14 @@ def main(
                 use_neutral=False,
             )
 
-            intervention_scores['off'].update(scores)
+            intervention_scores["off"].update(scores)
 
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
 
-
         flat_list = helpers.flatten_to_list_of_lists(intervention_scores)
         df_long = pd.DataFrame(flat_list)
-        columns = ['intervention','concept','scoring','value']
+        columns = ["intervention", "concept", "scoring", "value"]
         df_long.columns = columns
 
         df_long.to_csv(
@@ -398,10 +414,9 @@ def main(
         # Log the table to W&B
         wandb.log({"results table": table})
 
-        av_scores = df_long[['scoring','value']].groupby('scoring').agg('mean')
-        wandb.log({f'AUPRC': av_scores.loc['auprc_joint'].value })
-        wandb.log({f'AUROC': av_scores.loc['auroc_joint'].value })
-
+        av_scores = df_long[["scoring", "value"]].groupby("scoring").agg("mean")
+        wandb.log({f"AUPRC": av_scores.loc["auprc_joint"].value})
+        wandb.log({f"AUROC": av_scores.loc["auroc_joint"].value})
 
         if cfg.plotting.plot:
             helpers.create_composite_image(

@@ -15,7 +15,5 @@ plotting:
   plot: False
   plot_path: null
 
-
-
-
 test_intervention: False
+test_integration: ['modularity']
