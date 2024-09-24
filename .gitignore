@@ -3,3 +3,5 @@ __pycache__/
 plotting/
 data/
 rsc/
+.DS_Store
+conceptlab/.DS_Store
