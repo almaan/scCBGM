@@ -1,0 +1,21 @@
+# @package _global_
+
+defaults:
+  - override /modify: add.yaml
+  - override /model: cb_vae.yaml
+
+wandb:
+  project: conceptlab2
+  experiment: cb_vae_joint_incomplete_set_mod_add
+
+
+trainer:
+  max_epochs: 200
+
+
+plotting:
+  plot: True
+  plot_path: "/plotting/"
+
+test_intervention: True
+test_integration: ['modularity','lisi']
