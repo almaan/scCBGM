@@ -3,13 +3,11 @@ defaults:
   - dataset: default.yaml
   - constants: default.yaml
   - model: vae.yaml
-  - experiment: null
   - modify: default.yaml
-  
-  
+  - experiment: null
+
 trainer:
   max_epochs: 100
-
 
 plotting:
   plot: False
@@ -17,3 +15,4 @@ plotting:
 
 test_intervention: False
 test_integration: ['modularity']
+

@@ -7,14 +7,19 @@ from typing import List, Literal
 DTYPE_STR = '<U64'
 
 
-def _get_concepts(dataset: xr.Dataset | None, concepts: np.ndarray | None = None) -> np.ndarray:
+def _get_concepts(dataset: xr.Dataset | None, concepts: np.ndarray | None = None, return_coefs = False) -> np.ndarray:
     if dataset is not None:
         concepts = dataset[C.DataVars.concept.value].to_numpy().copy()
     elif concepts is None:
         raise ValueError('Ond of datast and concepts has to not be None')
     n_concepts = concepts.shape[1]
 
+    coefs = dataset['concept_coef'].to_numpy().copy()
+    if return_coefs:
+        return concepts, n_concepts, coefs
+
     return concepts, n_concepts
+
 
 
 def _get_num(n_og: PositiveInt, n_sel: PositiveFloat):
@@ -28,7 +33,7 @@ def _get_indicator(n_concepts: PositiveInt) -> np.ndarray:
 def drop_concepts(
     dataset: xr.Dataset | None = None,
         concepts: np.ndarray | None = None,
-    n_drop: PositiveInt | PositiveFloat = 1,
+        n_drop: PositiveInt | PositiveFloat = 1,
         **kwargs,
 ) -> np.ndarray:
 

@@ -83,7 +83,6 @@ def main(
             adata.uns["concept_indicator"] = indicator
 
         else:
-
             adata = helpers.dataset_to_anndata(dataset, adata_path=adata_path)
             adata.uns["concept_indicator"] = np.array(
                 [C.Mods.none] * adata.obsm["concepts"].shape[1], dtype="<U64"
@@ -112,11 +111,12 @@ def main(
         )
 
     n_obs, n_vars = adata.shape
+    n_concepts = adata.obsm['concepts'].shape[1]
 
     try:
         model_to_call = getattr(clab.models, cfg.model.type, None)
-        cfg.model.input_dim = cfg.dataset.n_vars
-        cfg.model.n_concepts = cfg.dataset.n_concepts
+        cfg.model.input_dim = n_vars
+        cfg.model.n_concepts = n_concepts
         model = model_to_call(config=cfg.model)
     except NotImplementedError as e:
         print(f"Error: {e}")
@@ -237,17 +237,26 @@ def main(
         wandb.log({"generation_plot": wandb.Image(plot_filename)})
 
     if cfg.model.has_cbm and cfg.test_intervention:
-        orignal_concepts = dataset.concepts.to_dataframe().unstack()["concepts"].copy()
+        # original_concepts = dataset.concepts.to_dataframe().unstack()["concepts"].copy()
+
+        indicator = adata_test.uns['concept_indicator']
+        ix_og_concepts = indicator == C.Mods.none
+        original_concepts = adata_test.obsm['concepts'][:,ix_og_concepts].copy()
+        original_concepts = pd.DataFrame(original_concepts,
+                                         index = adata_test.obs_names,
+                                         columns = [f'concept_{k}' for k in range(original_concepts.shape[1])],
+                                         )
+
         test_index = ["obs_" + str(i) for i in idx[0:n_test]]
-        orignal_test_concepts = orignal_concepts.loc[test_index]
+        original_test_concepts = original_concepts.loc[test_index]
         coefs = dataset.concept_coef.to_dataframe().unstack()["concept_coef"]
         genetrated_data = pd.DataFrame(x_pred, columns=coefs.columns)
-        n_concepts = len(orignal_test_concepts.columns)
+        n_concepts = len(original_test_concepts.columns)
 
         intervention_scores = dict(on=dict(), off=dict())
         strict_intervention_score = 0
 
-        for c, concept_name in enumerate(orignal_test_concepts.columns):
+        for c, concept_name in enumerate(original_test_concepts.columns):
             concept_vars = dict()
             concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
             concept_vars["neg"] = coefs.columns[(coefs.iloc[c, :] < 0).values]
@@ -311,15 +320,15 @@ def main(
                 plt.close()
 
             on_concepts = pd.DataFrame(
-                x_concepts_intervene,
-                index=orignal_test_concepts.index,
-                columns=orignal_test_concepts.columns,
+                x_concepts_intervene[:,ix_og_concepts],
+                index=original_test_concepts.index,
+                columns=original_test_concepts.columns,
             )
 
             scores, curves = clab.evaluation.interventions.DistributionShift.score(
                 genetrated_data,
                 genetrated_data_after_intervention,
-                orignal_test_concepts,
+                original_test_concepts,
                 on_concepts,
                 coefs,
                 use_neutral=False,
@@ -381,14 +390,14 @@ def main(
                 plt.close()
 
             off_concepts = pd.DataFrame(
-                x_concepts_intervene,
-                index=orignal_test_concepts.index,
-                columns=orignal_test_concepts.columns,
+                x_concepts_intervene[:,ix_og_concepts],
+                index=original_test_concepts.index,
+                columns=original_test_concepts.columns,
             )
             scores, curves = clab.evaluation.interventions.DistributionShift.score(
                 genetrated_data,
                 genetrated_data_after_intervention,
-                orignal_test_concepts,
+                original_test_concepts,
                 off_concepts,
                 coefs,
                 use_neutral=False,
