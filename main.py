@@ -1,6 +1,6 @@
 import conceptlab as clab
 import numpy as np
-import matplotlib.pyplot as plt
+
 import pandas as pd
 import seaborn as sns
 import wandb
@@ -13,9 +13,10 @@ import pytorch_lightning as pl
 import anndata as ad
 import xarray as xr
 import torch
-import scanpy as sc
+
 from conceptlab.utils.seed import set_seed
 from conceptlab.utils import helpers
+from conceptlab.utils import plot
 from conceptlab.datagen import modify
 from conceptlab.utils import constants as C
 import conceptlab.evaluation.integration as ig
@@ -58,7 +59,7 @@ def main(
         original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".pkl"
     )
 
-    generate_data = cfg.get("generate_data", False)
+    generate_data = cfg.get("generate_data", True)
 
     if not os.path.exists(adata_path) or generate_data:
 
@@ -147,6 +148,11 @@ def main(
 
     if cfg.plotting.plot:
 
+
+        plotting_folder_path = plot.create_plot_path(original_path,cfg)
+
+
+
         model.to("cpu")
         model.eval()
 
@@ -197,7 +203,6 @@ def main(
                 )
         else:
             ad_merge = ad.concat(dict(vae=ad_pred, true=ad_true), axis=0, label="ident")
-
         # this scales very poorly
 
         if 'test_integration' in cfg:
@@ -217,27 +222,12 @@ def main(
                         wandb.log({f"{ig_test}_{key}": val})
 
         ad_merge.obs_names_make_unique()
-
-        sc.pp.pca(ad_merge)
-        sc.pp.neighbors(ad_merge)
-        sc.tl.umap(ad_merge)
-
-        sc.pl.umap(ad_merge, color=["ident", "tissue", "celltype", "batch"], ncols=4)
-
-        plotting_folder_path = original_path + cfg.plotting.plot_path
-        if not os.path.exists(plotting_folder_path):
-            os.makedirs(plotting_folder_path)
-
-        plot_filename = plotting_folder_path + cfg.wandb.experiment + ".png"
-        plt.savefig(plot_filename)
-        plt.show()
-        plt.close()
-
-        # Log the plot to wandb
+        plot_filename = plot.plot_generation(ad_merge,plotting_folder_path,cfg)
+        Log the plot to wandb
         wandb.log({"generation_plot": wandb.Image(plot_filename)})
 
+     
     if cfg.model.has_cbm and cfg.test_intervention:
-        # original_concepts = dataset.concepts.to_dataframe().unstack()["concepts"].copy()
 
         indicator = adata_test.uns['concept_indicator']
         ix_og_concepts = indicator == C.Mods.none
@@ -250,11 +240,14 @@ def main(
         test_index = ["obs_" + str(i) for i in idx[0:n_test]]
         original_test_concepts = original_concepts.loc[test_index]
         coefs = dataset.concept_coef.to_dataframe().unstack()["concept_coef"]
+
+        true_data = pd.DataFrame(x_true, columns=coefs.columns)
         genetrated_data = pd.DataFrame(x_pred, columns=coefs.columns)
         n_concepts = len(original_test_concepts.columns)
 
-        intervention_scores = dict(on=dict(), off=dict())
+        intervention_scores = dict(On=dict(), Off=dict())
         strict_intervention_score = 0
+
 
         for c, concept_name in enumerate(original_test_concepts.columns):
             concept_vars = dict()
@@ -263,147 +256,15 @@ def main(
             concept_vars["neu"] = coefs.columns[(coefs.iloc[c, :] == 0).values]
             concept_vars["all"] = coefs.columns
 
-            mask = np.zeros_like(x_concepts)
-            mask[:, c] = 1
+            interventions_type=["On","Off"]
+            for _, intervention_type in enumerate(interventions_type):
+                results,scores = clab.evaluation.interventions.eval_intervention(intervention_type,c,x_concepts,x_true,ix_og_concepts,original_test_concepts,true_data, genetrated_data,coefs,concept_vars,model,cfg)
+        
+                if cfg.plotting.plot:
+                    plot.plot_concept_shift(results,concept_name,intervention_type,plotting_folder_path,cfg)
 
-            # Turn concept on ..
-            x_concepts_intervene = x_concepts.copy()
-            x_concepts_intervene[:, c] = 1
+                intervention_scores[intervention_type].update(scores)
 
-            x_pred_withIntervention = model.intervene(
-                torch.tensor(x_true),
-                torch.tensor(x_concepts_intervene),
-                torch.tensor(mask),
-            )["x_pred"]
-            x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
-
-            genetrated_data_after_intervention = pd.DataFrame(
-                x_pred_withIntervention, columns=coefs.columns
-            )
-
-            results = dict(values=[], data=[], coef_direction=[])
-            for data_name, data in zip(
-                ["perturbed", "original"],
-                [genetrated_data_after_intervention, genetrated_data],
-            ):
-                for direction_name, genes in concept_vars.items():
-                    ndata = data.loc[:, genes].copy()
-                    ndata = ndata.mean(axis=1).values
-                    results["values"] += ndata.tolist()
-                    results["data"] += len(ndata) * [data_name]
-                    results["coef_direction"] += len(ndata) * [direction_name]
-
-            results = pd.DataFrame(results)
-            # for visualization
-            results["data"] = pd.Categorical(results["data"], ["original", "perturbed"])
-
-            if cfg.plotting.plot:
-                ax = sns.violinplot(
-                    results,
-                    y="values",
-                    x="coef_direction",
-                    hue="data",
-                    split=True,
-                    gap=0.1,
-                    inner="quart",
-                )
-                ax.set_title(concept_name + " On")
-                plot_filename_turnOn = (
-                    plotting_folder_path
-                    + cfg.wandb.experiment
-                    + "_"
-                    + concept_name
-                    + "_turnOn.png"
-                )
-                plt.savefig(plot_filename_turnOn)
-                plt.show()
-                plt.close()
-
-            on_concepts = pd.DataFrame(
-                x_concepts_intervene[:,ix_og_concepts],
-                index=original_test_concepts.index,
-                columns=original_test_concepts.columns,
-            )
-
-            scores, curves = clab.evaluation.interventions.DistributionShift.score(
-                genetrated_data,
-                genetrated_data_after_intervention,
-                original_test_concepts,
-                on_concepts,
-                coefs,
-                use_neutral=False,
-            )
-
-            intervention_scores["on"].update(scores)
-
-            # Turn concept off ..
-            x_concepts_intervene = x_concepts.copy()
-            x_concepts_intervene[:, c] = 0
-
-            x_pred_withIntervention = model.intervene(
-                torch.tensor(x_true),
-                torch.tensor(x_concepts_intervene),
-                torch.tensor(mask),
-            )["x_pred"]
-            x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
-
-            genetrated_data_after_intervention = pd.DataFrame(
-                x_pred_withIntervention, columns=coefs.columns
-            )
-            results = dict(values=[], data=[], coef_direction=[])
-
-            for data_name, data in zip(
-                ["perturbed", "original"],
-                [genetrated_data_after_intervention, genetrated_data],
-            ):
-                for direction_name, genes in concept_vars.items():
-                    ndata = data.loc[:, genes].copy()
-                    ndata = ndata.mean(axis=1).values
-                    results["values"] += ndata.tolist()
-                    results["data"] += len(ndata) * [data_name]
-                    results["coef_direction"] += len(ndata) * [direction_name]
-
-            results = pd.DataFrame(results)
-            # for visualization
-            results["data"] = pd.Categorical(results["data"], ["original", "perturbed"])
-
-            if cfg.plotting.plot:
-                ax = sns.violinplot(
-                    results,
-                    y="values",
-                    x="coef_direction",
-                    hue="data",
-                    split=True,
-                    gap=0.1,
-                    inner="quart",
-                )
-                ax.set_title(concept_name + " Off")
-                plot_filename_turnOff = (
-                    plotting_folder_path
-                    + cfg.wandb.experiment
-                    + "_"
-                    + concept_name
-                    + "_turnOff.png"
-                )
-                plt.savefig(plot_filename_turnOff)
-                plt.show()
-                plt.close()
-
-            off_concepts = pd.DataFrame(
-                x_concepts_intervene[:,ix_og_concepts],
-                index=original_test_concepts.index,
-                columns=original_test_concepts.columns,
-            )
-            scores, curves = clab.evaluation.interventions.DistributionShift.score(
-                genetrated_data,
-                genetrated_data_after_intervention,
-                original_test_concepts,
-                off_concepts,
-                coefs,
-                use_neutral=False,
-            )
-
-            intervention_scores["off"].update(scores)
 
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
