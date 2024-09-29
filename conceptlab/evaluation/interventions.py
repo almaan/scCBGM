@@ -3,8 +3,86 @@ import pandas as pd
 from typing import Dict, Any, Literal, Tuple
 import numpy as np
 from sklearn.metrics import precision_recall_curve, auc, accuracy_score, roc_curve, roc_auc_score, cohen_kappa_score
+import torch
 
 
+def eval_intervention(intervention_type,concept_idx,x_concepts,x_true,ix_og_concepts,original_test_concepts,true_data, genetrated_data,coefs,concept_vars,model,cfg):
+    
+    mask = np.zeros_like(x_concepts)
+    mask[:, concept_idx] = 1
+    x_concepts_intervene = x_concepts.copy()
+
+    if intervention_type=="On":
+        x_concepts_intervene[:, concept_idx] = 1
+        indices = np.where(x_concepts[:, concept_idx] == 0)[0]
+
+    else:
+        x_concepts_intervene[:, concept_idx] = 0
+        indices = np.where(x_concepts[:, concept_idx] == 1)[0]
+
+    x_pred_withIntervention = model.intervene(
+        torch.tensor(x_true),
+        torch.tensor(x_concepts_intervene),
+        torch.tensor(mask),
+    )["x_pred"]
+    x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
+
+    genetrated_data_after_intervention = pd.DataFrame(
+        x_pred_withIntervention, columns=coefs.columns
+    )
+
+
+
+
+    #get subset 
+    subset_genetrated_data_after_intervention = genetrated_data_after_intervention.iloc[indices]
+    subset_genetrated_data = genetrated_data.iloc[indices]
+    subset_true_data= true_data.iloc[indices]
+
+    results= dict(values=[], data=[], coef_direction=[])
+    
+
+
+    for data_name, data in zip(
+        ["perturbed", "genetrated", "original"],
+        [subset_genetrated_data_after_intervention, subset_genetrated_data,subset_true_data],
+    ):
+        for direction_name, genes in concept_vars.items():
+            ndata = data.loc[:, genes].copy()
+            ndata = ndata.mean(axis=1).values
+            results["values"] += ndata.tolist()
+            results["data"] += len(ndata) * [data_name]
+            results["coef_direction"] += len(ndata) * [direction_name]
+
+    results = pd.DataFrame(results)
+    # for visualization
+    results["data"] = pd.Categorical(results["data"], ["perturbed", "genetrated", "original"])
+
+       
+
+    concepts = pd.DataFrame(
+        x_concepts_intervene[:,ix_og_concepts],
+        index=original_test_concepts.index,
+        columns=original_test_concepts.columns,
+    )
+
+
+    #get subset 
+    subset_original_test_concepts = original_test_concepts.iloc[indices]
+    subset_concepts = concepts.iloc[indices]
+
+
+    scores, curves = DistributionShift.score(
+        subset_genetrated_data,
+        subset_genetrated_data_after_intervention,
+        subset_original_test_concepts,
+        subset_concepts,
+        coefs,
+        use_neutral=False,
+    )
+
+
+    return results,scores
 
 def cohens_d(x, y):
     """

@@ -1,6 +1,6 @@
 import conceptlab as clab
 import numpy as np
-import matplotlib.pyplot as plt
+
 import pandas as pd
 import seaborn as sns
 import wandb
@@ -13,9 +13,10 @@ import pytorch_lightning as pl
 import anndata as ad
 import xarray as xr
 import torch
-import scanpy as sc
+
 from conceptlab.utils.seed import set_seed
 from conceptlab.utils import helpers
+from conceptlab.utils import plot
 from conceptlab.datagen import modify
 from conceptlab.utils import constants as C
 import conceptlab.evaluation.integration as ig
@@ -58,7 +59,7 @@ def main(
         original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".pkl"
     )
 
-    generate_data = cfg.get("generate_data", False)
+    generate_data = cfg.get("generate_data", True)
 
     if not os.path.exists(adata_path) or generate_data:
 
@@ -147,6 +148,11 @@ def main(
 
     if cfg.plotting.plot:
 
+
+        plotting_folder_path = plot.create_plot_path(original_path,cfg)
+
+
+
         model.to("cpu")
         model.eval()
 
@@ -197,29 +203,31 @@ def main(
                 )
         else:
             ad_merge = ad.concat(dict(vae=ad_pred, true=ad_true), axis=0, label="ident")
+        # this scales very poorly
+
+        if 'test_integration' in cfg:
+            ig_test_funs = dict(lisi = ig.lisi,
+                                modularity = ig.modularity,
+                                )
+
+            if isinstance(cfg.test_integration, str):
+                ig_tests = [cfg.test_integration]
+            else:
+                ig_tests = cfg.test_integration
+
+            for ig_test in ig_tests:
+                if ig_test in ig_test_funs:
+                    ig_scores = ig_test_funs[ig_test](ad_merge, label="ident")
+                    for key, val in ig_scores.items():
+                        wandb.log({f"{ig_test}_{key}": val})
 
         ad_merge.obs_names_make_unique()
-
-        sc.pp.pca(ad_merge)
-        sc.pp.neighbors(ad_merge)
-        sc.tl.umap(ad_merge)
-
-        sc.pl.umap(ad_merge, color=["ident", "tissue", "celltype", "batch"], ncols=4)
-
-        plotting_folder_path = original_path + cfg.plotting.plot_path
-        if not os.path.exists(plotting_folder_path):
-            os.makedirs(plotting_folder_path)
-
-        plot_filename = plotting_folder_path + cfg.wandb.experiment + ".png"
-        plt.savefig(plot_filename)
-        plt.show()
-        plt.close()
-
-        # Log the plot to wandb
+        plot_filename = plot.plot_generation(ad_merge,plotting_folder_path,cfg)
+        Log the plot to wandb
         wandb.log({"generation_plot": wandb.Image(plot_filename)})
 
+     
     if cfg.model.has_cbm and cfg.test_intervention:
-        # original_concepts = dataset.concepts.to_dataframe().unstack()["concepts"].copy()
 
         indicator = adata_test.uns['concept_indicator']
         ix_og_concepts = indicator == C.Mods.none
@@ -232,202 +240,53 @@ def main(
         test_index = ["obs_" + str(i) for i in idx[0:n_test]]
         original_test_concepts = original_concepts.loc[test_index]
         coefs = dataset.concept_coef.to_dataframe().unstack()["concept_coef"]
+
+        true_data = pd.DataFrame(x_true, columns=coefs.columns)
         genetrated_data = pd.DataFrame(x_pred, columns=coefs.columns)
         n_concepts = len(original_test_concepts.columns)
 
-        intervention_on_scores = dict()
-        intervention_off_scores = dict()
+        intervention_scores = dict(On=dict(), Off=dict())
         strict_intervention_score = 0
 
 
-        for c, concept_name in enumerate(orignal_test_concepts.columns):
-            pos_concept_vars = coefs.columns[(coefs.iloc[c, :] > 0).values]
-            neg_concept_vars = coefs.columns[(coefs.iloc[c, :] < 0).values]
+        for c, concept_name in enumerate(original_test_concepts.columns):
+            concept_vars = dict()
+            concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
+            concept_vars["neg"] = coefs.columns[(coefs.iloc[c, :] < 0).values]
+            concept_vars["neu"] = coefs.columns[(coefs.iloc[c, :] == 0).values]
+            concept_vars["all"] = coefs.columns
 
-            mask = np.zeros_like(x_concepts)
-            mask[:, c] = 1
+            interventions_type=["On","Off"]
+            for _, intervention_type in enumerate(interventions_type):
+                results,scores = clab.evaluation.interventions.eval_intervention(intervention_type,c,x_concepts,x_true,ix_og_concepts,original_test_concepts,true_data, genetrated_data,coefs,concept_vars,model,cfg)
+        
+                if cfg.plotting.plot:
+                    plot.plot_concept_shift(results,concept_name,intervention_type,plotting_folder_path,cfg)
 
-            # Turn concept on ..
-            x_concepts_intervene = x_concepts.copy()
-            x_concepts_intervene[:, c] = 1
+                intervention_scores[intervention_type].update(scores)
 
-            x_pred_withIntervention = model.intervene(
-                torch.tensor(x_true),
-                torch.tensor(x_concepts_intervene),
-                torch.tensor(mask),
-            )["x_pred"]
-            x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
-
-            genetrated_data_after_intervention = pd.DataFrame(
-                x_pred_withIntervention, columns=coefs.columns
-            )
-
-            results = dict(values=[], data=[], coef_direction=[])
-            for data_name, data in zip(
-                ["perturbed", "original"],
-                [genetrated_data_after_intervention, genetrated_data],
-            ):
-                for direction_name, genes in zip(
-                    ["up", "down"], [pos_concept_vars, neg_concept_vars]
-                ):
-                    ndata = data.loc[:, genes].copy()
-                    ndata = ndata.mean(axis=1).values
-                    results["values"] += ndata.tolist()
-                    results["data"] += len(ndata) * [data_name]
-                    results["coef_direction"] += len(ndata) * [direction_name]
-
-            results = pd.DataFrame(results)
-            # for visualization
-            results["data"] = pd.Categorical(results["data"], ["original", "perturbed"])
-
-            if cfg.plotting.plot:
-                ax = sns.violinplot(
-                    results,
-                    y="values",
-                    x="coef_direction",
-                    hue="data",
-                    split=True,
-                    gap=0.1,
-                    inner="quart",
-                )
-                ax.set_title(concept_name + " On")
-                plot_filename_turnOn = (
-                    plotting_folder_path
-                    + cfg.wandb.experiment
-                    + "_"
-                    + concept_name
-                    + "_turnOn.png"
-                )
-                plt.savefig(plot_filename_turnOn)
-                plt.show()
-                plt.close()
-
-            on_concepts = pd.DataFrame(
-                x_concepts_intervene[:,ix_og_concepts],
-                index=original_test_concepts.index,
-                columns=original_test_concepts.columns,
-            )
-
-            eval_res, scores = clab.evaluation.interventions.DistributionShift.score(
-                genetrated_data,
-                genetrated_data_after_intervention,
-                original_test_concepts,
-                on_concepts,
-                coefs,
-                use_neutral=False,
-            )
-
-            intervention_on_scores.update(scores)
-
-            # Turn concept off ..
-            x_concepts_intervene = x_concepts.copy()
-            x_concepts_intervene[:, c] = 0
-
-            x_pred_withIntervention = model.intervene(
-                torch.tensor(x_true),
-                torch.tensor(x_concepts_intervene),
-                torch.tensor(mask),
-            )["x_pred"]
-            x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
-
-            genetrated_data_after_intervention = pd.DataFrame(
-                x_pred_withIntervention, columns=coefs.columns
-            )
-            results = dict(values=[], data=[], coef_direction=[])
-            for data_name, data in zip(
-                ["perturbed", "original"],
-                [genetrated_data_after_intervention, genetrated_data],
-            ):
-                for direction_name, genes in zip(
-                    ["up", "down"], [pos_concept_vars, neg_concept_vars]
-                ):
-                    ndata = data.loc[:, genes].copy()
-                    ndata = ndata.mean(axis=1).values
-                    results["values"] += ndata.tolist()
-                    results["data"] += len(ndata) * [data_name]
-                    results["coef_direction"] += len(ndata) * [direction_name]
-
-            results = pd.DataFrame(results)
-            # for visualization
-            results["data"] = pd.Categorical(results["data"], ["original", "perturbed"])
-
-            if cfg.plotting.plot:
-                ax = sns.violinplot(
-                    results,
-                    y="values",
-                    x="coef_direction",
-                    hue="data",
-                    split=True,
-                    gap=0.1,
-                    inner="quart",
-                )
-                ax.set_title(concept_name + " Off")
-                plot_filename_turnOff = (
-                    plotting_folder_path
-                    + cfg.wandb.experiment
-                    + "_"
-                    + concept_name
-                    + "_turnOff.png"
-                )
-                plt.savefig(plot_filename_turnOff)
-                plt.show()
-                plt.close()
-
-            off_concepts = pd.DataFrame(
-                x_concepts_intervene[:,ix_og_concepts],
-                index=original_test_concepts.index,
-                columns=original_test_concepts.columns,
-            )
-            eval_res, scores = clab.evaluation.interventions.DistributionShift.score(
-                genetrated_data,
-                genetrated_data_after_intervention,
-                original_test_concepts,
-                off_concepts,
-                coefs,
-                use_neutral=False,
-            )
-
-            intervention_off_scores.update(scores)
-
-        # convert intervention score dict to dataframes
-        intervention_on_scores = pd.DataFrame(intervention_on_scores).T
-        intervention_off_scores = pd.DataFrame(intervention_off_scores).T
-
-        # merge on/off scores
-        intervention_score = pd.concat(
-            (intervention_on_scores, intervention_off_scores), axis=1
-        )
-
-        # compute stratified scores
-        for direction in ["pos", "neg", "neu"]:
-            d_col = [x for x in intervention_score if direction in x]
-            d_score = np.nanmean(intervention_score[d_col].values) * 100
-            wandb.log({f"intervention {direction} acc": d_score})
-
-        # compute number of non-nan elements for each concept
-        non_nan_on = np.sum(~np.isnan(intervention_on_scores.values), axis=1)
-        non_nan_off = np.sum(~np.isnan(intervention_off_scores.values), axis=1)
-
-        # calculate the on/off strict scores
-        strict_on_score = np.mean(
-            np.nansum(intervention_on_scores.values, axis=1) == non_nan_on
-        )
-        strict_off_score = np.mean(
-            np.nansum(intervention_off_scores.values, axis=1) == non_nan_off
-        )
-
-        # calculate global strict score
-        strict_intervention_score = (strict_on_score + strict_off_score) / 2 * 100
-
-        # log strict scores
-        wandb.log({"intervention strict acc": strict_intervention_score})
 
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
 
-        intervention_score.to_csv(
+        flat_list = helpers.flatten_to_list_of_lists(intervention_scores)
+        df_long = pd.DataFrame(flat_list)
+        columns = ["intervention", "concept", "scoring", "value"]
+        df_long.columns = columns
+
+        df_long.to_csv(
             original_path + "/results/" + cfg.wandb.experiment + ".csv", index=False
         )
+
+        # Convert the DataFrame into a W&B table
+        table = wandb.Table(dataframe=df_long)
+
+        # Log the table to W&B
+        wandb.log({"results table": table})
+
+        av_scores = df_long[["scoring", "value"]].groupby("scoring").agg("mean")
+        wandb.log({f"AUPRC": av_scores.loc["auprc_joint"].value})
+        wandb.log({f"AUROC": av_scores.loc["auroc_joint"].value})
 
         if cfg.plotting.plot:
             helpers.create_composite_image(
