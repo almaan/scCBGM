@@ -37,7 +37,7 @@ class CB_VAE(pl.LightningModule):
         self.beta = config.beta
         self.concepts_hp = config.concepts_hp
         self.orthogonality_hp = config.orthogonality_hp
-        self.dropout = config.get('dropout',0.3)
+        self.dropout = config.get('dropout',0.0)
 
 
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", False)

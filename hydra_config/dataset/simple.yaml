@@ -2,7 +2,7 @@ dataset_name: "complete_set_dataset"
 n_obs: 50000
 n_vars:  5000
 n_tissues: 3
-n_celltypes:  4
+n_celltypes:  10
 n_batches: 2
 n_concepts: 8
 baseline_lower: 3

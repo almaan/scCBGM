@@ -273,8 +273,8 @@ class OmicsDataGenerator(DataGenerator):
         # dirichlet priors
         alpha_U = np.ones(U)  # for cell type
         alpha_C = np.ones(C) / C  # for concepts
-        alpha_B = np.ones(B)  # for batches
-        alpha_T = np.ones(T)  # for tisse types
+        alpha_B = 10 * np.ones(B)  # for batches
+        alpha_T = 10 * np.ones(T)  # for tisse types
 
         # probability of sampling a batch (to model batch differences)
         p_N = rng.dirichlet(alpha_B)

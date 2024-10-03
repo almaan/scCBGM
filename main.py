@@ -173,8 +173,8 @@ def main(
         x_true = x_true / x_true.sum(axis=1, keepdims=True) * 1e4
         x_true = np.log1p(x_true)
 
-        # sub_idx = np.random.choice(x_true.shape[0], replace=False, size=2000)
-        sub_idx = np.arange(x_true.shape[0])
+        sub_idx = np.random.choice(x_true.shape[0], replace=False, size=min(5000, x_true.shape[0]))
+        # sub_idx = np.arange(x_true.shape[0])
 
         ad_true = ad.AnnData(
             x_true[sub_idx],
@@ -193,9 +193,9 @@ def main(
 
         if cfg.model.has_cbm:
             c_pred = preds['pred_concept'].detach().numpy()
-            ad_pred.obsm['concepts'] = c_pred
+            ad_pred.obsm['concepts'] = c_pred[sub_idx]
 
-            ad_true.obsm['concepts'] = x_concepts
+            ad_true.obsm['concepts'] = x_concepts[sub_idx]
             if cfg.model.independent_training:
                 x_pred_withGT = model(torch.tensor(x_true), torch.tensor(x_concepts))[
                     "x_pred"
@@ -207,7 +207,7 @@ def main(
                     obs=adata_test.obs.iloc[sub_idx],
                 )
 
-                ad_pred_withGT.obsm['concepts'] = x_concepts
+                ad_pred_withGT.obsm['concepts'] = x_concepts[sub_idx]
 
                 ad_merge = ad.concat(
                     dict(vae_cbm=ad_pred, vae_cbm_withGT=ad_pred_withGT, true=ad_true),
@@ -221,8 +221,8 @@ def main(
                     label="ident",
                 )
         else:
-            ad_pred.obsm['concepts'] = x_concepts.copy()
-            ad_true.obsm['concepts'] = x_concepts.copy()
+            ad_pred.obsm['concepts'] = x_concepts[sub_idx].copy()
+            ad_true.obsm['concepts'] = x_concepts[sub_idx].copy()
             ad_merge = ad.concat(dict(vae=ad_pred, true=ad_true), axis=0, label="ident")
 
         # this scales very poorly
@@ -392,7 +392,6 @@ def main(
                 plot.plot_concept_correlation_matrix(coefs)
                 plot.plot_celltype_correlation_matrix(dataset)
 
-    helpers.clear_cuda_memory()
     wandb.finish()
 
 

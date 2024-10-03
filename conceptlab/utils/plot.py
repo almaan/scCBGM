@@ -18,9 +18,9 @@ def create_plot_path(original_path, cfg):
 
 def plot_generation(adata, plotting_folder_path, cfg):
 
-    rsc.pp.pca(adata)
-    rsc.pp.neighbors(adata)
-    rsc.tl.umap(adata)
+    sc.pp.pca(adata)
+    sc.pp.neighbors(adata)
+    sc.tl.umap(adata)
 
     colors = ["ident", "tissue", "celltype", "batch"]
 
