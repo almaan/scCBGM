@@ -6,7 +6,7 @@ input_dim: 5000
 hidden_dim: 128
 latent_dim: 64
 n_concepts: 8
-min_latent: 32
+min_bottleneck_size: 32
 independent_training: False
 concepts_hp: 0.005
 orthogonality_hp: 0.1

@@ -5,16 +5,18 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
 import torch as t
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 # Define the VAE model
 class VAE(pl.LightningModule):
     def __init__(self, config):
         super(VAE, self).__init__()
-        self.input_dim = self.input_dim
-        self.hidden_dim = self.hidden_dim
-        self.latent_dim = self.latent_dim
-        self.learning_rate = self.learning_rate
+
+        self.input_dim = config.input_dim
+        self.hidden_dim = config.hidden_dim
+        self.latent_dim = config.latent_dim
+        self.learning_rate = config.lr
 
         # Encoder
         self.fc1 = nn.Linear(self.input_dim, self.hidden_dim)
@@ -24,7 +26,8 @@ class VAE(pl.LightningModule):
         # Decoder
         self.fc3 = nn.Linear(self.latent_dim, self.hidden_dim)
         self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
-        self.beta = beta
+        self.beta = config.beta
+        self.dropout = config.get('dropout',0.3)
 
         self.save_hyperparameters()
 
@@ -75,6 +78,19 @@ class VAE(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         return self._step(batch,batch_idx, 'val')
 
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+    def configure_optimizers(self,):
 
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        # Define the CosineAnnealingLR scheduler
+        scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
+
+        # Return a dictionary with the optimizer and the scheduler
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': scheduler,  # The LR scheduler instance
+                'interval': 'epoch',  # The interval to step the scheduler ('epoch' or 'step')
+                'frequency': 1,       # How often to update the scheduler
+                'monitor': 'val_loss', # Optional: if you use reduce-on-plateau schedulers
+            }
+        }

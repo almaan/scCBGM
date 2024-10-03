@@ -124,8 +124,14 @@ def main(
     wandb_logger = WandbLogger(
         project = cfg.wandb.project,
         name = wandb_name,
-        log_model="all",
+        log_model=False,
     )
+
+    wandb_config = omegaconf.OmegaConf.to_container(
+        cfg, resolve=True, throw_on_missing=True
+    )
+
+    wandb_logger.experiment.config.update(wandb_config)
 
     callbacks = []
 
@@ -177,17 +183,18 @@ def main(
 
         preds = model(torch.tensor(x_true))
         x_pred = preds['x_pred'].detach().numpy()
-        c_pred = preds['pred_concept'].detach().numpy()
+        x_concepts = adata_test.obsm["concepts"].astype(np.float32).copy()
 
         ad_pred = ad.AnnData(
             x_pred[sub_idx],
             obs=adata_test.obs.iloc[sub_idx],
         )
 
-        ad_pred.obsm['concepts'] = c_pred
 
         if cfg.model.has_cbm:
-            x_concepts = adata_test.obsm["concepts"].astype(np.float32).copy()
+            c_pred = preds['pred_concept'].detach().numpy()
+            ad_pred.obsm['concepts'] = c_pred
+
             ad_true.obsm['concepts'] = x_concepts
             if cfg.model.independent_training:
                 x_pred_withGT = model(torch.tensor(x_true), torch.tensor(x_concepts))[
@@ -214,6 +221,8 @@ def main(
                     label="ident",
                 )
         else:
+            ad_pred.obsm['concepts'] = x_concepts.copy()
+            ad_true.obsm['concepts'] = x_concepts.copy()
             ad_merge = ad.concat(dict(vae=ad_pred, true=ad_true), axis=0, label="ident")
 
         # this scales very poorly

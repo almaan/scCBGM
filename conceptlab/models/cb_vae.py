@@ -28,7 +28,7 @@ class CB_VAE(pl.LightningModule):
 
         self.fcCB1 = nn.Linear(self.latent_dim, self.n_concepts)
 
-        n_unknown = max(config.min_latent - self.n_concepts, self.n_concepts)
+        n_unknown = max(config.min_bottleneck_size - self.n_concepts, self.n_concepts)
         self.fcCB2 = nn.Linear(self.latent_dim, n_unknown)
 
         # Decoder
@@ -37,7 +37,7 @@ class CB_VAE(pl.LightningModule):
         self.beta = config.beta
         self.concepts_hp = config.concepts_hp
         self.orthogonality_hp = config.orthogonality_hp
-        self.logcosh_loss = LogCoshError(num_outputs = self.input_dim)
+        self.dropout = config.get('dropout',0.3)
 
 
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", False)
@@ -47,6 +47,7 @@ class CB_VAE(pl.LightningModule):
 
     def encode(self, x):
         h1 = F.relu(self.fc1(x))
+        h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
         mu, logvar = self.fc21(h1), self.fc22(h1)
         logvar = t.clip(logvar, -1e5, 1e5)
         return mu, logvar
@@ -74,6 +75,7 @@ class CB_VAE(pl.LightningModule):
 
     def decode(self, z):
         h3 = F.relu(self.fc3(z))
+        h3 = F.dropout(h3, p = self.dropout, training=True, inplace=False)
         return self.fc4(h3)
 
     def forward(self, x, concepts=None):
