@@ -1,11 +1,12 @@
 type: CB_VAE
 has_cbm: True
-lr: 1e-3
-beta: 0.002
+lr: 5e-4
+beta: 0.001
 input_dim: 5000
 hidden_dim: 128
 latent_dim: 64
 n_concepts: 8
+min_latent: 32
 independent_training: False
-concepts_hp: 0.01
+concepts_hp: 0.005
 orthogonality_hp: 0.1

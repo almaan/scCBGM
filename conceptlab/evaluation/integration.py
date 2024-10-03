@@ -1,4 +1,3 @@
-import scib
 import anndata as ad
 import scanpy as sc
 from typing import Dict

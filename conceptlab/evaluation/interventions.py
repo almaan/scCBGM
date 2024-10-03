@@ -2,17 +2,38 @@ from conceptlab.evaluation._base import EvaluationClass
 import pandas as pd
 from typing import Dict, Any, Literal, Tuple
 import numpy as np
-from sklearn.metrics import precision_recall_curve, auc, accuracy_score, roc_curve, roc_auc_score, cohen_kappa_score
+from sklearn.metrics import (
+    precision_recall_curve,
+    auc,
+    accuracy_score,
+    roc_curve,
+    roc_auc_score,
+    cohen_kappa_score,
+)
 import torch
 
 
-def eval_intervention(intervention_type,concept_idx,x_concepts,x_true,ix_og_concepts,original_test_concepts,true_data, genetrated_data,coefs,concept_vars,model,cfg):
-    
+def eval_intervention(
+    intervention_type,
+    concept_idx,
+    x_concepts,
+    x_true,
+    ix_og_concepts,
+    original_test_concepts,
+    true_data,
+    genetrated_data,
+    coefs,
+    concept_vars,
+    model,
+    cfg,
+):
+
     mask = np.zeros_like(x_concepts)
     mask[:, concept_idx] = 1
+
     x_concepts_intervene = x_concepts.copy()
 
-    if intervention_type=="On":
+    if intervention_type == "On":
         x_concepts_intervene[:, concept_idx] = 1
         indices = np.where(x_concepts[:, concept_idx] == 0)[0]
 
@@ -25,27 +46,29 @@ def eval_intervention(intervention_type,concept_idx,x_concepts,x_true,ix_og_conc
         torch.tensor(x_concepts_intervene),
         torch.tensor(mask),
     )["x_pred"]
+
     x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
 
     genetrated_data_after_intervention = pd.DataFrame(
         x_pred_withIntervention, columns=coefs.columns
     )
 
-
-
-
-    #get subset 
-    subset_genetrated_data_after_intervention = genetrated_data_after_intervention.iloc[indices]
+    # get subset
+    subset_genetrated_data_after_intervention = genetrated_data_after_intervention.iloc[
+        indices
+    ]
     subset_genetrated_data = genetrated_data.iloc[indices]
-    subset_true_data= true_data.iloc[indices]
+    subset_true_data = true_data.iloc[indices]
 
-    results= dict(values=[], data=[], coef_direction=[])
-    
-
+    results = dict(values=[], data=[], coef_direction=[])
 
     for data_name, data in zip(
         ["perturbed", "genetrated", "original"],
-        [subset_genetrated_data_after_intervention, subset_genetrated_data,subset_true_data],
+        [
+            subset_genetrated_data_after_intervention,
+            subset_genetrated_data,
+            subset_true_data,
+        ],
     ):
         for direction_name, genes in concept_vars.items():
             ndata = data.loc[:, genes].copy()
@@ -56,33 +79,31 @@ def eval_intervention(intervention_type,concept_idx,x_concepts,x_true,ix_og_conc
 
     results = pd.DataFrame(results)
     # for visualization
-    results["data"] = pd.Categorical(results["data"], ["perturbed", "genetrated", "original"])
-
-       
+    results["data"] = pd.Categorical(
+        results["data"], ["perturbed", "genetrated", "original"]
+    )
 
     concepts = pd.DataFrame(
-        x_concepts_intervene[:,ix_og_concepts],
+        x_concepts_intervene[:, ix_og_concepts],
         index=original_test_concepts.index,
         columns=original_test_concepts.columns,
     )
 
-
-    #get subset 
+    # get subset
     subset_original_test_concepts = original_test_concepts.iloc[indices]
     subset_concepts = concepts.iloc[indices]
 
-
-    scores, curves = DistributionShift.score(
-        subset_genetrated_data,
-        subset_genetrated_data_after_intervention,
-        subset_original_test_concepts,
-        subset_concepts,
-        coefs,
+    scores, curves, effect_size = DistributionShift.score(
+        X_old = subset_genetrated_data,
+        X_new = subset_genetrated_data_after_intervention,
+        concepts_old = subset_original_test_concepts,
+        concepts_new = subset_concepts,
+        concept_coefs = coefs,
         use_neutral=False,
     )
 
+    return results, scores, effect_size
 
-    return results,scores
 
 def cohens_d(x, y):
     """
@@ -99,10 +120,13 @@ def cohens_d(x, y):
     mean_y = np.mean(y, axis=0)
 
     # Pooled standard deviation
-    pooled_std = np.sqrt(((np.std(x, axis=0, ddof=1) ** 2) + (np.std(y, axis=0, ddof=1) ** 2)) / 2)
+    pooled_std = np.sqrt(
+        ((np.std(x, axis=0, ddof=1) ** 2) + (np.std(y, axis=0, ddof=1) ** 2)) / 2
+    )
 
     # Cohen's d calculation for each column
-    d_values = (mean_x - mean_y) / pooled_std
+    d_values = (mean_x - mean_y) / (pooled_std + 1e-8)
+    d_values = d_values[~np.isnan(d_values)]
 
     return d_values
 
@@ -111,32 +135,32 @@ def _concept_score(
     pval: float, direction: Literal["pos", "neg", "neu"], alpha: float = 0.05
 ):
     """
-        Compute a score based on the p-value and the specified direction.
+    Compute a score based on the p-value and the specified direction.
 
-        Parameters:
-        -----------
-        pval : float
-            The p-value to be compared against the significance threshold `alpha`.
+    Parameters:
+    -----------
+    pval : float
+        The p-value to be compared against the significance threshold `alpha`.
 
-        direction : Literal["pos", "neg", "neu"]
-            The direction of the test. Can be:
-                - "pos" or "neg": If the p-value is less than `alpha`, the score is 1.0; otherwise, 0.0.
-                - "neu": If the p-value is greater than `alpha`, the score is 1.0; otherwise, 0.0.
+    direction : Literal["pos", "neg", "neu"]
+        The direction of the test. Can be:
+            - "pos" or "neg": If the p-value is less than `alpha`, the score is 1.0; otherwise, 0.0.
+            - "neu": If the p-value is greater than `alpha`, the score is 1.0; otherwise, 0.0.
 
-        alpha : float, optional, default=0.05
-            The significance threshold. This is the value against which the p-value is compared.
+    alpha : float, optional, default=0.05
+        The significance threshold. This is the value against which the p-value is compared.
 
-        Returns:
-        --------
-        float
-            A score of 1.0 or 0.0 depending on the comparison between the p-value and `alpha`.
-            - For "pos" or "neg" directions, 1.0 if `pval < alpha`, else 0.0.
-            - For "neu", 1.0 if `pval > alpha`, else 0.0.
+    Returns:
+    --------
+    float
+        A score of 1.0 or 0.0 depending on the comparison between the p-value and `alpha`.
+        - For "pos" or "neg" directions, 1.0 if `pval < alpha`, else 0.0.
+        - For "neu", 1.0 if `pval > alpha`, else 0.0.
 
-        Raises:
-        -------
-        ValueError
-            If the `direction` is not one of "pos", "neg", or "neu".
+    Raises:
+    -------
+    ValueError
+        If the `direction` is not one of "pos", "neg", or "neu".
     """
 
     match direction:
@@ -149,13 +173,14 @@ def _concept_score(
 
     return score
 
-def concept_score(pvals: np.ndarray, direction: Literal["pos", "neg", "neu"], alpha: float = 0.05):
+
+def concept_score(
+    pvals: np.ndarray, direction: Literal["pos", "neg", "neu"], alpha: float = 0.05
+):
 
     fun = np.vectorize(lambda x: _concept_score(x, direction, alpha))
 
     return fun(pvals)
-
-
 
 
 class DistributionShift(EvaluationClass):
@@ -204,9 +229,11 @@ class DistributionShift(EvaluationClass):
         axis = 0
 
         if dropped:
-            return wilcoxon(Y, X, alternative=direction_alternatives[direction],axis=axis)
+            return wilcoxon(
+                Y, X, alternative=direction_alternatives[direction], axis=axis
+            )
 
-        return wilcoxon(X, Y, alternative=direction_alternatives[direction],axis=axis)
+        return wilcoxon(X, Y, alternative=direction_alternatives[direction], axis=axis)
 
     @classmethod
     def score(
@@ -216,11 +243,11 @@ class DistributionShift(EvaluationClass):
         concepts_old: pd.DataFrame,
         concepts_new: pd.DataFrame,
         concept_coefs: pd.DataFrame,
-            use_neutral: bool = False,
-    ) -> Tuple[Dict[str, Any],Dict[str,Any]]:
+        use_neutral: bool = True,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
-        Evaluates the distribution shift by calculating statistical 
-        significance of changes in concept distributions between 
+        Evaluates the distribution shift by calculating statistical
+        significance of changes in concept distributions between
 
         the old and new datasets.
 
@@ -229,7 +256,7 @@ class DistributionShift(EvaluationClass):
             X_new (pd.DataFrame): The new dataset features.
             concepts_old (pd.DataFrame): Concept values in the original dataset.
             concepts_new (pd.DataFrame): Concept values in the new dataset.
-            concept_coefs (pd.DataFrame): Coefficients indicating the relationship 
+            concept_coefs (pd.DataFrame): Coefficients indicating the relationship
                                           between variables and concepts.
 
             use_neutral: (bool):  Use shared neutral genes (across all concepts)
@@ -243,13 +270,15 @@ class DistributionShift(EvaluationClass):
         concept_uni_vars = (concept_coefs != 0).sum(axis=0)
         concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
 
-        direction_to_true = dict(neu = 0,
-                                 pos = 1,
-                                 neg = 1,
-                                 )
+        direction_to_true = dict(
+            neu=0,
+            pos=1,
+            neg=1,
+        )
 
         results = dict()
         curves = dict()
+        effect_size = dict(neu = [], pos = [], neg = [])
 
         for concept_name in concept_names:
 
@@ -279,8 +308,7 @@ class DistributionShift(EvaluationClass):
             else:
                 var_names_dict["neu"] = coefs_k.index[coefs_k.values == 0]
 
-
-            pred_vals  = dict()
+            pred_vals = dict()
             true_vals = dict()
 
             for direction, var_names in var_names_dict.items():
@@ -293,51 +321,64 @@ class DistributionShift(EvaluationClass):
                 pos_delta = concept_delta > 0
                 neg_delta = concept_delta < 0
 
-                for delta, dropped, ivn in zip([pos_delta,neg_delta],[False,True],['0->1','1->0']):
+                for delta, dropped, ivn in zip(
+                    [pos_delta, neg_delta], [False, True], ["0->1", "1->0"]
+                ):
 
                     if np.any(delta):
                         test_res = cls.diff_test(
-                            vals_new[delta], vals_old[delta], direction, dropped = dropped,
+                            vals_new[delta],
+                            vals_old[delta],
+                            direction,
+                            dropped=dropped,
                         )
 
-
                         pred_vals[direction] += test_res.tolist()
+                        effect_size[direction] += test_res.tolist()
+
                         base = [direction_to_true[direction]] * len(test_res)
                         true_vals[direction] += base
 
-
                         diff_av = cohens_d(vals_new[delta], vals_old[delta]).mean()
 
-                        results[concept_name][f"{ivn} : {direction} cohen's d"] =  diff_av
+                        results[concept_name][
+                            f"{direction}"
+                        ] = diff_av
 
             true_vals_all = np.concatenate([v for v in true_vals.values()])
             pred_vals_all = np.concatenate([v for v in pred_vals.values()])
 
-            # precision recall calculations
-            precision, recall, thresholds = precision_recall_curve(true_vals_all, pred_vals_all)
-            results[concept_name]['auprc_joint'] =  auc(recall,precision)
-            curves[concept_name]['auprc_joint'] = dict(y = precision, x = recall)
+            if len(pred_vals_all) > 1:
 
-            # roc calculations
-            fpr, tpr,_ = roc_curve(true_vals_all, pred_vals_all)
-            results[concept_name]['auroc_joint'] =  roc_auc_score(true_vals_all, pred_vals_all)
-            curves[concept_name]['auroc_joint'] = dict(y = tpr, x = fpr)
+                # precision recall calculations
+                precision, recall, thresholds = precision_recall_curve(
+                    true_vals_all, pred_vals_all, pos_label = 1,
+                )
 
+                results[concept_name]["auprc_joint"] = auc(recall, precision)
+                curves[concept_name]["auprc_joint"] = dict(y=precision, x=recall)
 
-        results = {key:val for key,val in results.items() if len(val) > 0}
-        curves = {key:val for key,val in curves.items() if len(val) > 0}
+                # roc calculations
+                fpr, tpr, _ = roc_curve(true_vals_all, pred_vals_all)
+                results[concept_name]["auroc_joint"] = roc_auc_score(
+                    true_vals_all, pred_vals_all,
+                )
+                curves[concept_name]["auroc_joint"] = dict(y=tpr, x=fpr)
 
+        results = {key: val for key, val in results.items() if len(val) > 0}
+        curves = {key: val for key, val in curves.items() if len(val) > 0}
 
-        return results,curves
+        return results, curves, effect_size
 
     @classmethod
     def diff_test(cls, X, Y, direction, dropped=False):
 
-        delta = np.mean(X - Y,axis =0)
+        delta = cohens_d(X, Y)
 
         if dropped:
-            delta = - delta
-        if direction == 'neg':
+            delta = -delta
+
+        if direction == "neg":
             delta = -delta
 
         return delta

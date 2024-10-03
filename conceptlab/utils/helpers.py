@@ -6,7 +6,14 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 from PIL import Image
+import torch
 import os
+import random
+import string
+import re
+import datetime
+
+
 
 def dataset_to_anndata(
     dataset: xr.Dataset,
@@ -109,3 +116,25 @@ def simple_adata_train_test_split(
 
     adata_test, adata_train = adata[idx[0:n_test]].copy(), adata[idx[n_test::]].copy()
     return adata_test, adata_train, n_test,idx
+
+
+
+
+def generate_random_string(length=15):
+    characters = string.ascii_letters + string.digits
+    random_string = ''.join(random.choice(characters) for _ in range(length))
+    return random_string
+
+def clear_cuda_memory():
+    # Empty the PyTorch cache
+    torch.cuda.empty_cache()
+    # Synchronize the GPU
+    torch.cuda.synchronize()
+
+    # Optionally, you can also reset memory stats for a fresh start (optional)
+    torch.cuda.reset_peak_memory_stats()
+
+
+def timestamp() -> str:
+    return re.sub(":|-|\.| |", "", str(datetime.datetime.now()))
+

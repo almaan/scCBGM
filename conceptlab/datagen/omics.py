@@ -235,6 +235,7 @@ class OmicsDataGenerator(DataGenerator):
         beta_b: PositiveFloat = 0.5,
         seed: int = 42,
         zero_inflate: bool = True,
+            **kwargs,
     ) -> xr.Dataset:
         """
         Generate synthetic omics data.

@@ -6,6 +6,7 @@ defaults:
   - modify: default.yaml
   - experiment: null
 
+
 trainer:
   max_epochs: 100
 
@@ -16,3 +17,5 @@ plotting:
 test_intervention: False
 test_integration: ['modularity']
 
+save_checkpoints: True
+DEBUG: False
