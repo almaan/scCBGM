@@ -5,6 +5,4 @@ n_tissues: 3
 n_celltypes:  10
 n_batches: 2
 n_concepts: 8
-baseline_lower: 3
-baseline_upper: 8
 

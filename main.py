@@ -389,8 +389,8 @@ def main(
                     all_effect_size,
                 )
 
-                plot.plot_concept_correlation_matrix(coefs)
-                plot.plot_celltype_correlation_matrix(dataset)
+                # plot.plot_concept_correlation_matrix(coefs)
+                # plot.plot_celltype_correlation_matrix(dataset)
 
     wandb.finish()
 

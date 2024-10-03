@@ -1,4 +1,5 @@
 from conceptlab.evaluation._base import EvaluationClass
+from collections import OrderedDict
 import pandas as pd
 from typing import Dict, Any, Literal, Tuple
 import numpy as np
@@ -291,7 +292,9 @@ class DistributionShift(EvaluationClass):
 
             concept_delta_mean = concept_delta.mean()
 
+            print(concept_name)
             if concept_delta_mean == 0:
+                print('we pass on {}'.format(concept_name))
                 continue
 
             results[concept_name] = dict()
@@ -308,8 +311,8 @@ class DistributionShift(EvaluationClass):
             else:
                 var_names_dict["neu"] = coefs_k.index[coefs_k.values == 0]
 
-            pred_vals = dict()
-            true_vals = dict()
+            pred_vals = OrderedDict()
+            true_vals = OrderedDict()
 
             for direction, var_names in var_names_dict.items():
                 pred_vals[direction] = []
@@ -352,7 +355,7 @@ class DistributionShift(EvaluationClass):
 
                 # precision recall calculations
                 precision, recall, thresholds = precision_recall_curve(
-                    true_vals_all, pred_vals_all, pos_label = 1,
+                    true_vals_all, pred_vals_all,
                 )
 
                 results[concept_name]["auprc_joint"] = auc(recall, precision)

@@ -5,7 +5,6 @@ import scanpy as sc
 import numpy as np
 import wandb
 import pandas as pd
-import rapids_singlecell as rsc
 
 
 
@@ -137,7 +136,7 @@ def plot_concept_correlation_matrix(coefs):
 
     wandb.log(
         {
-            "concept_correlation": wandb.plots.HeatMap(
+            "concept_correlation": wandb.plot.HeatMap(
                 cmat.index.tolist(),
                 cmat.columns.tolist(),
                 cmat.values,
@@ -153,7 +152,7 @@ def plot_celltype_correlation_matrix(dataset):
 
     wandb.log(
         {
-            "celltype_correlation": wandb.plots.HeatMap(
+            "celltype_correlation": wandb.plot.HeatMap(
                 cmat.index.tolist(),
                 cmat.columns.tolist(),
                 cmat.values,
@@ -180,7 +179,6 @@ def plot_intervention_effect_size(
                     wandb.Table(data=plot_values, columns=["cohens_d"]),
                     "cohens_d",
                     title=f"Effect Size : {direction}",
-                    num_bins=50,
                 )
             }
         )
