@@ -138,3 +138,38 @@ def clear_cuda_memory():
 def timestamp() -> str:
     return re.sub(":|-|\.| |", "", str(datetime.datetime.now()))
 
+def get_unique_leaf_keys(d):
+    unique_keys = set()  # Use a set to collect unique leaf keys
+
+    def recurse_keys(current_dict):
+        for key, value in current_dict.items():
+            if isinstance(value, dict):  # If the value is a dictionary, recurse into it
+                recurse_keys(value)
+            elif isinstance(value, list):  # If the value is a list, iterate and check if its items are dictionaries
+                for item in value:
+                    if isinstance(item, dict):
+                        recurse_keys(item)
+                    else:
+                        unique_keys.add(key)  # Add the key if it's a leaf
+            else:
+                unique_keys.add(key)  # Add the key if it's a leaf
+
+    recurse_keys(d)
+    return unique_keys
+
+
+def get_n_level_keys(d, n):
+    n_level_keys = set()
+
+    def recurse_keys(current_dict, current_level):
+        # If we have reached the target level (n), add the keys
+        if current_level == n:
+            n_level_keys.update(current_dict.keys())
+        else:
+            for key, value in current_dict.items():
+                if isinstance(value, dict):  # Only recurse into dictionaries
+                    recurse_keys(value, current_level + 1)
+
+    # Start the recursion
+    recurse_keys(d, 1)  # Start from level 1
+    return n_level_keys

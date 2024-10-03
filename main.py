@@ -116,14 +116,13 @@ def main(
     except NotImplementedError as e:
         print(f"Error: {e}")
 
-
     # this part is necessary for sweeps to work
     wandb.finish()
-    wandb_name = cfg.wandb.experiment + '_' + helpers.timestamp()
+    wandb_name = cfg.wandb.experiment + "_" + helpers.timestamp()
 
     wandb_logger = WandbLogger(
-        project = cfg.wandb.project,
-        name = wandb_name,
+        project=cfg.wandb.project,
+        name=wandb_name,
         log_model=False,
     )
 
@@ -148,32 +147,25 @@ def main(
 
         callbacks.append(checkpoint_callback)
 
-
     callbacks = callbacks if len(callbacks) > 0 else None
     max_epochs = cfg.trainer.max_epochs
-    trainer = pl.Trainer(max_epochs=max_epochs, logger=wandb_logger, callbacks = callbacks)
+    trainer = pl.Trainer(
+        max_epochs=max_epochs, logger=wandb_logger, callbacks=callbacks
+    )
     trainer.fit(model, data_module)
 
-    if cfg.plotting.plot:
-
-        plotting_folder_path = plot.create_plot_path(original_path, cfg)
+    if cfg.plotting.plot or cfg.test_intervention:
 
         model.to("cpu")
         model.eval()
-
-        wandb.log(
-            {
-                "fc3": wandb.Image(
-                    model.state_dict()["fc3.weight"].detach().numpy(), caption="FC3"
-                )
-            },
-        )
 
         x_true = adata_test.X.astype(np.float32).copy()
         x_true = x_true / x_true.sum(axis=1, keepdims=True) * 1e4
         x_true = np.log1p(x_true)
 
-        sub_idx = np.random.choice(x_true.shape[0], replace=False, size=min(5000, x_true.shape[0]))
+        sub_idx = np.random.choice(
+            x_true.shape[0], replace=False, size=min(5000, x_true.shape[0])
+        )
         # sub_idx = np.arange(x_true.shape[0])
 
         ad_true = ad.AnnData(
@@ -182,7 +174,7 @@ def main(
         )
 
         preds = model(torch.tensor(x_true))
-        x_pred = preds['x_pred'].detach().numpy()
+        x_pred = preds["x_pred"].detach().numpy()
         x_concepts = adata_test.obsm["concepts"].astype(np.float32).copy()
 
         ad_pred = ad.AnnData(
@@ -191,11 +183,22 @@ def main(
         )
 
 
-        if cfg.model.has_cbm:
-            c_pred = preds['pred_concept'].detach().numpy()
-            ad_pred.obsm['concepts'] = c_pred[sub_idx]
+    if cfg.plotting:
+        plotting_folder_path = plot.create_plot_path(original_path, cfg)
+        wandb.log(
+            {
+                "fc3": wandb.Image(
+                    model.state_dict()["fc3.weight"].detach().numpy(), caption="FC3"
+                )
+            },
+        )
 
-            ad_true.obsm['concepts'] = x_concepts[sub_idx]
+
+        if cfg.model.has_cbm:
+            c_pred = preds["pred_concept"].detach().numpy()
+            ad_pred.obsm["concepts"] = c_pred[sub_idx]
+
+            ad_true.obsm["concepts"] = x_concepts[sub_idx]
             if cfg.model.independent_training:
                 x_pred_withGT = model(torch.tensor(x_true), torch.tensor(x_concepts))[
                     "x_pred"
@@ -207,7 +210,7 @@ def main(
                     obs=adata_test.obs.iloc[sub_idx],
                 )
 
-                ad_pred_withGT.obsm['concepts'] = x_concepts[sub_idx]
+                ad_pred_withGT.obsm["concepts"] = x_concepts[sub_idx]
 
                 ad_merge = ad.concat(
                     dict(vae_cbm=ad_pred, vae_cbm_withGT=ad_pred_withGT, true=ad_true),
@@ -221,8 +224,8 @@ def main(
                     label="ident",
                 )
         else:
-            ad_pred.obsm['concepts'] = x_concepts[sub_idx].copy()
-            ad_true.obsm['concepts'] = x_concepts[sub_idx].copy()
+            ad_pred.obsm["concepts"] = x_concepts[sub_idx].copy()
+            ad_true.obsm["concepts"] = x_concepts[sub_idx].copy()
             ad_merge = ad.concat(dict(vae=ad_pred, true=ad_true), axis=0, label="ident")
 
         # this scales very poorly
@@ -268,9 +271,7 @@ def main(
         n_concepts = len(original_test_concepts.columns)
 
         intervention_scores = dict(On=dict(), Off=dict())
-        strict_intervention_score = 0
-
-        all_effect_size = dict(pos=[], neu=[], neg=[])
+        all_curves = dict(On=dict(), Off=dict())
 
         for c, concept_name in enumerate(original_test_concepts.columns):
             concept_vars = dict()
@@ -281,7 +282,7 @@ def main(
 
             interventions_type = ["On", "Off"]
             for _, intervention_type in enumerate(interventions_type):
-                results, scores, concept_effect_size = (
+                results, scores, curves = (
                     clab.evaluation.interventions.eval_intervention(
                         intervention_type,
                         c,
@@ -298,9 +299,6 @@ def main(
                     )
                 )
 
-                for k, v in concept_effect_size.items():
-                    all_effect_size[k] += v
-
                 if cfg.plotting.plot:
                     plot.plot_concept_shift(
                         results,
@@ -311,10 +309,10 @@ def main(
                     )
 
                 intervention_scores[intervention_type].update(scores)
+                all_curves[intervention_type].update(curves)
 
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
-
 
         flat_list = helpers.flatten_to_list_of_lists(intervention_scores)
         df_long = pd.DataFrame(flat_list)
@@ -340,6 +338,8 @@ def main(
 
         wandb.log({f"AUPRC": av_scores.loc["auprc_joint"].values})
         wandb.log({f"AUROC": av_scores.loc["auroc_joint"].values})
+
+        plot.plot_performance_curves(all_curves)
 
         if cfg.plotting.plot:
 
@@ -386,14 +386,13 @@ def main(
                 )
 
                 plot.plot_intervention_effect_size(
-                    all_effect_size,
+                    df_long_local,
                 )
 
                 # plot.plot_concept_correlation_matrix(coefs)
                 # plot.plot_celltype_correlation_matrix(dataset)
 
     wandb.finish()
-
 
 
 if __name__ == "__main__":

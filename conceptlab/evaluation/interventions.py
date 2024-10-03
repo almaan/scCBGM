@@ -94,16 +94,16 @@ def eval_intervention(
     subset_original_test_concepts = original_test_concepts.iloc[indices]
     subset_concepts = concepts.iloc[indices]
 
-    scores, curves, effect_size = DistributionShift.score(
-        X_old = subset_genetrated_data,
-        X_new = subset_genetrated_data_after_intervention,
-        concepts_old = subset_original_test_concepts,
-        concepts_new = subset_concepts,
-        concept_coefs = coefs,
+    scores, curves = DistributionShift.score(
+        X_old=subset_genetrated_data,
+        X_new=subset_genetrated_data_after_intervention,
+        concepts_old=subset_original_test_concepts,
+        concepts_new=subset_concepts,
+        concept_coefs=coefs,
         use_neutral=False,
     )
 
-    return results, scores, effect_size
+    return results, scores, curves
 
 
 def cohens_d(x, y):
@@ -127,7 +127,6 @@ def cohens_d(x, y):
 
     # Cohen's d calculation for each column
     d_values = (mean_x - mean_y) / (pooled_std + 1e-8)
-    d_values = d_values[~np.isnan(d_values)]
 
     return d_values
 
@@ -279,7 +278,6 @@ class DistributionShift(EvaluationClass):
 
         results = dict()
         curves = dict()
-        effect_size = dict(neu = [], pos = [], neg = [])
 
         for concept_name in concept_names:
 
@@ -292,10 +290,11 @@ class DistributionShift(EvaluationClass):
 
             concept_delta_mean = concept_delta.mean()
 
-            print(concept_name)
             if concept_delta_mean == 0:
-                print('we pass on {}'.format(concept_name))
                 continue
+
+            pos_delta = concept_delta > 0
+            neg_delta = concept_delta < 0
 
             results[concept_name] = dict()
 
@@ -311,67 +310,80 @@ class DistributionShift(EvaluationClass):
             else:
                 var_names_dict["neu"] = coefs_k.index[coefs_k.values == 0]
 
-            pred_vals = OrderedDict()
-            true_vals = OrderedDict()
+            vals_new = X_new.values
+            vals_old = X_old.values
 
-            for direction, var_names in var_names_dict.items():
-                pred_vals[direction] = []
-                true_vals[direction] = []
+            y_true_all = np.array([])
+            y_pred_all = np.array([])
 
-                vals_new = X_new.loc[:, var_names].values
-                vals_old = X_old.loc[:, var_names].values
+            for delta, dropped, ivn in zip(
+                [pos_delta, neg_delta], [False, True], ["0->1", "1->0"]
+            ):
 
-                pos_delta = concept_delta > 0
-                neg_delta = concept_delta < 0
+                if not np.any(delta):
+                    continue
 
-                for delta, dropped, ivn in zip(
-                    [pos_delta, neg_delta], [False, True], ["0->1", "1->0"]
-                ):
+                d_values = pd.Series(
+                    cohens_d(vals_new[delta], vals_old[delta]), index=X_new.columns
+                )
 
-                    if np.any(delta):
-                        test_res = cls.diff_test(
-                            vals_new[delta],
-                            vals_old[delta],
-                            direction,
-                            dropped=dropped,
-                        )
+                # split by direction
+                d_dict = {
+                    direction: d_values[var_names_dict[direction]].values
+                    for direction in var_names_dict.keys()
+                }
 
-                        pred_vals[direction] += test_res.tolist()
-                        effect_size[direction] += test_res.tolist()
+                # Process the values for each key in the dictionary
+                for key in d_dict:
+                    d_dict[key] = d_dict[key][~np.isnan(d_dict[key])]
 
-                        base = [direction_to_true[direction]] * len(test_res)
-                        true_vals[direction] += base
+                # Negate the negative values as required
+                d_dict["neg"] = -d_dict["neg"]
 
-                        diff_av = cohens_d(vals_new[delta], vals_old[delta]).mean()
+                # Concatenate the values for y_pred
+                y_pred = np.concatenate([d_dict[key] for key in ["pos", "neg", "neu"]])
 
-                        results[concept_name][
-                            f"{direction}"
-                        ] = diff_av
+                # Optionally negate y_pred if needed
+                if dropped:
+                    y_pred = -y_pred
 
-            true_vals_all = np.concatenate([v for v in true_vals.values()])
-            pred_vals_all = np.concatenate([v for v in pred_vals.values()])
+                # Create y_true based on the lengths of the respective arrays
+                y_true = np.concatenate(
+                    [
+                        np.ones_like(d_dict["pos"]),
+                        np.ones_like(d_dict["neg"]),
+                        np.zeros_like(d_dict["neu"]),
+                    ]
+                )
 
-            if len(pred_vals_all) > 1:
+                y_pred_all = np.append(y_pred_all,y_pred)
+                y_true_all = np.append(y_true_all,y_true)
+
+                results[concept_name].update({k:v.mean() for k,v in d_dict.items()})
+
+            if len( np.unique(y_true_all) ) == 2:
 
                 # precision recall calculations
                 precision, recall, thresholds = precision_recall_curve(
-                    true_vals_all, pred_vals_all,
+                    y_true_all,
+                    y_pred_all,
                 )
 
                 results[concept_name]["auprc_joint"] = auc(recall, precision)
-                curves[concept_name]["auprc_joint"] = dict(y=precision, x=recall)
+                curves[concept_name]['auprc_joint'] = dict(y=precision, x=recall)
 
                 # roc calculations
-                fpr, tpr, _ = roc_curve(true_vals_all, pred_vals_all)
+                fpr, tpr, _ = roc_curve(y_true_all, y_pred_all)
                 results[concept_name]["auroc_joint"] = roc_auc_score(
-                    true_vals_all, pred_vals_all,
+                    y_true_all,
+                    y_pred_all,
                 )
                 curves[concept_name]["auroc_joint"] = dict(y=tpr, x=fpr)
 
         results = {key: val for key, val in results.items() if len(val) > 0}
         curves = {key: val for key, val in curves.items() if len(val) > 0}
 
-        return results, curves, effect_size
+        return results, curves
 
     @classmethod
     def diff_test(cls, X, Y, direction, dropped=False):

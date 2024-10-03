@@ -5,7 +5,7 @@ import scanpy as sc
 import numpy as np
 import wandb
 import pandas as pd
-
+from conceptlab.utils import helpers
 
 
 def create_plot_path(original_path, cfg):
@@ -26,14 +26,15 @@ def plot_generation(adata, plotting_folder_path, cfg):
     old_obs = adata.obs.copy()
 
     if "concepts" in adata.obsm:
-        concepts = adata.obsm['concepts'].copy()
-        columns = [f'concept_{k}' for k in range(concepts.shape[1])]
-        concepts = pd.DataFrame(concepts,
-                                index = adata.obs.index,
-                                columns = columns,
-                                )
+        concepts = adata.obsm["concepts"].copy()
+        columns = [f"concept_{k}" for k in range(concepts.shape[1])]
+        concepts = pd.DataFrame(
+            concepts,
+            index=adata.obs.index,
+            columns=columns,
+        )
 
-        adata.obs = pd.concat(( old_obs, concepts ), axis =1)
+        adata.obs = pd.concat((old_obs, concepts), axis=1)
 
         colors += columns
 
@@ -166,19 +167,49 @@ def plot_intervention_effect_size(
     effect_size,
 ):
 
-    for k, (direction, values) in enumerate(effect_size.items()):
 
-        if direction == "neg":
-            plot_values = [[-x] for x in values]
-        else:
-            plot_values = [[x] for x in values]
+    fig, ax = plt.subplots(1,1)
 
-        wandb.log(
-            {
-                f"effect_sizes_{direction}": wandb.plot.histogram(
-                    wandb.Table(data=plot_values, columns=["cohens_d"]),
-                    "cohens_d",
-                    title=f"Effect Size : {direction}",
-                )
-            }
-        )
+    sns.histplot(effect_size, x = 'cohens_d', hue = 'direction', ax = ax, bins = 25)
+
+    wandb.log({f"effect_sizes": wandb.Image(fig)})
+
+
+def plot_performance_curves(curve_dict):
+
+    score_names = helpers.get_n_level_keys(curve_dict, 3)
+    n_scores = len(score_names)
+    score_to_ax = {s:k for k,s in enumerate(score_names)}
+    fig, ax = plt.subplots(1,n_scores, figsize = (n_scores * 9 , 8))
+
+    df = dict( intervention = [],
+               concept = [],
+               metric= [],
+               x = [],
+               y = [],
+               )
+
+    for i,(iv_key, iv_val) in enumerate( curve_dict.items() ):
+        for c_key,c_val in iv_val.items():
+            for s_key,s_val in c_val.items():
+                x = s_val['x']
+                y = s_val['y']
+                n = len(x)
+
+                df['intervention'] += [iv_key] * n
+                df['concept'] += [c_key] * n
+                df['metric'] += [s_key] * n
+                df['x'] += x.tolist()
+                df['y'] += y.tolist()
+
+    df = pd.DataFrame(df)
+
+    for s,k in score_to_ax.items():
+        sub_df = df.iloc[df['metric'].values == s]
+        sns.lineplot(sub_df, x = 'x', y ='y', hue = 'concept', style = 'intervention',ax = ax[k], errorbar = None)
+        ax[k].set_title(s.split('_')[0].upper())
+
+    fig.tight_layout()
+
+    wandb.log({ 'performance_curves': wandb.Image(fig) })
+
