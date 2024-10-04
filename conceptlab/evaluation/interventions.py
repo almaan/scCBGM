@@ -2,6 +2,7 @@ from conceptlab.evaluation._base import EvaluationClass
 from collections import OrderedDict
 from conceptlab.utils import helpers
 import pandas as pd
+import plotly.graph_objects as go
 from typing import Dict, Any, Literal, Tuple, List
 import numpy as np
 from sklearn.metrics import (
@@ -14,6 +15,26 @@ from sklearn.metrics import (
 )
 import torch
 import wandb
+
+
+class DistributionShift(EvaluationClass):
+    """
+    A class to evaluate distribution shifts between two datasets by comparing
+    their statistical properties and concept distributions.
+
+    Inherits from:
+        EvaluationClass: A base class that provides common evaluation utilities.
+    """
+
+    def __init__(
+        self,
+    ):
+        super().__init__()
+
+    @classmethod
+    def _score_fun(cls, X_new, X_old):
+        d_values = pd.Series(cohens_d(X_new.values, X_old.values), index=X_new.columns)
+        return d_values
 
 
 def eval_intervention(
@@ -133,26 +154,6 @@ def cohens_d(x, y):
     return d_values
 
 
-class DistributionShift(EvaluationClass):
-    """
-    A class to evaluate distribution shifts between two datasets by comparing
-    their statistical properties and concept distributions.
-
-    Inherits from:
-        EvaluationClass: A base class that provides common evaluation utilities.
-    """
-
-    def __init__(
-        self,
-    ):
-        super().__init__()
-
-    @classmethod
-    def _score_fun(cls, X_new, X_old):
-        d_values = pd.Series(cohens_d(X_new.values, X_old.values), index=X_new.columns)
-        return d_values
-
-
 def compute_auroc(y_true, y_pred, plot=False):
     true_to_val = dict(
         pos=1,
@@ -163,20 +164,42 @@ def compute_auroc(y_true, y_pred, plot=False):
     y_pred_adj = y_pred.copy()
     y_pred_adj[y_true == "neg"] = -y_pred_adj[y_true == "neg"]
 
-    print(y_true_adj)
-    print(y_pred_adj)
-    print('--')
-
-
     if plot:
-        wandb.log(
-            {
-                "roc": wandb.plot.roc_curve(
-                    y_true_adj,
-                    y_pred_adj,
-                )
-            }
+        fpr, tpr, _ = roc_curve(y_true_adj, y_pred_adj)
+
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(x=fpr, y=tpr, mode="lines", name="data"))
+
+        fig.add_trace(
+            go.Scatter(
+                x=[0, 1],
+                y=[0, 1],
+                mode="lines",
+                name="random",
+                line=dict(color="red", dash="solid"),
+            )
         )
+
+        fig.update_layout(
+            title="ROC",
+            xaxis_title="FPR",
+            yaxis_title="TPR",
+            xaxis=dict(
+                scaleanchor="y",
+                scaleratio=1,
+                range=[0, 1],
+            ),  # Ensure equal scale
+            yaxis=dict(
+                scaleanchor="x",
+                scaleratio=1,
+                range=[0, 1],
+            ),  # Ensure equal scale
+            width=600,
+            height=600,
+        )
+
+        wandb.log({"roc": fig})
 
     score = roc_auc_score(
         y_true_adj,
@@ -197,24 +220,44 @@ def compute_auprc(y_true, y_pred, plot=False):
     y_pred_adj = y_pred.copy()
     y_pred_adj[y_true == "neg"] = -y_pred_adj[y_true == "neg"]
 
-    print(y_true_adj)
-    print(y_pred_adj)
-    print('--')
-
-
-
-    if plot:
-        wandb.log(
-            {
-                "pr": wandb.plot.pr_curve(
-                    y_true_adj,
-                    y_pred_adj,
-                )
-            }
-        )
-
     precision, recall, _ = precision_recall_curve(y_true_adj, y_pred_adj)
     score = auc(recall, precision)
+
+    if plot:
+
+        p_pos = y_true_adj.sum() / len(y_true_adj)
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(x=recall, y=precision, mode="lines", name="data"))
+
+        fig.add_trace(
+            go.Scatter(
+                x=[0, 1],
+                y=[p_pos, p_pos],
+                mode="lines",
+                name="random",
+                line=dict(color="red", dash="solid"),
+            )
+        )
+
+        fig.update_layout(
+            title="PR",
+            xaxis_title="recall",
+            yaxis_title="precision",
+            xaxis=dict(
+                scaleanchor="y",
+                scaleratio=1,  # Link x-axis to y-axis
+            ),  # Ensure equal scale
+            yaxis=dict(
+                scaleanchor="x",
+                scaleratio=1,  # Link y-axis to x-axis
+            ),  # Ensure equal scale
+            width=600,
+            height=600,
+        )
+
+        wandb.log({"pr": fig})
+
     return score
 
 

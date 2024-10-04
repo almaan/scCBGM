@@ -310,7 +310,7 @@ def main(
 
 
         joint_score = clab.evaluation.interventions.score_intervention(
-            intervention_scores, metrics=["auroc", "auprc"], plot=False,
+            intervention_scores, metrics=["auroc", "auprc"], plot=True,
         )
 
         for key, val in joint_score.items():
