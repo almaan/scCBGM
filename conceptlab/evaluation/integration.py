@@ -1,12 +1,10 @@
 import anndata as ad
-import scanpy as sc
 from typing import Dict
 from itertools import combinations
 import numpy as np
 import pandas as pd
-from . _lisi import compute_lisi
-from . _modularity import compute_modularity
-from scipy.spatial import cKDTree as KDTree
+from ._lisi import compute_lisi
+from ._modularity import compute_modularity
 
 
 def lisi(
@@ -36,11 +34,11 @@ def lisi(
         l1, l2 = combo
         sel_idx = np.isin(labels, combo)
 
-        metadata = pd.DataFrame(labels[sel_idx], columns = [label])
+        metadata = pd.DataFrame(labels[sel_idx], columns=[label])
 
         X = ad_all[sel_idx].to_df().values
-        n_components = min(X.shape[1],50)
-        pca = PCA(n_components = n_components)
+        n_components = min(X.shape[1], 50)
+        pca = PCA(n_components=n_components)
         X = pca.fit_transform(X)
 
         score = compute_lisi(X, metadata, label_colnames=[label])
@@ -53,7 +51,10 @@ def lisi(
 
 
 def modularity(
-        adatas: Dict[str, ad.AnnData] | ad.AnnData, label: str | None = None, embedd: bool = True, **kwargs
+    adatas: Dict[str, ad.AnnData] | ad.AnnData,
+    label: str | None = None,
+    embedd: bool = True,
+    **kwargs,
 ):
     from sklearn.decomposition import PCA
 
@@ -83,8 +84,8 @@ def modularity(
 
         X = ad_all[sel_idx].to_df().values
         if embedd:
-            n_components = min(X.shape[1],50)
-            pca = PCA(n_components = n_components)
+            n_components = min(X.shape[1], 50)
+            pca = PCA(n_components=n_components)
             X = pca.fit_transform(X)
 
         score = compute_modularity(X, metadata)
@@ -92,5 +93,3 @@ def modularity(
         scores[f"{l1}_vs_{l2}"] = 1 - score
 
     return scores
-
-

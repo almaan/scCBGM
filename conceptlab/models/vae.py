@@ -2,8 +2,6 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset, random_split
-from torchvision import transforms
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
@@ -27,15 +25,15 @@ class VAE(pl.LightningModule):
         self.fc3 = nn.Linear(self.latent_dim, self.hidden_dim)
         self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
         self.beta = config.beta
-        self.dropout = config.get('dropout',0.3)
+        self.dropout = config.get("dropout", 0.3)
 
         self.save_hyperparameters()
 
     def encode(self, x):
         h1 = F.relu(self.fc1(x))
-        mu,logvar = self.fc21(h1), self.fc22(h1)
-        logvar = t.clip(logvar,-1e5,1e5)
-        return mu,logvar
+        mu, logvar = self.fc21(h1), self.fc22(h1)
+        logvar = t.clip(logvar, -1e5, 1e5)
+        return mu, logvar
 
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
@@ -50,35 +48,36 @@ class VAE(pl.LightningModule):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
         x_pred = self.decode(z)
-        return {'x_pred':x_pred, 'z':z, 'mu':mu, 'logvar':logvar}
+        return {"x_pred": x_pred, "z": z, "mu": mu, "logvar": logvar}
 
-    def loss_function(self, x, x_pred, mu, logvar,**kwargs):
-        loss_dict ={}
-        MSE = F.mse_loss(x_pred, x, reduction='mean')
+    def loss_function(self, x, x_pred, mu, logvar, **kwargs):
+        loss_dict = {}
+        MSE = F.mse_loss(x_pred, x, reduction="mean")
         KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-        loss_dict['rec_loss']= MSE
-        loss_dict['KL_loss']= KLD
-        loss_dict['Total_loss']= MSE + self.beta * KLD 
+        loss_dict["rec_loss"] = MSE
+        loss_dict["KL_loss"] = KLD
+        loss_dict["Total_loss"] = MSE + self.beta * KLD
 
         return loss_dict
 
-
-    def _step(self,batch,batch_idx, prefix = 'train'):
+    def _step(self, batch, batch_idx, prefix="train"):
         x = batch
         out = self(x)
-        loss_dict = self.loss_function(x,**out)
+        loss_dict = self.loss_function(x, **out)
 
         for key, value in loss_dict.items():
-            self.log(f'{prefix}_{key}', value)
-        return loss_dict['Total_loss']
+            self.log(f"{prefix}_{key}", value)
+        return loss_dict["Total_loss"]
 
     def training_step(self, batch, batch_idx):
-        return self._step(batch,batch_idx, 'train')
+        return self._step(batch, batch_idx, "train")
 
     def validation_step(self, batch, batch_idx):
-        return self._step(batch,batch_idx, 'val')
+        return self._step(batch, batch_idx, "val")
 
-    def configure_optimizers(self,):
+    def configure_optimizers(
+        self,
+    ):
 
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         # Define the CosineAnnealingLR scheduler
@@ -86,11 +85,11 @@ class VAE(pl.LightningModule):
 
         # Return a dictionary with the optimizer and the scheduler
         return {
-            'optimizer': optimizer,
-            'lr_scheduler': {
-                'scheduler': scheduler,  # The LR scheduler instance
-                'interval': 'epoch',  # The interval to step the scheduler ('epoch' or 'step')
-                'frequency': 1,       # How often to update the scheduler
-                'monitor': 'val_loss', # Optional: if you use reduce-on-plateau schedulers
-            }
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,  # The LR scheduler instance
+                "interval": "epoch",  # The interval to step the scheduler ('epoch' or 'step')
+                "frequency": 1,  # How often to update the scheduler
+                "monitor": "val_loss",  # Optional: if you use reduce-on-plateau schedulers
+            },
         }

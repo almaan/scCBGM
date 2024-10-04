@@ -5,7 +5,7 @@ This is a toy setup for OMICS data to test different architecture
 
 ## Getting started
 
-Install the environment 
+Install the environment
 
 ```
 mamba env create -f env.yml

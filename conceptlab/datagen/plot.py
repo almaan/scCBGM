@@ -10,7 +10,7 @@ def matrix_plot(
     cmap=plt.cm.RdBu,
     cmap_size: int = 5,
     ax: plt.Axes | None = None,
-        show: bool = True,
+    show: bool = True,
 ):
 
     n_y, n_x = matrix.shape

@@ -22,7 +22,3 @@ model:
 
 test_intervention: True
 test_integration: ['modularity']
-
-
-
-

@@ -1,17 +1,14 @@
 from conceptlab.evaluation._base import EvaluationClass
-from collections import OrderedDict
 from conceptlab.utils import helpers
 import pandas as pd
 import plotly.graph_objects as go
-from typing import Dict, Any, Literal, Tuple, List
+from typing import Literal, List
 import numpy as np
 from sklearn.metrics import (
     precision_recall_curve,
     auc,
-    accuracy_score,
     roc_curve,
     roc_auc_score,
-    cohen_kappa_score,
 )
 import torch
 import wandb

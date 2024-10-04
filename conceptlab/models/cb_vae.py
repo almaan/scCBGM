@@ -2,12 +2,8 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset, random_split
-from torchvision import transforms
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
-import wandb
-from torchmetrics.regression import LogCoshError
 
 
 # Define the VAE model
@@ -37,8 +33,7 @@ class CB_VAE(pl.LightningModule):
         self.beta = config.beta
         self.concepts_hp = config.concepts_hp
         self.orthogonality_hp = config.orthogonality_hp
-        self.dropout = config.get('dropout',0.0)
-
+        self.dropout = config.get("dropout", 0.0)
 
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", False)
         self.use_concept_loss = config.get("use_concept_loss", True)
@@ -75,7 +70,7 @@ class CB_VAE(pl.LightningModule):
 
     def decode(self, z):
         h3 = F.relu(self.fc3(z))
-        h3 = F.dropout(h3, p = self.dropout, training=True, inplace=False)
+        h3 = F.dropout(h3, p=self.dropout, training=True, inplace=False)
         return self.fc4(h3)
 
     def forward(self, x, concepts=None):
@@ -145,7 +140,6 @@ class CB_VAE(pl.LightningModule):
                 pred_concept, concepts, reduction="mean"
             )
 
-            concept_losses = []
             for c in range(self.n_concepts):
                 accuracy = self.binary_accuracy(pred_concept[:, c], concepts[:, c])
                 loss_dict[str(c) + "_acc"] = accuracy
@@ -180,9 +174,11 @@ class CB_VAE(pl.LightningModule):
         return self._step(batch, batch_idx, "val")
 
     # def configure_optimizers(self):
-        # return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+    # return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def configure_optimizers(self,):
+    def configure_optimizers(
+        self,
+    ):
 
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         # Define the CosineAnnealingLR scheduler
@@ -190,11 +186,11 @@ class CB_VAE(pl.LightningModule):
 
         # Return a dictionary with the optimizer and the scheduler
         return {
-            'optimizer': optimizer,
-            'lr_scheduler': {
-                'scheduler': scheduler,  # The LR scheduler instance
-                'interval': 'epoch',  # The interval to step the scheduler ('epoch' or 'step')
-                'frequency': 1,       # How often to update the scheduler
-                'monitor': 'val_loss', # Optional: if you use reduce-on-plateau schedulers
-            }
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,  # The LR scheduler instance
+                "interval": "epoch",  # The interval to step the scheduler ('epoch' or 'step')
+                "frequency": 1,  # How often to update the scheduler
+                "monitor": "val_loss",  # Optional: if you use reduce-on-plateau schedulers
+            },
         }

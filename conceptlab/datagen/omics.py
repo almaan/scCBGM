@@ -1,7 +1,7 @@
 from conceptlab.datagen._base import DataGenerator
 from conceptlab.utils.types import *
 import conceptlab.utils.constants as _C
-from typing import Dict, Any, List, Literal
+from typing import Dict, List, Literal
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -13,6 +13,7 @@ def idx_to_mask(idx_vec, size):
     vec = np.zeros(size)
     vec[idx_vec] = 1
     return vec
+
 
 def categorical(p):
     return np.argmax(np.random.multinomial(1, p))
@@ -235,7 +236,7 @@ class OmicsDataGenerator(DataGenerator):
         beta_b: PositiveFloat = 0.5,
         seed: int = 42,
         zero_inflate: bool = True,
-            **kwargs,
+        **kwargs,
     ) -> xr.Dataset:
         """
         Generate synthetic omics data.
@@ -303,7 +304,7 @@ class OmicsDataGenerator(DataGenerator):
 
         if zero_inflate:
             # zero inflation probability
-            pi = 1-rng.beta(beta_a, beta_b, size=C)
+            pi = 1 - rng.beta(beta_a, beta_b, size=C)
 
             # add zero inflation
             mask = np.vstack([rng.binomial(1, pi[i], size=F) for i in range(C)])

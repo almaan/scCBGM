@@ -5,16 +5,12 @@ import numpy as np
 import omegaconf
 
 import pandas as pd
-import seaborn as sns
 import wandb
-import argparse
 import os
-import pathlib
 from lightning.pytorch.loggers import WandbLogger
 from hydra.utils import get_original_cwd
 import pytorch_lightning as pl
 import anndata as ad
-import xarray as xr
 import torch
 
 from conceptlab.utils.seed import set_seed
@@ -24,7 +20,7 @@ from conceptlab.datagen import modify
 from conceptlab.utils import constants as C
 import conceptlab.evaluation.integration as ig
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 import pickle
 
 
@@ -303,14 +299,17 @@ def main(
                         cfg,
                     )
 
-                intervention_scores[intervention_type][concept_name] = scores[concept_name]
+                intervention_scores[intervention_type][concept_name] = scores[
+                    concept_name
+                ]
 
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
 
-
         joint_score = clab.evaluation.interventions.score_intervention(
-            intervention_scores, metrics=["auroc", "auprc"], plot=True,
+            intervention_scores,
+            metrics=["auroc", "auprc"],
+            plot=True,
         )
 
         for key, val in joint_score.items():

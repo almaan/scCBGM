@@ -1,5 +1,4 @@
-from abc import ABCMeta, abstractmethod,abstractclassmethod
-from typing import Dict, Any
+from abc import ABCMeta, abstractclassmethod
 
 
 class DataGenerator(ABCMeta):
@@ -7,8 +6,5 @@ class DataGenerator(ABCMeta):
         pass
 
     @abstractclassmethod
-    def generate(cls, n_obs: int,**kwargs):
+    def generate(cls, n_obs: int, **kwargs):
         pass
-
-
-

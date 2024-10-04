@@ -4,35 +4,35 @@ from torch.utils.data import DataLoader, Dataset, random_split
 import torch as t
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
 
 # import omics
 # from conceptlab.datagen.omics import OmicsDataGenerator
 import xarray as xr
 
+
 class GeneExpressionDataset(Dataset):
     def __init__(
         self,
         data: pd.DataFrame | np.ndarray,
-        add_concepts: bool =False,
+        add_concepts: bool = False,
         concepts: pd.DataFrame | np.ndarray = None,
     ):
 
-        if isinstance(data,np.ndarray):
+        if isinstance(data, np.ndarray):
             self.data = data
             self.var_names = None
             self.obs_names = None
-        elif isinstance(data,pd.DataFrame):
+        elif isinstance(data, pd.DataFrame):
             self.var_names = data.columns.tolist()
             self.obs_names = data.index.tolist()
-            self.data=data.values.astype(np.float32)
+            self.data = data.values.astype(np.float32)
             self.data = t.tensor(self.data)
         else:
             raise ValueError()
 
-        self.add_concepts=add_concepts
-        if(self.add_concepts):
-            self.concepts =concepts.values.astype(np.float32)
+        self.add_concepts = add_concepts
+        if self.add_concepts:
+            self.concepts = concepts.values.astype(np.float32)
             self.concepts = t.tensor(self.concepts)
 
     def __len__(self):
@@ -45,8 +45,10 @@ class GeneExpressionDataset(Dataset):
             return sample, concepts
         return sample
 
-    def get_data(self,):
-        return pd.DataFrame(self.data, index = self.obs_names, columns = self.var_names)
+    def get_data(
+        self,
+    ):
+        return pd.DataFrame(self.data, index=self.obs_names, columns=self.var_names)
 
 
 class GeneExpressionDataModule(pl.LightningDataModule):
@@ -56,12 +58,12 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         batch_size: int = 32,
         val_split: float = 0.2,
         layer: str = None,
-        add_concepts: bool=False,
-        normalize: bool=True,
+        add_concepts: bool = False,
+        normalize: bool = True,
     ):
         super().__init__()
 
-        self.add_concepts=add_concepts
+        self.add_concepts = add_concepts
 
         if isinstance(data, xr.Dataset):
 
@@ -71,27 +73,28 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         elif isinstance(data, ad.AnnData):
             self.data = data.to_df(layer=layer)
             if self.add_concepts:
-                self.concepts = pd.DataFrame(data.obsm['concepts'])
-        elif isinstance(data,pd.DataFrame):
+                self.concepts = pd.DataFrame(data.obsm["concepts"])
+        elif isinstance(data, pd.DataFrame):
             self.data = data.copy()
         else:
-            raise ValueError('Only supported data formats are : ad.AnnData and pd.DataFrame')
+            raise ValueError(
+                "Only supported data formats are : ad.AnnData and pd.DataFrame"
+            )
 
         if not self.add_concepts:
             self.concepts = None
 
-        if(normalize):
-            X= self.data.values
-            X = X / np.sum(X,axis=1,keepdims = True) * 1e4
+        if normalize:
+            X = self.data.values
+            X = X / np.sum(X, axis=1, keepdims=True) * 1e4
             X = np.log1p(X)
             self.data = pd.DataFrame(X)
-
 
         self.batch_size = batch_size
         self.val_split = val_split
 
     def setup(self, stage=None):
-        dataset = GeneExpressionDataset(self.data,self.add_concepts,self.concepts)
+        dataset = GeneExpressionDataset(self.data, self.add_concepts, self.concepts)
         val_size = int(len(dataset) * self.val_split)
         train_size = len(dataset) - val_size
         self.train_dataset, self.val_dataset = random_split(

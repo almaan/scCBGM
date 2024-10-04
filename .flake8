@@ -1,0 +1,4 @@
+[flake8]
+extend-ignore = EX,GL
+exclude = .git,__pycache__,docs/source/conf.py,old,build,dist,.yaml,.ipynb
+max-complexity = 10

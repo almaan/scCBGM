@@ -1,10 +1,8 @@
-from abc import ABCMeta, abstractmethod, abstractclassmethod
+from abc import ABCMeta, abstractclassmethod
 from typing import Dict, Any, Tuple
-import matplotlib.pyplot as plt
 import pandas as pd
-from typing import Dict, Any, Literal, Tuple
+from typing import Dict, Any, Tuple
 import numpy as np
-from conceptlab.utils import helpers
 
 
 class EvaluationClass(ABCMeta):
@@ -79,8 +77,8 @@ class EvaluationClass(ABCMeta):
             else:
                 var_names_dict["neu"] = coefs_k.index[coefs_k.values == 0]
 
-            vals_new = X_new.values
-            vals_old = X_old.values
+            X_new.values
+            X_old.values
 
             for delta, dropped, ivn in zip(
                 [pos_delta, neg_delta], [False, True], ["0->1", "1->0"]
@@ -89,14 +87,13 @@ class EvaluationClass(ABCMeta):
                 if not np.any(delta):
                     continue
 
-                score_values = cls._score_fun(X_new.iloc[delta],X_old.iloc[delta])
+                score_values = cls._score_fun(X_new.iloc[delta], X_old.iloc[delta])
 
                 # split by direction
                 d_dict = {
                     direction: score_values[var_names_dict[direction]].values
                     for direction in var_names_dict.keys()
                 }
-
 
                 # Process the values for each key in the dictionary
                 for key in d_dict:
@@ -111,6 +108,6 @@ class EvaluationClass(ABCMeta):
 
                 results[concept_name].update({k: v.mean() for k, v in d_dict.items()})
 
-            results = {k:v for k,v in results.items() if len(v) > 0}
+            results = {k: v for k, v in results.items() if len(v) > 0}
 
             return results
