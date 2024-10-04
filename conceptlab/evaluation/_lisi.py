@@ -26,7 +26,7 @@ def compute_lisi(
     X: np.array,
     metadata: pd.DataFrame,
     label_colnames: Iterable[str],
-    perplexity: float=30
+    perplexity: float = 30,
 ):
     """Compute the Local Inverse Simpson Index (LISI) for each column in metadata.
 
@@ -51,18 +51,20 @@ def compute_lisi(
     n_cells = metadata.shape[0]
     n_labels = len(label_colnames)
     # We need at least 3 * n_neigbhors to compute the perplexity
-    knn = NearestNeighbors(n_neighbors = perplexity * 3, algorithm = 'kd_tree').fit(X)
+    knn = NearestNeighbors(n_neighbors=perplexity * 3, algorithm="kd_tree").fit(X)
     distances, indices = knn.kneighbors(X)
     # Don't count yourself
-    indices = indices[:,1:]
-    distances = distances[:,1:]
+    indices = indices[:, 1:]
+    distances = distances[:, 1:]
     # Save the result
     lisi_df = np.zeros((n_cells, n_labels))
     for i, label in enumerate(label_colnames):
         labels = pd.Categorical(metadata[label])
         n_categories = len(labels.categories)
-        simpson = compute_simpson(distances.T, indices.T, labels, n_categories, perplexity)
-        lisi_df[:,i] = 1 / simpson
+        simpson = compute_simpson(
+            distances.T, indices.T, labels, n_categories, perplexity
+        )
+        lisi_df[:, i] = 1 / simpson
     return lisi_df
 
 
@@ -72,7 +74,7 @@ def compute_simpson(
     labels: pd.Categorical,
     n_categories: int,
     perplexity: float,
-    tol: float=1e-5
+    tol: float = 1e-5,
 ):
     n = distances.shape[1]
     P = np.zeros(distances.shape[0])
@@ -84,13 +86,13 @@ def compute_simpson(
         betamin = -np.inf
         betamax = np.inf
         # Compute Hdiff
-        P = np.exp(-distances[:,i] * beta)
+        P = np.exp(-distances[:, i] * beta)
         P_sum = np.sum(P)
         if P_sum == 0:
             H = 0
             P = np.zeros(distances.shape[0])
         else:
-            H = np.log(P_sum) + beta * np.sum(distances[:,i] * P) / P_sum
+            H = np.log(P_sum) + beta * np.sum(distances[:, i] * P) / P_sum
             P = P / P_sum
         Hdiff = H - logU
         n_tries = 50
@@ -112,13 +114,13 @@ def compute_simpson(
                 else:
                     beta = (beta + betamin) / 2
             # Compute Hdiff
-            P = np.exp(-distances[:,i] * beta)
+            P = np.exp(-distances[:, i] * beta)
             P_sum = np.sum(P)
             if P_sum == 0:
                 H = 0
                 P = np.zeros(distances.shape[0])
             else:
-                H = np.log(P_sum) + beta * np.sum(distances[:,i] * P) / P_sum
+                H = np.log(P_sum) + beta * np.sum(distances[:, i] * P) / P_sum
                 P = P / P_sum
             Hdiff = H - logU
         # distancesefault value
@@ -126,7 +128,7 @@ def compute_simpson(
             simpson[i] = -1
         # Simpson's index
         for label_category in labels.categories:
-            ix = indices[:,i]
+            ix = indices[:, i]
             q = labels[ix] == label_category
             if np.any(q):
                 P_sum = np.sum(P[q])

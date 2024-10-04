@@ -1,11 +1,14 @@
 # @package _global_
 
 defaults:
-  - override /model: cem_vae.yaml
+  - override /model: vae.yaml
+  - override /dataset: simple.yaml
+
+
 
 wandb:
-  project: conceptlab2
-  experiment: cem_vae_independent_incomplete_set
+  project: conceptlab_dev
+  experiment: cb_vae_dev
 
 
 trainer:
@@ -22,3 +25,4 @@ model:
 
 test_intervention: True
 test_integration: ['modularity']
+save_checkpoints: False

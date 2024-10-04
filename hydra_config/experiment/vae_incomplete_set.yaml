@@ -15,5 +15,3 @@ trainer:
 plotting:
   plot: True
   plot_path: "/plotting/"
-
-

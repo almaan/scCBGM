@@ -19,6 +19,6 @@ plotting:
 
 model:
   independent_training: True
-  
+
 test_intervention: True
-test_integration: ['modularity','lisi']
+test_integration: ['modularity']

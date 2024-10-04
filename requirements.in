@@ -16,3 +16,7 @@ hydra-core
 pyyaml
 networkx
 python-louvain
+--extra-index-url https://pypi.nvidia.com
+rapids-singlecell[rapids12]
+cupy-cuda12x
+pre-commit

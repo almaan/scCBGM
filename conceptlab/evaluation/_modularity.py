@@ -4,10 +4,11 @@ from sklearn.neighbors import NearestNeighbors
 from scipy.sparse import csr_matrix
 import community
 
-def compute_modularity(data, labels, n_neighbors = 30):
+
+def compute_modularity(data, labels, n_neighbors=30):
 
     # Step 1: Compute nearest neighbors using sklearn's NearestNeighbors
-    nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='auto').fit(data)
+    nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm="auto").fit(data)
     distances, indices = nbrs.kneighbors(data)
 
     # Step 2: Build a sparse adjacency matrix from neighbors
@@ -23,16 +24,13 @@ def compute_modularity(data, labels, n_neighbors = 30):
 
     G = nx.from_scipy_sparse_array(adj_matrix_sparse)
 
-    attrs = {k:l for k,l in enumerate(labels)}
+    attrs = {k: l for k, l in enumerate(labels)}
 
-    nx.set_node_attributes(G, attrs, 'labels')
+    nx.set_node_attributes(G, attrs, "labels")
 
-    partition = {node: G.nodes[node]['labels'] for node in G.nodes()}
+    partition = {node: G.nodes[node]["labels"] for node in G.nodes()}
 
     # Compute the modularity score
     modularity = community.modularity(partition, G)
 
     return modularity
-
-
-
