@@ -20,3 +20,6 @@ python-louvain
 rapids-singlecell[rapids12]
 cupy-cuda12x
 pre-commit
+autoflake
+black
+isort
