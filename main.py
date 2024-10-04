@@ -182,7 +182,6 @@ def main(
             obs=adata_test.obs.iloc[sub_idx],
         )
 
-
     if cfg.plotting:
         plotting_folder_path = plot.create_plot_path(original_path, cfg)
         wandb.log(
@@ -192,7 +191,6 @@ def main(
                 )
             },
         )
-
 
         if cfg.model.has_cbm:
             c_pred = preds["pred_concept"].detach().numpy()
@@ -271,7 +269,6 @@ def main(
         n_concepts = len(original_test_concepts.columns)
 
         intervention_scores = dict(On=dict(), Off=dict())
-        all_curves = dict(On=dict(), Off=dict())
 
         for c, concept_name in enumerate(original_test_concepts.columns):
             concept_vars = dict()
@@ -282,21 +279,19 @@ def main(
 
             interventions_type = ["On", "Off"]
             for _, intervention_type in enumerate(interventions_type):
-                results, scores, curves = (
-                    clab.evaluation.interventions.eval_intervention(
-                        intervention_type,
-                        c,
-                        x_concepts,
-                        x_true,
-                        ix_og_concepts,
-                        original_test_concepts,
-                        true_data,
-                        genetrated_data,
-                        coefs,
-                        concept_vars,
-                        model,
-                        cfg,
-                    )
+                results, scores = clab.evaluation.interventions.eval_intervention(
+                    intervention_type,
+                    c,
+                    x_concepts,
+                    x_true,
+                    ix_og_concepts,
+                    original_test_concepts,
+                    true_data,
+                    genetrated_data,
+                    coefs,
+                    concept_vars,
+                    model,
+                    cfg,
                 )
 
                 if cfg.plotting.plot:
@@ -308,38 +303,18 @@ def main(
                         cfg,
                     )
 
-                intervention_scores[intervention_type].update(scores)
-                all_curves[intervention_type].update(curves)
+                intervention_scores[intervention_type][concept_name] = scores[concept_name]
 
         if not os.path.exists(original_path + "/results/"):
             os.makedirs(original_path + "/results/")
 
-        flat_list = helpers.flatten_to_list_of_lists(intervention_scores)
-        df_long = pd.DataFrame(flat_list)
-        columns = ["intervention", "concept", "direction", "cohens_d"]
-        df_long.columns = columns
 
-        df_long.to_csv(
-            original_path + "/results/" + cfg.wandb.experiment + ".csv", index=False
+        joint_score = clab.evaluation.interventions.score_intervention(
+            intervention_scores, metrics=["auroc", "auprc"], plot=False,
         )
 
-        long_global_ix = np.isin(
-            df_long["direction"].values, ["auprc_joint", "auroc_joint"]
-        )
-
-        df_long_global = df_long.iloc[long_global_ix].copy()
-        df_long_global.columns = ["intervention", "concept", "metric", "value"]
-
-        # Convert the DataFrame into a W&B table
-        global_table = wandb.Table(dataframe=df_long_global)
-        wandb.log({"results global": global_table})
-
-        av_scores = df_long_global[["metric", "value"]].groupby("metric").agg("mean")
-
-        wandb.log({f"AUPRC": av_scores.loc["auprc_joint"].values})
-        wandb.log({f"AUROC": av_scores.loc["auroc_joint"].values})
-
-        plot.plot_performance_curves(all_curves)
+        for key, val in joint_score.items():
+            wandb.log({key.upper(): val})
 
         if cfg.plotting.plot:
 
@@ -360,9 +335,6 @@ def main(
             )
 
         if cfg.DEBUG:
-            df_long_local = df_long.iloc[~long_global_ix].copy()
-            local_table = wandb.Table(dataframe=df_long_local)
-            wandb.log({"results local": local_table})
 
             for _adata, split in zip([adata, adata_test], ["train", "test"]):
 
@@ -380,17 +352,14 @@ def main(
                 on_off_table = wandb.Table(dataframe=on_off_df)
                 wandb.log({f"[{split}] | concept table": on_off_table})
 
-                plot.plot_performance_abundance_correlation(
-                    df_long_global,
-                    on_off_df,
-                )
+                # plot.plot_performance_abundance_correlation(
+                #     df_long_global,
+                #     on_off_df,
+                # )
 
-                plot.plot_intervention_effect_size(
-                    df_long_local,
-                )
-
-                # plot.plot_concept_correlation_matrix(coefs)
-                # plot.plot_celltype_correlation_matrix(dataset)
+                # plot.plot_intervention_effect_size(
+                #     df_long,
+                # )
 
     wandb.finish()
 

@@ -1,7 +1,8 @@
 from conceptlab.evaluation._base import EvaluationClass
 from collections import OrderedDict
+from conceptlab.utils import helpers
 import pandas as pd
-from typing import Dict, Any, Literal, Tuple
+from typing import Dict, Any, Literal, Tuple, List
 import numpy as np
 from sklearn.metrics import (
     precision_recall_curve,
@@ -12,6 +13,7 @@ from sklearn.metrics import (
     cohen_kappa_score,
 )
 import torch
+import wandb
 
 
 def eval_intervention(
@@ -94,7 +96,7 @@ def eval_intervention(
     subset_original_test_concepts = original_test_concepts.iloc[indices]
     subset_concepts = concepts.iloc[indices]
 
-    scores, curves = DistributionShift.score(
+    scores = DistributionShift.score(
         X_old=subset_genetrated_data,
         X_new=subset_genetrated_data_after_intervention,
         concepts_old=subset_original_test_concepts,
@@ -103,7 +105,7 @@ def eval_intervention(
         use_neutral=False,
     )
 
-    return results, scores, curves
+    return results, scores
 
 
 def cohens_d(x, y):
@@ -131,58 +133,6 @@ def cohens_d(x, y):
     return d_values
 
 
-def _concept_score(
-    pval: float, direction: Literal["pos", "neg", "neu"], alpha: float = 0.05
-):
-    """
-    Compute a score based on the p-value and the specified direction.
-
-    Parameters:
-    -----------
-    pval : float
-        The p-value to be compared against the significance threshold `alpha`.
-
-    direction : Literal["pos", "neg", "neu"]
-        The direction of the test. Can be:
-            - "pos" or "neg": If the p-value is less than `alpha`, the score is 1.0; otherwise, 0.0.
-            - "neu": If the p-value is greater than `alpha`, the score is 1.0; otherwise, 0.0.
-
-    alpha : float, optional, default=0.05
-        The significance threshold. This is the value against which the p-value is compared.
-
-    Returns:
-    --------
-    float
-        A score of 1.0 or 0.0 depending on the comparison between the p-value and `alpha`.
-        - For "pos" or "neg" directions, 1.0 if `pval < alpha`, else 0.0.
-        - For "neu", 1.0 if `pval > alpha`, else 0.0.
-
-    Raises:
-    -------
-    ValueError
-        If the `direction` is not one of "pos", "neg", or "neu".
-    """
-
-    match direction:
-        case "pos" | "neg":
-            score = float(pval < alpha)
-        case "neu":
-            score = float(pval > alpha)
-        case _:
-            raise ValueError("Incorrect Direction")
-
-    return score
-
-
-def concept_score(
-    pvals: np.ndarray, direction: Literal["pos", "neg", "neu"], alpha: float = 0.05
-):
-
-    fun = np.vectorize(lambda x: _concept_score(x, direction, alpha))
-
-    return fun(pvals)
-
-
 class DistributionShift(EvaluationClass):
     """
     A class to evaluate distribution shifts between two datasets by comparing
@@ -198,220 +148,95 @@ class DistributionShift(EvaluationClass):
         super().__init__()
 
     @classmethod
-    def stat_test(cls, X, Y, direction, dropped=False):
-        """
-        Performs a Wilcoxon signed-rank test between two samples, X and Y,
-        to evaluate if there is a significant difference between them
-        based on the specified direction.
+    def _score_fun(cls, X_new, X_old):
+        d_values = pd.Series(cohens_d(X_new.values, X_old.values), index=X_new.columns)
+        return d_values
 
-        Args:
-            X (array-like): The first sample.
-            Y (array-like): The second sample.
-            direction (str): The direction of the test, one of 'pos' (greater),
-                             'neg' (less), or 'neu' (two-sided).
-            dropped (bool, optional): Whether the intervention was to drop or add the concept
-                                      Default is False.
 
-        Returns:
-            stat (float): The test statistic.
-            p-value (float): The p-value of the test.
+def compute_auroc(y_true, y_pred, plot=False):
+    true_to_val = dict(
+        pos=1,
+        neg=1,
+        neu=0,
+    )
+    y_true_adj = np.array([true_to_val[x] for x in y_true]).astype(float)
+    y_pred_adj = y_pred.copy()
+    y_pred_adj[y_true == "neg"] = -y_pred_adj[y_true == "neg"]
 
-        """
-        from scipy.stats import wilcoxon
+    print(y_true_adj)
+    print(y_pred_adj)
+    print('--')
 
-        direction_alternatives = dict(
-            pos="greater",
-            neg="less",
-            neu="two-sided",
+
+    if plot:
+        wandb.log(
+            {
+                "roc": wandb.plot.roc_curve(
+                    y_true_adj,
+                    y_pred_adj,
+                )
+            }
         )
 
-        # set axis to compute statistic along
-        axis = 0
+    score = roc_auc_score(
+        y_true_adj,
+        y_pred_adj,
+    )
 
-        if dropped:
-            return wilcoxon(
-                Y, X, alternative=direction_alternatives[direction], axis=axis
-            )
+    return score
 
-        return wilcoxon(X, Y, alternative=direction_alternatives[direction], axis=axis)
 
-    @classmethod
-    def score(
-        cls,
-        X_old: pd.DataFrame,
-        X_new: pd.DataFrame,
-        concepts_old: pd.DataFrame,
-        concepts_new: pd.DataFrame,
-        concept_coefs: pd.DataFrame,
-        use_neutral: bool = True,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """
-        Evaluates the distribution shift by calculating statistical
-        significance of changes in concept distributions between
+def compute_auprc(y_true, y_pred, plot=False):
 
-        the old and new datasets.
+    true_to_val = dict(
+        pos=1,
+        neg=1,
+        neu=0,
+    )
+    y_true_adj = np.array([true_to_val[x] for x in y_true]).astype(float)
+    y_pred_adj = y_pred.copy()
+    y_pred_adj[y_true == "neg"] = -y_pred_adj[y_true == "neg"]
 
-        Args:
-            X_old (pd.DataFrame): The original dataset features.
-            X_new (pd.DataFrame): The new dataset features.
-            concepts_old (pd.DataFrame): Concept values in the original dataset.
-            concepts_new (pd.DataFrame): Concept values in the new dataset.
-            concept_coefs (pd.DataFrame): Coefficients indicating the relationship
-                                          between variables and concepts.
+    print(y_true_adj)
+    print(y_pred_adj)
+    print('--')
 
-            use_neutral: (bool):  Use shared neutral genes (across all concepts)
 
-        Returns:
-            results (Dict[str, Any]): A dictionary containing the scores.
-            curves (Dict[str, Any]): A dictionary with the auroc and auprc curves
-        """
 
-        concept_names = concepts_old.columns
-        concept_uni_vars = (concept_coefs != 0).sum(axis=0)
-        concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
-
-        direction_to_true = dict(
-            neu=0,
-            pos=1,
-            neg=1,
+    if plot:
+        wandb.log(
+            {
+                "pr": wandb.plot.pr_curve(
+                    y_true_adj,
+                    y_pred_adj,
+                )
+            }
         )
 
-        results = dict()
-        curves = dict()
+    precision, recall, _ = precision_recall_curve(y_true_adj, y_pred_adj)
+    score = auc(recall, precision)
+    return score
 
-        for concept_name in concept_names:
 
-            results[concept_name] = dict()
-            curves[concept_name] = dict()
+def score_intervention(
+    d, metrics: List[Literal["auroc", "auprc"]], plot=False, return_df=False
+):
 
-            concept_delta = (
-                concepts_new.loc[:, concept_name] - concepts_old.loc[:, concept_name]
-            ).values
+    metric_funs = dict(auroc=compute_auroc, auprc=compute_auprc)
 
-            concept_delta_mean = concept_delta.mean()
+    flat_list = helpers.flatten_to_list_of_lists(d)
+    df_long = pd.DataFrame(flat_list)
+    columns = ["intervention", "concept", "direction", "values"]
+    df_long.columns = columns
 
-            if concept_delta_mean == 0:
-                continue
+    y_true = df_long.direction.values
+    y_pred = df_long["values"].values
 
-            pos_delta = concept_delta > 0
-            neg_delta = concept_delta < 0
+    results = dict()
+    for metric in metrics:
+        results[metric] = metric_funs[metric](y_true, y_pred, plot=plot)
 
-            results[concept_name] = dict()
+    if return_df:
+        results, df
 
-            var_names_dict = dict()
-
-            coefs_k = concept_coefs.loc[concept_name, :]
-
-            var_names_dict["pos"] = coefs_k.index[coefs_k.values > 0]
-            var_names_dict["neg"] = coefs_k.index[coefs_k.values < 0]
-
-            if use_neutral:
-                var_names_dict["neu"] = concept_neutral_vars
-            else:
-                var_names_dict["neu"] = coefs_k.index[coefs_k.values == 0]
-
-            vals_new = X_new.values
-            vals_old = X_old.values
-
-            y_true_all = np.array([])
-            y_pred_all = np.array([])
-
-            for delta, dropped, ivn in zip(
-                [pos_delta, neg_delta], [False, True], ["0->1", "1->0"]
-            ):
-
-                if not np.any(delta):
-                    continue
-
-                d_values = pd.Series(
-                    cohens_d(vals_new[delta], vals_old[delta]), index=X_new.columns
-                )
-
-                # split by direction
-                d_dict = {
-                    direction: d_values[var_names_dict[direction]].values
-                    for direction in var_names_dict.keys()
-                }
-
-                # Process the values for each key in the dictionary
-                for key in d_dict:
-                    d_dict[key] = d_dict[key][~np.isnan(d_dict[key])]
-
-                # Negate the negative values as required
-                d_dict["neg"] = -d_dict["neg"]
-
-                # Concatenate the values for y_pred
-                y_pred = np.concatenate([d_dict[key] for key in ["pos", "neg", "neu"]])
-
-                # Optionally negate y_pred if needed
-                if dropped:
-                    y_pred = -y_pred
-
-                # Create y_true based on the lengths of the respective arrays
-                y_true = np.concatenate(
-                    [
-                        np.ones_like(d_dict["pos"]),
-                        np.ones_like(d_dict["neg"]),
-                        np.zeros_like(d_dict["neu"]),
-                    ]
-                )
-
-                y_pred_all = np.append(y_pred_all,y_pred)
-                y_true_all = np.append(y_true_all,y_true)
-
-                results[concept_name].update({k:v.mean() for k,v in d_dict.items()})
-
-            if len( np.unique(y_true_all) ) == 2:
-
-                # precision recall calculations
-                precision, recall, thresholds = precision_recall_curve(
-                    y_true_all,
-                    y_pred_all,
-                )
-
-                results[concept_name]["auprc_joint"] = auc(recall, precision)
-                curves[concept_name]['auprc_joint'] = dict(y=precision, x=recall)
-
-                # roc calculations
-                fpr, tpr, _ = roc_curve(y_true_all, y_pred_all)
-                results[concept_name]["auroc_joint"] = roc_auc_score(
-                    y_true_all,
-                    y_pred_all,
-                )
-                curves[concept_name]["auroc_joint"] = dict(y=tpr, x=fpr)
-
-        results = {key: val for key, val in results.items() if len(val) > 0}
-        curves = {key: val for key, val in curves.items() if len(val) > 0}
-
-        return results, curves
-
-    @classmethod
-    def diff_test(cls, X, Y, direction, dropped=False):
-
-        delta = cohens_d(X, Y)
-
-        if dropped:
-            delta = -delta
-
-        if direction == "neg":
-            delta = -delta
-
-        return delta
-
-    @classmethod
-    def pretty_display(cls, results):
-        """
-        Displays the results of the distribution shift evaluation in a
-        well-formatted table.
-
-        Args:
-            results (Dict[str, Any]): The results dictionary to display.
-
-        Returns:
-            None
-        """
-
-        with pd.option_context(
-            "display.float_format", "{:.2e}".format
-        ) and pd.option_context("display.width", 1000):
-            print(pd.DataFrame(results).T)
+    return results
