@@ -1,0 +1,36 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+    -   id: check-yaml
+    -   id: end-of-file-fixer
+    -   id: trailing-whitespace
+
+-   repo: https://github.com/psf/black
+    rev: 22.10.0
+    hooks:
+    -   id: black
+
+# Adding autoflake
+-   repo: https://github.com/myint/autoflake
+    rev: v1.4
+    hooks:
+    -   id: autoflake
+        args: [
+            "--in-place",
+            "--remove-unused-variables", 
+            "--remove-all-unused-imports"
+        ]
+
+# Adding flake8 with additional dependencies
+-   repo: https://gitlab.com/pycqa/flake8
+    rev: 3.9.2  # or latest stable version
+    hooks:
+    -   id: flake8
+        additional_dependencies: [
+            flake8-pytest-style,
+            flake8-bugbear,
+            flake8-comprehensions,
+            flake8-print,
+            darglint
+        ]
