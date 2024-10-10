@@ -23,8 +23,12 @@ class CB_VAE(pl.LightningModule):
         self.fc22 = nn.Linear(self.hidden_dim, self.latent_dim)  # Log variance
 
         self.fcCB1 = nn.Linear(self.latent_dim, self.n_concepts)
+        
 
         n_unknown = max(config.min_bottleneck_size - self.n_concepts, self.n_concepts)
+
+
+        self.fcCBproj= nn.Linear(self.n_concepts,n_unknown)
         self.fcCB2 = nn.Linear(self.latent_dim, n_unknown)
 
         # Decoder
@@ -35,8 +39,9 @@ class CB_VAE(pl.LightningModule):
         self.orthogonality_hp = config.orthogonality_hp
         self.dropout = config.get("dropout", 0.0)
 
-        self.use_orthogonality_loss = config.get("use_orthogonality_loss", False)
+        self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
         self.use_concept_loss = config.get("use_concept_loss", True)
+
 
         self.save_hyperparameters()
 
@@ -55,6 +60,7 @@ class CB_VAE(pl.LightningModule):
     def cbm(self, z, concepts=None, mask=None, intervene=False):
 
         known_concepts = F.sigmoid(self.fcCB1(z))
+        known_concepts_proj = self.fcCBproj(known_concepts)
         unknown = F.relu(self.fcCB2(z))
 
         if intervene:
@@ -66,7 +72,7 @@ class CB_VAE(pl.LightningModule):
             else:
                 h = torch.cat((concepts, unknown), 1)
 
-        return known_concepts, unknown, h
+        return known_concepts,known_concepts_proj, unknown, h
 
     def decode(self, z):
         h3 = F.relu(self.fc3(z))
@@ -76,7 +82,7 @@ class CB_VAE(pl.LightningModule):
     def forward(self, x, concepts=None):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        known_concepts, unknown, z = self.cbm(z, concepts)
+        known_concepts,known_concepts_proj, unknown, z = self.cbm(z, concepts)
         x_pred = self.decode(z)
         return {
             "x_pred": x_pred,
@@ -84,13 +90,14 @@ class CB_VAE(pl.LightningModule):
             "mu": mu,
             "logvar": logvar,
             "pred_concept": known_concepts,
+            "concept_proj": known_concepts_proj,
             "unknown": unknown,
         }
 
     def intervene(self, x, concepts, mask):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        known_concepts, unknown, z = self.cbm(z, concepts, mask, True)
+        _,_,  _, z = self.cbm(z, concepts, mask, True)
         x_pred = self.decode(z)
         return {"x_pred": x_pred}
 
@@ -122,11 +129,11 @@ class CB_VAE(pl.LightningModule):
         return accuracy.item()
 
     def loss_function(
-        self, x, concepts, x_pred, mu, logvar, pred_concept, unknown, **kwargs
+        self, x, concepts, x_pred, mu, logvar, pred_concept, concept_proj,unknown, **kwargs
     ):
         loss_dict = {}
         MSE = F.mse_loss(x_pred, x, reduction="mean")
-        # MSE = self.logcosh_loss(x_pred, x).mean()
+        
         KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
 
         loss_dict["rec_loss"] = MSE
@@ -144,11 +151,14 @@ class CB_VAE(pl.LightningModule):
                 accuracy = self.binary_accuracy(pred_concept[:, c], concepts[:, c])
                 loss_dict[str(c) + "_acc"] = accuracy
 
+
+
+
             loss_dict["concept_loss"] = overall_concept_loss
             loss_dict["Total_loss"] += self.concepts_hp * overall_concept_loss
 
         if self.use_orthogonality_loss:
-            orth_loss = self.orthogonality_loss(pred_concept, unknown)
+            orth_loss = self.orthogonality_loss(concept_proj, unknown)
             loss_dict["orth_loss"] = orth_loss
             loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
 

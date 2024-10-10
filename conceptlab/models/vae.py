@@ -6,6 +6,7 @@ import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
+
 # Define the VAE model
 class VAE(pl.LightningModule):
     def __init__(self, config):
@@ -26,7 +27,6 @@ class VAE(pl.LightningModule):
         self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
         self.beta = config.beta
         self.dropout = config.get("dropout", 0.3)
-
         self.save_hyperparameters()
 
     def encode(self, x):

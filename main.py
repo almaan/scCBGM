@@ -19,7 +19,8 @@ from conceptlab.utils import plot
 from conceptlab.datagen import modify
 from conceptlab.utils import constants as C
 import conceptlab.evaluation.integration as ig
-
+import conceptlab.evaluation.generation as gen
+import conceptlab.evaluation.concepts as con
 from omegaconf import DictConfig
 import pickle
 
@@ -98,7 +99,7 @@ def main(
 
     else:
         data_module = clab.data.dataloader.GeneExpressionDataModule(
-            adata, batch_size=512
+            adata, batch_size=512,normalize=False,
         )
 
     n_obs, n_vars = adata.shape
@@ -138,7 +139,7 @@ def main(
             verbose=True,
             monitor="val_Total_loss",
             mode="min",
-            every_n_epochs=10,
+            every_n_epochs=10, 
         )
 
         callbacks.append(checkpoint_callback)
@@ -154,7 +155,7 @@ def main(
 
         model.to("cpu")
         model.eval()
-
+        x_raw =  adata_test.X.astype(np.float32).copy()
         x_true = adata_test.X.astype(np.float32).copy()
         x_true = x_true / x_true.sum(axis=1, keepdims=True) * 1e4
         x_true = np.log1p(x_true)
@@ -170,8 +171,17 @@ def main(
         )
 
         preds = model(torch.tensor(x_true))
+
+
         x_pred = preds["x_pred"].detach().numpy()
         x_concepts = adata_test.obsm["concepts"].astype(np.float32).copy()
+
+        if cfg.model.has_cbm:
+            pred_concept = preds["pred_concept"].detach().numpy()
+            concept_loss_dict = con.concept_accuarcy(x_concepts,pred_concept,)
+            for key, value in   concept_loss_dict.items():
+                wandb.log({f"{key}": value})
+
 
         ad_pred = ad.AnnData(
             x_pred[sub_idx],
@@ -211,17 +221,22 @@ def main(
                     axis=0,
                     label="ident",
                 )
+                rec_loss_withGT = gen.reconstruction_loss(x_true,x_pred_withGT)
+
+                wandb.log({"test_rec_loss_withGT": rec_loss_withGT})            
             else:
                 ad_merge = ad.concat(
                     dict(vae_cbm=ad_pred, true=ad_true),
                     axis=0,
                     label="ident",
                 )
+
         else:
             ad_pred.obsm["concepts"] = x_concepts[sub_idx].copy()
             ad_true.obsm["concepts"] = x_concepts[sub_idx].copy()
             ad_merge = ad.concat(dict(vae=ad_pred, true=ad_true), axis=0, label="ident")
-
+        rec_loss = gen.reconstruction_loss(x_true,x_pred,x_raw)
+        wandb.log({"test_rec_loss": rec_loss})
         # this scales very poorly
         if "test_integration" in cfg:
             ig_test_funs = dict(
@@ -245,6 +260,7 @@ def main(
         # Log the plot to wandb
         wandb.log({"generation_plot": wandb.Image(plot_filename)})
 
+
     if cfg.model.has_cbm and cfg.test_intervention:
 
         indicator = adata_test.uns["concept_indicator"]
@@ -260,12 +276,15 @@ def main(
         original_test_concepts = original_concepts.loc[test_index]
         coefs = dataset.concept_coef.to_dataframe().unstack()["concept_coef"]
 
+
+
+
         true_data = pd.DataFrame(x_true, columns=coefs.columns)
         genetrated_data = pd.DataFrame(x_pred, columns=coefs.columns)
         n_concepts = len(original_test_concepts.columns)
 
         intervention_scores = dict(On=dict(), Off=dict())
-
+        intervention_data = dict(On=dict(), Off=dict())
         for c, concept_name in enumerate(original_test_concepts.columns):
             concept_vars = dict()
             concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
@@ -275,7 +294,7 @@ def main(
 
             interventions_type = ["On", "Off"]
             for _, intervention_type in enumerate(interventions_type):
-                results, scores = clab.evaluation.interventions.eval_intervention(
+                results, scores,perturbed_data = clab.evaluation.interventions.eval_intervention(
                     intervention_type,
                     c,
                     x_concepts,
@@ -303,14 +322,21 @@ def main(
                     concept_name
                 ]
 
-        if not os.path.exists(original_path + "/results/"):
-            os.makedirs(original_path + "/results/")
+                intervention_data[intervention_type][concept_name] = perturbed_data
+
+
 
         joint_score = clab.evaluation.interventions.score_intervention(
-            intervention_scores,
-            metrics=["auroc", "auprc"],
+            metrics=["auroc", "auprc","acc","corr"],
+            scores= intervention_scores,
+            data = intervention_data,
+            concept_coefs = coefs,
+            concepts = x_concepts,
+            raw_data=x_raw,
             plot=True,
         )
+
+
 
         for key, val in joint_score.items():
             wandb.log({key.upper(): val})
@@ -335,6 +361,15 @@ def main(
 
         if cfg.DEBUG:
 
+
+            if not os.path.exists(original_path + "/results/"):
+                os.makedirs(original_path + "/results/")
+
+            df = pd.DataFrame(coefs)
+            df.to_csv(original_path + "/results/"+cfg.wandb.experiment+'_concept_coef.csv', index=False)
+            clab.utils.helpers.write_dict_to_csv(intervention_scores['On'], original_path + "/results/"+cfg.wandb.experiment+"_on.csv")
+            clab.utils.helpers.write_dict_to_csv(intervention_scores['Off'], original_path + "/results/"+cfg.wandb.experiment+"_off.csv")
+
             for _adata, split in zip([adata, adata_test], ["train", "test"]):
 
                 n_on_concepts = _adata.obsm["concepts"].sum(axis=0)
@@ -351,14 +386,6 @@ def main(
                 on_off_table = wandb.Table(dataframe=on_off_df)
                 wandb.log({f"[{split}] | concept table": on_off_table})
 
-                # plot.plot_performance_abundance_correlation(
-                #     df_long_global,
-                #     on_off_df,
-                # )
-
-                # plot.plot_intervention_effect_size(
-                #     df_long,
-                # )
 
     wandb.finish()
 

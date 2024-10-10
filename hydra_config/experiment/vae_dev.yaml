@@ -8,7 +8,7 @@ defaults:
 
 wandb:
   project: conceptlab_dev
-  experiment: cb_vae_dev
+  experiment: vae_pos
 
 
 trainer:
