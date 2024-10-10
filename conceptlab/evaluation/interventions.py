@@ -12,7 +12,7 @@ from sklearn.metrics import (
 )
 import torch
 import wandb
-
+from scipy.stats import spearmanr
 
 class DistributionShift(EvaluationClass):
     """
@@ -123,7 +123,7 @@ def eval_intervention(
         use_neutral=False,
     )
 
-    return results, scores
+    return results, scores, genetrated_data_after_intervention
 
 
 def cohens_d(x, y):
@@ -257,14 +257,80 @@ def compute_auprc(y_true, y_pred, plot=False):
 
     return score
 
+def compute_acc(data):
+
+    correct_count = 0
+    total_count = len(data)
+    
+    for concept, values in data.items():
+        pos = values['pos']
+        neg = values['neg']
+        neu = values['neu']
+        
+        if pos > 0 and neg < 0 and abs(neu) < abs(pos) and abs(neu) < abs(neg):
+            correct_count += 1
+    average = correct_count / total_count if total_count > 0 else 0
+    return average
+
+def compute_correlation(intervention_data,concept_coefs,x_concepts,raw_data , debug=True):
+    corr_dict={}
+
+    n_concept=concept_coefs.shape[0]
+
+
+
+
+    all_rho=0
+    all_p_value=0
+    for concept_idx , concept in enumerate (concept_coefs.index):
+ 
+
+
+
+        neu_indices = (concept_coefs.iloc[concept_idx, :] == 0).values
+
+
+        concept_coef=concept_coefs[concept_idx,~neu_indices]
+        C_true =np.exp(concept_coef)
+
+
+        on_data = intervention_data['On'][concept].iloc[:,~neu_indices]
+        on_data= np.expm1(on_data)
+        on_data= on_data * raw_data.sum(axis=1, keepdims=True) / 1e4
+
+        
+
+        off_data = intervention_data['Off'][concept].iloc[:,~neu_indices]
+        off_data= np.expm1(off_data)
+        off_data= off_data * raw_data.sum(axis=1, keepdims=True) / 1e4
+
+
+        
+
+        estim_coef= on_data.mean(axis=0)/ off_data.mean(axis=0)
+
+        rho, p_value = spearmanr(estim_coef, C_true)
+        if debug:
+            corr_dict[concept+"_corr"] =rho 
+            corr_dict[concept+"_p_value"] =p_value 
+        all_rho+=rho
+        all_p_value+=p_value
+
+
+    corr_dict["avg_concept_coef_corr"] = all_rho/n_concept
+    corr_dict["avg_concept_coef_corr_p_value"] = all_p_value/n_concept
+
+    return corr_dict
 
 def score_intervention(
-    d, metrics: List[Literal["auroc", "auprc"]], plot=False, return_df=False
+    metrics: List[Literal["auroc", "auprc","acc","corr"]],
+    scores=None, data=None,concept_coefs=None,concepts=None, raw_data=None,
+    plot=False, return_df=False
 ):
 
-    metric_funs = dict(auroc=compute_auroc, auprc=compute_auprc)
+    metric_funs = dict(auroc=compute_auroc, auprc=compute_auprc,acc=compute_acc,corr=compute_correlation)
 
-    flat_list = helpers.flatten_to_list_of_lists(d)
+    flat_list = helpers.flatten_to_list_of_lists(scores)
     df_long = pd.DataFrame(flat_list)
     columns = ["intervention", "concept", "direction", "values"]
     df_long.columns = columns
@@ -274,7 +340,17 @@ def score_intervention(
 
     results = dict()
     for metric in metrics:
-        results[metric] = metric_funs[metric](y_true, y_pred, plot=plot)
+        if(metric=="acc"):
+            results["On_acc"]=  metric_funs[metric](scores["On"])
+            results["Off_acc"]=  metric_funs[metric](scores["Off"])
+            results["avg_acc"] = (results["On_acc"]+results["Off_acc"])/2
+
+        elif (metric=="corr"):
+            corr_results = metric_funs[metric](data,concept_coefs,concepts,raw_data)
+            results.update(corr_results)
+
+        else:
+            results[metric] = metric_funs[metric](y_true, y_pred, plot=plot)
 
     if return_df:
         results, df

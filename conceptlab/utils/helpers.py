@@ -11,8 +11,20 @@ import random
 import string
 import re
 import datetime
+import csv
 
 
+def write_dict_to_csv(data, filename):
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        # Write the header
+        writer.writerow(['Concept', 'Pos', 'Neg', 'Neu'])
+        # Write the rows
+        for concept, values in data.items():
+            writer.writerow([concept, float(values['pos']), float(values['neg']), float(values['neu'])])
+
+
+            
 def dataset_to_anndata(
     dataset: xr.Dataset,
     concepts: np.ndarray | None = None,

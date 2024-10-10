@@ -8,7 +8,7 @@ defaults:
 
 wandb:
   project: conceptlab_dev
-  experiment: vae_pos
+  experiment: vae_poss_unNormalizedd
 
 
 trainer:

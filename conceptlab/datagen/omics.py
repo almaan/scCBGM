@@ -334,7 +334,6 @@ class OmicsDataGenerator(DataGenerator):
         cls, dataset: xr.Dataset, mode: Literal["dataframe", "numpy"] = "numpy"
     ) -> Dict[str, np.ndarray]:
         """helper function to get model parameters from a dataset"""
-
         match mode:
             case "numpy":
                 return {
