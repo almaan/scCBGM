@@ -290,7 +290,7 @@ def compute_correlation(intervention_data,concept_coefs,x_concepts,raw_data , de
         neu_indices = (concept_coefs.iloc[concept_idx, :] == 0).values
 
 
-        concept_coef=concept_coefs[concept_idx,~neu_indices]
+        concept_coef=concept_coefs.iloc[concept_idx,~neu_indices]
         C_true =np.exp(concept_coef)
 
 
