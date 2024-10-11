@@ -24,7 +24,90 @@ def write_dict_to_csv(data, filename):
             writer.writerow([concept, float(values['pos']), float(values['neg']), float(values['neu'])])
 
 
-            
+def add_extras_to_concepts(dataset,cfg) -> xr.Dataset:
+
+
+   # Step 1: Create the new concept coordinate
+    new_concepts = dataset['concept'].values.tolist() + \
+                   [f'concept_{i}' for i in range( cfg.dataset.n_concepts, cfg.dataset.n_concepts+cfg.dataset.n_tissues)] + \
+                   [f'concept_{i}' for i in range( cfg.dataset.n_concepts+cfg.dataset.n_tissues,\
+                                                     cfg.dataset.n_concepts+cfg.dataset.n_tissues+cfg.dataset.n_celltypes)]+\
+                   [f'concept_{i}' for i in range(cfg.dataset.n_concepts+cfg.dataset.n_tissues+cfg.dataset.n_celltypes,\
+                                                    cfg.dataset.n_concepts+cfg.dataset.n_tissues+cfg.dataset.n_celltypes+cfg.dataset.n_batches)] 
+
+
+    # Step 2: Extend the concepts data variable
+    new_concepts_data = np.zeros((dataset.sizes['obs'], len(new_concepts)))
+
+    # Copy the existing concepts values
+    new_concepts_data[:, :cfg.dataset.n_concepts] = dataset['concepts'].values
+
+    total_concepts= cfg.dataset.n_concepts
+    # Set the appropriate concept_tissue, concept_batch, and concept_celltype coefficients
+    for i in range(dataset.sizes['obs']):
+        tissue = dataset['tissues'].isel(obs=i).values.item()  # Convert to a scalar
+        tissue_index = int(tissue.split('_')[-1])
+        new_concepts_data[i, cfg.dataset.n_concepts + tissue_index] = 1
+        
+
+        celltype = dataset['celltypes'].isel(obs=i).values.item()  # Convert to a scalar
+        celltype_index = int(celltype.split('_')[-1])
+        new_concepts_data[i, cfg.dataset.n_concepts +cfg.dataset.n_tissues + celltype_index] = 1
+        total_concepts+=cfg.dataset.n_celltypes
+
+
+        batch = dataset['batches'].isel(obs=i).values.item()  # Convert to a scalar
+        batch_index = int(batch.split('_')[-1])
+        new_concepts_data[i, cfg.dataset.n_concepts +cfg.dataset.n_tissues+ cfg.dataset.n_celltypes+ batch_index] = 1
+
+
+
+    # Step 3: Extend the concept_coef data variable
+    new_concept_coef = np.zeros((len(new_concepts), dataset.sizes['var']))
+    new_concept_coef[:8, :] = dataset['concept_coef'].values
+
+    # Copy the tissue_coef, batch_coef, and celltype_coef values to the new concept entries
+    for i in range(cfg.dataset.n_tissues):
+        new_concept_coef[ cfg.dataset.n_concepts  + i, :] = dataset['tissue_coef'].sel(tissue=f'tissue_{i}').values
+
+    for i in range(cfg.dataset.n_celltypes):
+        new_concept_coef[cfg.dataset.n_concepts +cfg.dataset.n_tissues   + i, :] = dataset['celltype_coef'].sel(celltype=f'celltype_{i}').values
+
+    for i in range(cfg.dataset.n_batches):
+        new_concept_coef[cfg.dataset.n_concepts +cfg.dataset.n_tissues+ cfg.dataset.n_celltypes + i, :] = dataset['batch_coef'].sel(batch=f'batch_{i}').values
+
+
+    new_dataset = xr.Dataset(
+        {
+            'data': dataset['data'],
+            'concepts': (['obs', 'concept'], new_concepts_data),
+            'concept_coef': (['concept', 'var'], new_concept_coef),
+            'tissues': dataset['tissues'],
+            'tissue_coef': dataset['tissue_coef'],
+            'batches': dataset['batches'],
+            'batch_coef': dataset['batch_coef'],
+            'celltypes': dataset['celltypes'],
+            'celltype_coef': dataset['celltype_coef'],
+            'std_libsize': dataset['std_libsize'],
+            'p_batch': dataset['p_batch'],
+            'p_tissue': dataset['p_tissue'],
+            'p_celltype_in_tissue': dataset['p_celltype_in_tissue'],
+            'p_concept_in_celltype': dataset['p_concept_in_celltype'],
+            'baseline': dataset['baseline']
+        },
+        coords={
+            'obs': dataset['obs'],
+            'var': dataset['var'],
+            'concept': new_concepts,
+            'tissue': dataset['tissue'],
+            'celltype': dataset['celltype'],
+            'batch': dataset['batch']
+        }
+    )
+
+
+    return new_dataset
+
 def dataset_to_anndata(
     dataset: xr.Dataset,
     concepts: np.ndarray | None = None,
