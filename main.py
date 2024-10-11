@@ -1,5 +1,6 @@
 import conceptlab as clab
 import numpy as np
+import xarray as xr
 
 
 import omegaconf
@@ -65,7 +66,12 @@ def main(
 
         dataset = clab.datagen.omics.OmicsDataGenerator.generate(**cfg.dataset)
 
+
+        if cfg.dataset.add_all_effects_as_concepts:
+            dataset = helpers.add_extras_to_concepts(dataset,cfg)
+
         mod = cfg.modify.mod
+
 
         if mod is not None:
             mod_fun = MODS[mod]
@@ -80,6 +86,8 @@ def main(
                 [C.Mods.none] * adata.obsm["concepts"].shape[1], dtype="<U64"
             )
 
+
+
             # Saving the data object
         with open(dataset_path, "wb") as file:
             pickle.dump(dataset, file)
@@ -90,6 +98,7 @@ def main(
         with open(dataset_path, "rb") as file:
             dataset = pickle.load(file)
 
+
     adata_test, adata, n_test, idx = helpers.simple_adata_train_test_split(adata)
 
     if cfg.model.has_cbm:
@@ -99,11 +108,13 @@ def main(
 
     else:
         data_module = clab.data.dataloader.GeneExpressionDataModule(
-            adata, batch_size=512,normalize=False,
+            adata, batch_size=512,
         )
 
     n_obs, n_vars = adata.shape
     n_concepts = adata.obsm["concepts"].shape[1]
+    n_concepts_to_eval=cfg.dataset.n_concepts
+
 
     try:
         model_to_call = getattr(clab.models, cfg.model.type, None)
@@ -285,7 +296,10 @@ def main(
 
         intervention_scores = dict(On=dict(), Off=dict())
         intervention_data = dict(On=dict(), Off=dict())
-        for c, concept_name in enumerate(original_test_concepts.columns):
+
+
+        for c in range(n_concepts_to_eval):
+            concept_name = original_test_concepts.columns[c]
             concept_vars = dict()
             concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
             concept_vars["neg"] = coefs.columns[(coefs.iloc[c, :] < 0).values]
@@ -333,11 +347,13 @@ def main(
             concept_coefs = coefs,
             concepts = x_concepts,
             raw_data=x_raw,
+            n_concepts=n_concepts_to_eval,
+            debug=cfg.DEBUG,
             plot=True,
         )
 
 
-
+        print("done")
         for key, val in joint_score.items():
             wandb.log({key.upper(): val})
 
