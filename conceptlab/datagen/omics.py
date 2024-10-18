@@ -114,7 +114,9 @@ class OmicsDataGenerator(DataGenerator):
             mu = np.log(p_C[u_n] / (1 - p_C[u_n]))
             # sample logits with dependency
             logits = rng.multivariate_normal(mean=mu, cov=cov)
+            # convert logits to probabilities
             p_v_n = 1 / (1 + np.exp(-logits))
+            # store probabilities
             P_mat[n, :] = p_v_n
             # get concept indicator
             v_n = rng.binomial(1, p_v_n)
@@ -250,6 +252,7 @@ class OmicsDataGenerator(DataGenerator):
         std_libsize_lower: NonNegativeFloat = 0.01,
         std_libsize_upper: NonNegativeFloat = 0.03,
         std_noise: NonNegativeFloat = 0.01,
+        cov_prior_range: float = 5,
         beta_a: PositiveFloat = 1,
         beta_b: PositiveFloat = 0.5,
         seed: int = 42,
@@ -278,8 +281,10 @@ class OmicsDataGenerator(DataGenerator):
             std_noise (float, optional): Standard deviation for noise. Defaults to 0.01.
             beta_a (float, optional): Alpha parameter for beta distribution in zero inflation. Defaults to 1.
             beta_b (float, optional): Beta parameter for beta distribution in zero inflation. Defaults to 0.5.
+            cov_prior_range (float) : will sample Wishart scale matric elements from Unif(-value,value) if use_concept_dependency is True
             seed (int, optional): Seed for random number generator. Defaults to 42.
             zero_inflate (bool, optional): Whether to add zero inflation to the data. Defaults to True.
+            use_concept_dependency: whether to introduce dependency between concepts or not
 
         Returns:
             xr.Dataset: An xarray dataset containing the generated synthetic omics data.
@@ -319,7 +324,9 @@ class OmicsDataGenerator(DataGenerator):
 
         # covariance
         if use_concept_dependency:
-            scale_matrix_elements = np.random.uniform(-3, 3, size=(C * (C + 1)) // 2)
+            scale_matrix_elements = np.random.uniform(
+                -cov_prior_range, cov_prior_range, size=(C * (C + 1)) // 2
+            )
             scale_matrix = np.zeros((C, C))
             tril_indices = np.tril_indices_from(scale_matrix)
             scale_matrix[tril_indices[0], tril_indices[1]] = scale_matrix_elements
