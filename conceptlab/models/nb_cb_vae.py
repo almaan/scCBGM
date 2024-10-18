@@ -4,12 +4,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.distributions.negative_binomial import NegativeBinomial as NB
+from torch.distributions.poisson import Poisson as Poi
 
 
 # Define the VAE model
-class CB_VAE(pl.LightningModule):
+class NB_CB_VAE(pl.LightningModule):
     def __init__(self, config):
-        super(CB_VAE, self).__init__()
+        super(NB_CB_VAE, self).__init__()
+        print("using nb vae")
         self.input_dim = config.input_dim
         self.hidden_dim = config.hidden_dim
         self.latent_dim = config.latent_dim
@@ -31,9 +34,14 @@ class CB_VAE(pl.LightningModule):
 
         # Decoder
         self.fc3 = nn.Linear((self.n_concepts + n_unknown), self.hidden_dim)
-        self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
+
+        self.fc4_tc = nn.Linear(self.hidden_dim, self.input_dim)
+        self.fc4_logits = nn.Linear(self.hidden_dim, self.input_dim)
+
         self.beta = config.beta
+
         self.concepts_hp = config.concepts_hp
+
         self.orthogonality_hp = config.orthogonality_hp
         self.dropout = config.get("dropout", 0.0)
 
@@ -47,6 +55,7 @@ class CB_VAE(pl.LightningModule):
         h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
         mu, logvar = self.fc21(h1), self.fc22(h1)
         logvar = t.clip(logvar, -1e5, 1e5)
+
         return mu, logvar
 
     def reparameterize(self, mu, logvar):
@@ -74,18 +83,28 @@ class CB_VAE(pl.LightningModule):
     def decode(self, z):
         h3 = F.relu(self.fc3(z))
         h3 = F.dropout(h3, p=self.dropout, training=True, inplace=False)
-        return self.fc4(h3)
+
+        total_counts = torch.clip(self.fc4_tc(h3), 1e-6, 1e6)
+        total_counts = F.softplus(total_counts)
+
+        logits = self.fc4_logits(h3)
+        logits = torch.clip(logits, 1e-6, 1e6)
+
+        nb = NB(total_count=total_counts, logits=logits)
+
+        return dict(nb=nb, x_pred=nb.mean)
 
     def forward(self, x, concepts=None):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
         known_concepts, known_concepts_proj, unknown, z = self.cbm(z, concepts)
-        x_pred = self.decode(z)
+        d = self.decode(z)
         return {
-            "x_pred": x_pred,
+            "x_pred": d["x_pred"],
             "z": z,
             "mu": mu,
             "logvar": logvar,
+            "nb": d["nb"],
             "pred_concept": known_concepts,
             "concept_proj": known_concepts_proj,
             "unknown": unknown,
@@ -95,8 +114,8 @@ class CB_VAE(pl.LightningModule):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
         _, _, _, z = self.cbm(z, concepts, mask, True)
-        x_pred = self.decode(z)
-        return {"x_pred": x_pred}
+        d = self.decode(z)
+        return {"x_pred": d["x_pred"]}
 
     def orthogonality_loss(self, concept_emb, unk_emb):
         cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
@@ -130,6 +149,7 @@ class CB_VAE(pl.LightningModule):
         x,
         concepts,
         x_pred,
+        nb,
         mu,
         logvar,
         pred_concept,
@@ -138,14 +158,18 @@ class CB_VAE(pl.LightningModule):
         **kwargs,
     ):
         loss_dict = {}
+
         MSE = F.mse_loss(x_pred, x, reduction="mean")
+
+        REC = nb.log_prob(x).mean()
 
         KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
 
-        loss_dict["rec_loss"] = MSE
+        loss_dict["rec_loss"] = REC
         loss_dict["KL_loss"] = KLD
+        loss_dict["MSE_loss"] = MSE
 
-        loss_dict["Total_loss"] = MSE + self.beta * KLD
+        loss_dict["Total_loss"] = -REC + self.beta * KLD
 
         if self.use_concept_loss:
 
@@ -178,6 +202,7 @@ class CB_VAE(pl.LightningModule):
 
         for key, value in loss_dict.items():
             self.log(f"{prefix}_{key}", value)
+
         return loss_dict["Total_loss"]
 
     def training_step(self, batch, batch_idx):

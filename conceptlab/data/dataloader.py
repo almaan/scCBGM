@@ -1,6 +1,6 @@
 import pytorch_lightning as pl
 import anndata as ad
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, Dataset, random_split, Subset
 import torch as t
 import numpy as np
 import pandas as pd
@@ -60,13 +60,14 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         layer: str = None,
         add_concepts: bool = False,
         normalize: bool = True,
+        split_by: str | None = "split_label",
     ):
         super().__init__()
 
         self.add_concepts = add_concepts
+        self.split_by = split_by
 
         if isinstance(data, xr.Dataset):
-
             self.data = data.data.to_dataframe().unstack()
             if self.add_concepts:
                 self.concepts = data.concepts.to_dataframe().unstack()
@@ -84,8 +85,6 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         if not self.add_concepts:
             self.concepts = None
 
-
-
         if normalize:
             X = self.data.values
             X = X / np.sum(X, axis=1, keepdims=True) * 1e4
@@ -96,9 +95,11 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         self.val_split = val_split
 
     def setup(self, stage=None):
+
         dataset = GeneExpressionDataset(self.data, self.add_concepts, self.concepts)
         val_size = int(len(dataset) * self.val_split)
         train_size = len(dataset) - val_size
+
         self.train_dataset, self.val_dataset = random_split(
             dataset, [train_size, val_size]
         )
