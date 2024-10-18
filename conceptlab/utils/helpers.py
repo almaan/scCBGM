@@ -11,102 +11,147 @@ import random
 import string
 import re
 import datetime
+from scipy.sparse import spmatrix
 import csv
 
 
 def write_dict_to_csv(data, filename):
-    with open(filename, mode='w', newline='') as file:
+    with open(filename, mode="w", newline="") as file:
         writer = csv.writer(file)
         # Write the header
-        writer.writerow(['Concept', 'Pos', 'Neg', 'Neu'])
+        writer.writerow(["Concept", "Pos", "Neg", "Neu"])
         # Write the rows
         for concept, values in data.items():
-            writer.writerow([concept, float(values['pos']), float(values['neg']), float(values['neu'])])
+            writer.writerow(
+                [
+                    concept,
+                    float(values["pos"]),
+                    float(values["neg"]),
+                    float(values["neu"]),
+                ]
+            )
 
 
-def add_extras_to_concepts(dataset,cfg) -> xr.Dataset:
+def add_extras_to_concepts(dataset, cfg) -> xr.Dataset:
 
-
-   # Step 1: Create the new concept coordinate
-    new_concepts = dataset['concept'].values.tolist() + \
-                   [f'concept_{i}' for i in range( cfg.dataset.n_concepts, cfg.dataset.n_concepts+cfg.dataset.n_tissues)] + \
-                   [f'concept_{i}' for i in range( cfg.dataset.n_concepts+cfg.dataset.n_tissues,\
-                                                     cfg.dataset.n_concepts+cfg.dataset.n_tissues+cfg.dataset.n_celltypes)]+\
-                   [f'concept_{i}' for i in range(cfg.dataset.n_concepts+cfg.dataset.n_tissues+cfg.dataset.n_celltypes,\
-                                                    cfg.dataset.n_concepts+cfg.dataset.n_tissues+cfg.dataset.n_celltypes+cfg.dataset.n_batches)] 
-
+    # Step 1: Create the new concept coordinate
+    new_concepts = (
+        dataset["concept"].values.tolist()
+        + [
+            f"concept_{i}"
+            for i in range(
+                cfg.dataset.n_concepts, cfg.dataset.n_concepts + cfg.dataset.n_tissues
+            )
+        ]
+        + [
+            f"concept_{i}"
+            for i in range(
+                cfg.dataset.n_concepts + cfg.dataset.n_tissues,
+                cfg.dataset.n_concepts
+                + cfg.dataset.n_tissues
+                + cfg.dataset.n_celltypes,
+            )
+        ]
+        + [
+            f"concept_{i}"
+            for i in range(
+                cfg.dataset.n_concepts
+                + cfg.dataset.n_tissues
+                + cfg.dataset.n_celltypes,
+                cfg.dataset.n_concepts
+                + cfg.dataset.n_tissues
+                + cfg.dataset.n_celltypes
+                + cfg.dataset.n_batches,
+            )
+        ]
+    )
 
     # Step 2: Extend the concepts data variable
-    new_concepts_data = np.zeros((dataset.sizes['obs'], len(new_concepts)))
+    new_concepts_data = np.zeros((dataset.sizes["obs"], len(new_concepts)))
 
     # Copy the existing concepts values
-    new_concepts_data[:, :cfg.dataset.n_concepts] = dataset['concepts'].values
+    new_concepts_data[:, : cfg.dataset.n_concepts] = dataset["concepts"].values
 
-    total_concepts= cfg.dataset.n_concepts
+    total_concepts = cfg.dataset.n_concepts
     # Set the appropriate concept_tissue, concept_batch, and concept_celltype coefficients
-    for i in range(dataset.sizes['obs']):
-        tissue = dataset['tissues'].isel(obs=i).values.item()  # Convert to a scalar
-        tissue_index = int(tissue.split('_')[-1])
+    for i in range(dataset.sizes["obs"]):
+        tissue = dataset["tissues"].isel(obs=i).values.item()  # Convert to a scalar
+        tissue_index = int(tissue.split("_")[-1])
         new_concepts_data[i, cfg.dataset.n_concepts + tissue_index] = 1
-        
 
-        celltype = dataset['celltypes'].isel(obs=i).values.item()  # Convert to a scalar
-        celltype_index = int(celltype.split('_')[-1])
-        new_concepts_data[i, cfg.dataset.n_concepts +cfg.dataset.n_tissues + celltype_index] = 1
-        total_concepts+=cfg.dataset.n_celltypes
+        celltype = dataset["celltypes"].isel(obs=i).values.item()  # Convert to a scalar
+        celltype_index = int(celltype.split("_")[-1])
+        new_concepts_data[
+            i, cfg.dataset.n_concepts + cfg.dataset.n_tissues + celltype_index
+        ] = 1
+        total_concepts += cfg.dataset.n_celltypes
 
-
-        batch = dataset['batches'].isel(obs=i).values.item()  # Convert to a scalar
-        batch_index = int(batch.split('_')[-1])
-        new_concepts_data[i, cfg.dataset.n_concepts +cfg.dataset.n_tissues+ cfg.dataset.n_celltypes+ batch_index] = 1
-
-
+        batch = dataset["batches"].isel(obs=i).values.item()  # Convert to a scalar
+        batch_index = int(batch.split("_")[-1])
+        new_concepts_data[
+            i,
+            cfg.dataset.n_concepts
+            + cfg.dataset.n_tissues
+            + cfg.dataset.n_celltypes
+            + batch_index,
+        ] = 1
 
     # Step 3: Extend the concept_coef data variable
-    new_concept_coef = np.zeros((len(new_concepts), dataset.sizes['var']))
-    new_concept_coef[:8, :] = dataset['concept_coef'].values
+    new_concept_coef = np.zeros((len(new_concepts), dataset.sizes["var"]))
+    new_concept_coef[:8, :] = dataset["concept_coef"].values
 
     # Copy the tissue_coef, batch_coef, and celltype_coef values to the new concept entries
     for i in range(cfg.dataset.n_tissues):
-        new_concept_coef[ cfg.dataset.n_concepts  + i, :] = dataset['tissue_coef'].sel(tissue=f'tissue_{i}').values
+        new_concept_coef[cfg.dataset.n_concepts + i, :] = (
+            dataset["tissue_coef"].sel(tissue=f"tissue_{i}").values
+        )
 
     for i in range(cfg.dataset.n_celltypes):
-        new_concept_coef[cfg.dataset.n_concepts +cfg.dataset.n_tissues   + i, :] = dataset['celltype_coef'].sel(celltype=f'celltype_{i}').values
+        new_concept_coef[cfg.dataset.n_concepts + cfg.dataset.n_tissues + i, :] = (
+            dataset["celltype_coef"].sel(celltype=f"celltype_{i}").values
+        )
 
     for i in range(cfg.dataset.n_batches):
-        new_concept_coef[cfg.dataset.n_concepts +cfg.dataset.n_tissues+ cfg.dataset.n_celltypes + i, :] = dataset['batch_coef'].sel(batch=f'batch_{i}').values
-
+        new_concept_coef[
+            cfg.dataset.n_concepts
+            + cfg.dataset.n_tissues
+            + cfg.dataset.n_celltypes
+            + i,
+            :,
+        ] = (
+            dataset["batch_coef"].sel(batch=f"batch_{i}").values
+        )
 
     new_dataset = xr.Dataset(
         {
-            'data': dataset['data'],
-            'concepts': (['obs', 'concept'], new_concepts_data),
-            'concept_coef': (['concept', 'var'], new_concept_coef),
-            'tissues': dataset['tissues'],
-            'tissue_coef': dataset['tissue_coef'],
-            'batches': dataset['batches'],
-            'batch_coef': dataset['batch_coef'],
-            'celltypes': dataset['celltypes'],
-            'celltype_coef': dataset['celltype_coef'],
-            'std_libsize': dataset['std_libsize'],
-            'p_batch': dataset['p_batch'],
-            'p_tissue': dataset['p_tissue'],
-            'p_celltype_in_tissue': dataset['p_celltype_in_tissue'],
-            'p_concept_in_celltype': dataset['p_concept_in_celltype'],
-            'baseline': dataset['baseline']
+            "data": dataset["data"],
+            "concepts": (["obs", "concept"], new_concepts_data),
+            "concept_coef": (["concept", "var"], new_concept_coef),
+            "tissues": dataset["tissues"],
+            "tissue_coef": dataset["tissue_coef"],
+            "batches": dataset["batches"],
+            "batch_coef": dataset["batch_coef"],
+            "celltypes": dataset["celltypes"],
+            "celltype_coef": dataset["celltype_coef"],
+            "std_libsize": dataset["std_libsize"],
+            "p_batch": dataset["p_batch"],
+            "p_tissue": dataset["p_tissue"],
+            "p_celltype_in_tissue": dataset["p_celltype_in_tissue"],
+            "p_concept_in_celltype": dataset["p_concept_in_celltype"],
+            "baseline": dataset["baseline"],
         },
         coords={
-            'obs': dataset['obs'],
-            'var': dataset['var'],
-            'concept': new_concepts,
-            'tissue': dataset['tissue'],
-            'celltype': dataset['celltype'],
-            'batch': dataset['batch']
-        }
+            "obs": dataset["obs"],
+            "var": dataset["var"],
+            "concept": new_concepts,
+            "tissue": dataset["tissue"],
+            "celltype": dataset["celltype"],
+            "batch": dataset["batch"],
+        },
     )
 
-
     return new_dataset
+
 
 def dataset_to_anndata(
     dataset: xr.Dataset,
@@ -212,6 +257,50 @@ def simple_adata_train_test_split(
     return adata_test, adata_train, n_test, idx
 
 
+def stratified_adata_train_test_split(
+    adata: ad.AnnData,
+    p_test: NonNegativeFloat = 0.5,
+    concept_key: str = "concepts",
+) -> Tuple[ad.AnnData, ad.AnnData]:
+
+    if concept_key not in adata.obsm:
+        return simple_adata_train_test_split(
+            adata,
+            p_test,
+        )
+
+    if (p_test >= 1) or (p_test <= 0):
+        raise ValueError(
+            "p_test = {}, this is not in the interval (0,1)".format(p_test)
+        )
+    from sklearn.model_selection import StratifiedShuffleSplit
+
+    concept_vec = np.array(
+        ["".join(map(str, row.astype(int))) for row in adata.obsm["concepts"]]
+    )
+
+    uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)
+    while uni_cnt.min() < 2:
+
+        min_lab = np.argmin(uni_cnt)
+        uni_cnt[min_lab] = uni_cnt.max()
+        smin_lab = np.argmin(uni_cnt)
+        concept_vec[concept_vec == uni_lab[min_lab]] = uni_lab[smin_lab]
+        uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)
+
+    sss = StratifiedShuffleSplit(n_splits=1, test_size=p_test, random_state=69)
+    idx = np.arange(len(adata))
+    train_idx, test_idx = next(sss.split(idx, concept_vec))
+
+    adata_test, adata_train = adata[test_idx].copy(), adata[train_idx].copy()
+    n_test = len(adata_test)
+
+    adata_test.obs["split_label"] = concept_vec[test_idx]
+    adata_train.obs["split_label"] = concept_vec[train_idx]
+
+    return adata_test, adata_train, n_test, np.concatenate((test_idx, train_idx))
+
+
 def generate_random_string(length=15):
     characters = string.ascii_letters + string.digits
     random_string = "".join(random.choice(characters) for _ in range(length))
@@ -269,3 +358,62 @@ def get_n_level_keys(d, n):
     # Start the recursion
     recurse_keys(d, 1)  # Start from level 1
     return n_level_keys
+
+
+def matrix_correlation(
+    O: np.ndarray | spmatrix, P: np.ndarray | spmatrix
+) -> np.ndarray:
+    # efficient implementation of columnwise
+    # correlation between two input matrices
+    # shamelessly stolen from: https://github.com/ikizhvatov/efficient-columnwise-correlation/blob/master/columnwise_corrcoef_perf.py
+
+    if isinstance(O, spmatrix):
+        O = O.toarray()
+    if isinstance(P, spmatrix):
+        P = P.toarray()
+
+    (n, t) = O.shape  # n traces of t samples
+    (n_bis, m) = P.shape  # n predictions for each of m candidates
+
+    DO = O - (
+        np.einsum("nt->t", O, optimize="optimal") / np.double(n)
+    )  # compute O - mean(O)
+    DP = P - (
+        np.einsum("nm->m", P, optimize="optimal") / np.double(n)
+    )  # compute P - mean(P)
+
+    # compute covariance
+    cov = np.einsum("nm,nt->mt", DP, DO, optimize="optimal")
+
+    # compute variance
+    varP = np.einsum("nm,nm->m", DP, DP, optimize="optimal")
+    varO = np.einsum("nt,nt->t", DO, DO, optimize="optimal")
+    tmp = np.einsum("m,t->mt", varP, varO, optimize="optimal")
+
+    return cov / np.sqrt(tmp)
+
+
+def matrix_covariance(O: np.ndarray | spmatrix, P: np.ndarray | spmatrix) -> np.ndarray:
+    # efficient implementation of columnwise
+    # correlation between two input matrices
+    # shamelessly stolen from: https://github.com/ikizhvatov/efficient-columnwise-correlation/blob/master/columnwise_corrcoef_perf.py
+
+    if isinstance(O, spmatrix):
+        O = O.toarray()
+    if isinstance(P, spmatrix):
+        P = P.toarray()
+
+    (n, t) = O.shape  # n traces of t samples
+    (n_bis, m) = P.shape  # n predictions for each of m candidates
+
+    DO = O - (
+        np.einsum("nt->t", O, optimize="optimal") / np.double(n)
+    )  # compute O - mean(O)
+    DP = P - (
+        np.einsum("nm->m", P, optimize="optimal") / np.double(n)
+    )  # compute P - mean(P)
+
+    # compute covariance
+    cov = np.einsum("nm,nt->mt", DP, DO, optimize="optimal")
+
+    return cov

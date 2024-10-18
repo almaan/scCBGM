@@ -94,7 +94,7 @@ def main(
         with open(dataset_path, "rb") as file:
             dataset = pickle.load(file)
 
-    adata_test, adata, n_test, idx = helpers.simple_adata_train_test_split(adata)
+    adata_test, adata, n_test, idx = helpers.stratified_adata_train_test_split(adata)
 
     if cfg.model.has_cbm:
         data_module = clab.data.dataloader.GeneExpressionDataModule(
@@ -154,6 +154,16 @@ def main(
 
         callbacks.append(checkpoint_callback)
 
+    if cfg.model.get("early_stopping", False):
+        early_stop_callback = pl.callbacks.EarlyStopping(
+            monitor="val_concept_loss",
+            min_delta=0.00,
+            patience=10,
+            verbose=False,
+            mode="min",
+        )
+        callbacks.append(early_stop_callback)
+
     callbacks = callbacks if len(callbacks) > 0 else None
     max_epochs = cfg.trainer.max_epochs
     trainer = pl.Trainer(
@@ -163,6 +173,10 @@ def main(
 
     model.to("cpu")
     model.eval()
+
+    if hasattr(model, "log_parameters"):
+        model.log_parameters()
+
     x_raw = adata_test.X.astype(np.float32).copy()
     x_true = adata_test.X.astype(np.float32).copy()
 
