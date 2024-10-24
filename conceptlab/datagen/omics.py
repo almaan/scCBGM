@@ -5,6 +5,7 @@ from typing import Dict, List, Literal
 import xarray as xr
 import numpy as np
 import pandas as pd
+from scipy.stats import wishart
 
 __all__ = ["OmicsDataGenerator"]
 
@@ -50,6 +51,7 @@ class OmicsDataGenerator(DataGenerator):
         p_T: np.ndarray,
         p_C: np.ndarray,
         std_l: np.ndarray,
+        cov: np.ndarray,
         std_noise: float = 0.01,
         rng: np.random._generator.Generator | None = None,
         seed: int = 42,
@@ -71,6 +73,7 @@ class OmicsDataGenerator(DataGenerator):
             p_T (np.ndarray): Probabilities for cell type given tissue type.
             p_C (np.ndarray): Probabilities for concept indicator given cell type.
             std_l (np.ndarray): Standard deviation for library size.
+            cov (np.ndarray) : covariance matrix for logits
             std_noise (float, optional): Standard deviation for noise. Defaults to 0.01.
             rng (np.random.Generator, optional): Random number generator. Defaults to None.
             seed (int, optional): Seed for random number generator if rng is None. Defaults to 42.
@@ -96,6 +99,7 @@ class OmicsDataGenerator(DataGenerator):
         B_mat = np.zeros(N)
         T_mat = np.zeros(N)
         L_mat = np.zeros(N)
+        P_mat = np.zeros((N, C))
 
         # -- Generate Data -- #
         for n in range(N):
@@ -105,8 +109,18 @@ class OmicsDataGenerator(DataGenerator):
             t_n = categorical(p_Q)
             # get cell type
             u_n = categorical(p_T[t_n])
+
+            # get type specific concept probabilities, transform to logits
+            mu = np.log(p_C[u_n] / (1 - p_C[u_n]))
+            # sample logits with dependency
+            logits = rng.multivariate_normal(mean=mu, cov=cov)
+            # convert logits to probabilities
+            p_v_n = 1 / (1 + np.exp(-logits))
+            # store probabilities
+            P_mat[n, :] = p_v_n
             # get concept indicator
-            v_n = rng.binomial(1, p_C[u_n])
+            v_n = rng.binomial(1, p_v_n)
+
             # get library size
             l_n = rng.normal(0, std_l[b_n])
             # get noise
@@ -139,6 +153,7 @@ class OmicsDataGenerator(DataGenerator):
             "C_mat": C_mat,
             "T_mat": T_mat,
             "L_mat": L_mat,
+            "P_mat": P_mat,
         }
 
     @classmethod
@@ -150,6 +165,7 @@ class OmicsDataGenerator(DataGenerator):
         T_mat: np.ndarray,
         B_mat: np.ndarray,
         L_mat: np.ndarray,
+        P_mat: np.ndarray,
         gamma: np.ndarray,
         omega: np.ndarray,
         tau: np.ndarray,
@@ -160,6 +176,7 @@ class OmicsDataGenerator(DataGenerator):
         p_Q: np.ndarray,
         p_T: np.ndarray,
         p_C: np.ndarray,
+        cov: np.ndarray,
     ):
         """helper function to build dataset"""
 
@@ -184,6 +201,7 @@ class OmicsDataGenerator(DataGenerator):
             "obs": obs_names,
             "var": var_names,
             "concept": concept_names,
+            "_concept": concept_names,
             "tissue": tissue_names,
             "celltype": celltype_names,
             "batch": batch_names,
@@ -200,6 +218,7 @@ class OmicsDataGenerator(DataGenerator):
             "batch_coef": (("batch", "var"), gamma),
             _C.DataVars.celltype.value: (("obs",), U_mat),
             "libsize": (("obs"), L_mat),
+            "cov": (("concept", "_concept"), cov),
             cls.params_key["omega"]: (("celltype", "var"), omega),
             cls.params_key["std_l"]: (("batch"), std_l),
             cls.params_key["p_N"]: (("batch"), p_N),
@@ -207,6 +226,7 @@ class OmicsDataGenerator(DataGenerator):
             cls.params_key["p_T"]: (("tissue", "celltype"), p_T),
             cls.params_key["p_C"]: (("celltype", "concept"), p_C),
             cls.params_key["ws"]: (("var"), ws),
+            "bernoulli_prob": (("obs", "concepts"), P_mat),
         }
 
         # create xarray dataset
@@ -232,10 +252,12 @@ class OmicsDataGenerator(DataGenerator):
         std_libsize_lower: NonNegativeFloat = 0.01,
         std_libsize_upper: NonNegativeFloat = 0.03,
         std_noise: NonNegativeFloat = 0.01,
+        cov_prior_range: float = 5,
         beta_a: PositiveFloat = 1,
         beta_b: PositiveFloat = 0.5,
         seed: int = 42,
         zero_inflate: bool = True,
+        use_concept_dependency: bool = False,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -259,8 +281,10 @@ class OmicsDataGenerator(DataGenerator):
             std_noise (float, optional): Standard deviation for noise. Defaults to 0.01.
             beta_a (float, optional): Alpha parameter for beta distribution in zero inflation. Defaults to 1.
             beta_b (float, optional): Beta parameter for beta distribution in zero inflation. Defaults to 0.5.
+            cov_prior_range (float) : will sample Wishart scale matric elements from Unif(-value,value) if use_concept_dependency is True
             seed (int, optional): Seed for random number generator. Defaults to 42.
             zero_inflate (bool, optional): Whether to add zero inflation to the data. Defaults to True.
+            use_concept_dependency: whether to introduce dependency between concepts or not
 
         Returns:
             xr.Dataset: An xarray dataset containing the generated synthetic omics data.
@@ -298,6 +322,19 @@ class OmicsDataGenerator(DataGenerator):
         # concept coefficients
         cs = rng.normal(0, std_concept, size=(C, F))
 
+        # covariance
+        if use_concept_dependency:
+            scale_matrix_elements = np.random.uniform(
+                -cov_prior_range, cov_prior_range, size=(C * (C + 1)) // 2
+            )
+            scale_matrix = np.zeros((C, C))
+            tril_indices = np.tril_indices_from(scale_matrix)
+            scale_matrix[tril_indices[0], tril_indices[1]] = scale_matrix_elements
+            scale_matrix = scale_matrix @ scale_matrix.T
+            cov = wishart.rvs(df=C, scale=scale_matrix, random_state=rng)
+        else:
+            cov = np.zeros((C, C))
+
         # baseline values
         r, s = np.log(baseline_lower), np.log(baseline_upper)
         ws = rng.uniform(r, s, size=F)
@@ -321,6 +358,7 @@ class OmicsDataGenerator(DataGenerator):
             p_T=p_T,
             p_C=p_C,
             std_l=std_l,
+            cov=cov,
         )
 
         data = cls._model(n_obs=N, **params, std_noise=std_noise, rng=rng)
