@@ -1,14 +1,12 @@
 # @package _global_
 
 defaults:
-  - override /model: cb_vae.yaml
+  - override /model: cb_vae_sf.yaml
   - override /dataset: simple.yaml
-
-
 
 wandb:
   project: cblab_dev
-  experiment: cb_vae_dev
+  experiment: scaled_cb_vae
 
 
 trainer:
