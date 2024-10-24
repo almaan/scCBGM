@@ -43,7 +43,7 @@ class GeneExpressionDataset(Dataset):
         if self.add_concepts:
             concepts = self.concepts[idx]
             return sample, concepts
-        return sample
+        return sample, t.tensor([])
 
     def get_data(
         self,

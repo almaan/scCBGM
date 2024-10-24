@@ -4,19 +4,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from .base import BaseCBVAE
 
 
-
-# Define the VAE model
-class VAE(pl.LightningModule):
+class VAE(BaseCBVAE):
     def __init__(self, config):
-        super(VAE, self).__init__()
-
-        self.input_dim = config.input_dim
-        self.hidden_dim = config.hidden_dim
-        self.latent_dim = config.latent_dim
-        self.learning_rate = config.lr
-
+        super().__init__(
+            config,
+        )
         # Encoder
         self.fc1 = nn.Linear(self.input_dim, self.hidden_dim)
         self.fc21 = nn.Linear(self.hidden_dim, self.latent_dim)  # Mean
@@ -27,30 +22,35 @@ class VAE(pl.LightningModule):
         self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
         self.beta = config.beta
         self.dropout = config.get("dropout", 0.3)
+
         self.save_hyperparameters()
 
-    def encode(self, x):
+    def encode(self, x, **kwargs):
         h1 = F.relu(self.fc1(x))
+        h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
         mu, logvar = self.fc21(h1), self.fc22(h1)
         logvar = t.clip(logvar, -1e5, 1e5)
-        return mu, logvar
 
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
+        return dict(mu=mu, logvar=logvar)
 
-    def decode(self, z):
-        h3 = F.relu(self.fc3(z))
-        return self.fc4(h3)
+    def cbm(self, z, **kwargs):
+        return dict(h=z)
 
-    def forward(self, x):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
-        x_pred = self.decode(z)
-        return {"x_pred": x_pred, "z": z, "mu": mu, "logvar": logvar}
+    def intervene(self, x, **kwargs):
+        enc = self.encode(x)
+        z = self.reparametrize(**enc)
+        cbm = self.cbm(**z)
+        dec = self.decode(**cbm)
+        return dec
 
-    def loss_function(self, x, x_pred, mu, logvar, **kwargs):
+    def decode(self, h, **kwargs):
+        h3 = F.relu(self.fc3(h))
+        h3 = F.dropout(h3, p=self.dropout, training=True, inplace=False)
+        h4 = self.fc4(h3)
+        return dict(x_pred=h4)
+
+    def loss_function(self, x, concepts, x_pred, mu, logvar, **kwargs):
+
         loss_dict = {}
         MSE = F.mse_loss(x_pred, x, reduction="mean")
         KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
@@ -59,21 +59,6 @@ class VAE(pl.LightningModule):
         loss_dict["Total_loss"] = MSE + self.beta * KLD
 
         return loss_dict
-
-    def _step(self, batch, batch_idx, prefix="train"):
-        x = batch
-        out = self(x)
-        loss_dict = self.loss_function(x, **out)
-
-        for key, value in loss_dict.items():
-            self.log(f"{prefix}_{key}", value)
-        return loss_dict["Total_loss"]
-
-    def training_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, "train")
-
-    def validation_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, "val")
 
     def configure_optimizers(
         self,

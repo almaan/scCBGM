@@ -38,7 +38,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         pass
 
     @abstractmethod
-    def intervene(self, x, concepts, mask):
+    def intervene(self, *args, **kwargs):
         pass
 
     def log_parameters(self, *args, **kwargs):
@@ -64,6 +64,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
     def _step(self, batch, batch_idx, prefix="train"):
 
         x, concepts = batch
+
         if prefix == "train" and self.independent_training:
             out = self(x, concepts)
         else:

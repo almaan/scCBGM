@@ -5,17 +5,13 @@ import torch.nn.functional as F
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
+from .base import BaseCBVAE
 
-# Define the VAE model
-class CB_VAE(pl.LightningModule):
+
+class CB_VAE(BaseCBVAE):
     def __init__(self, config):
-        super(CB_VAE, self).__init__()
-        self.input_dim = config.input_dim
-        self.hidden_dim = config.hidden_dim
-        self.latent_dim = config.latent_dim
-        self.n_concepts = config.n_concepts
-        self.learning_rate = config.lr
-        self.independent_training = config.independent_training
+
+        super().__init__(config)
 
         # Encoder
         self.fc1 = nn.Linear(self.input_dim, self.hidden_dim)
@@ -24,7 +20,14 @@ class CB_VAE(pl.LightningModule):
 
         self.fcCB1 = nn.Linear(self.latent_dim, self.n_concepts)
 
-        n_unknown = max(config.min_bottleneck_size - self.n_concepts, self.n_concepts)
+        if "n_unknown" in config:
+            n_unknown = config["n_unknown"]
+        elif "min_bottleneck_size" in config:
+            n_unknown = max(
+                config.min_bottleneck_size - self.n_concepts, self.n_concepts
+            )
+        else:
+            n_unknown = 32
 
         self.fcCBproj = nn.Linear(self.n_concepts, n_unknown)
         self.fcCB2 = nn.Linear(self.latent_dim, n_unknown)
@@ -42,19 +45,15 @@ class CB_VAE(pl.LightningModule):
 
         self.save_hyperparameters()
 
-    def encode(self, x):
+    def encode(self, x, **kwargs):
         h1 = F.relu(self.fc1(x))
         h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
         mu, logvar = self.fc21(h1), self.fc22(h1)
         logvar = t.clip(logvar, -1e5, 1e5)
-        return mu, logvar
 
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
+        return dict(mu=mu, logvar=logvar)
 
-    def cbm(self, z, concepts=None, mask=None, intervene=False):
+    def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
 
         known_concepts = F.sigmoid(self.fcCB1(z))
         known_concepts_proj = self.fcCBproj(known_concepts)
@@ -69,61 +68,30 @@ class CB_VAE(pl.LightningModule):
             else:
                 h = torch.cat((concepts, unknown), 1)
 
-        return known_concepts, known_concepts_proj, unknown, h
+        return dict(
+            pred_concept=known_concepts,
+            concept_proj=known_concepts_proj,
+            unknown=unknown,
+            h=h,
+        )
 
-    def decode(self, z):
-        h3 = F.relu(self.fc3(z))
+    def decode(self, h, **kwargs):
+        h3 = F.relu(self.fc3(h))
         h3 = F.dropout(h3, p=self.dropout, training=True, inplace=False)
-        return self.fc4(h3)
+        h4 = self.fc4(h3)
+        return dict(x_pred=h4)
 
-    def forward(self, x, concepts=None):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
-        known_concepts, known_concepts_proj, unknown, z = self.cbm(z, concepts)
-        x_pred = self.decode(z)
-        return {
-            "x_pred": x_pred,
-            "z": z,
-            "mu": mu,
-            "logvar": logvar,
-            "pred_concept": known_concepts,
-            "concept_proj": known_concepts_proj,
-            "unknown": unknown,
-        }
-
-    def intervene(self, x, concepts, mask):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
-        _, _, _, z = self.cbm(z, concepts, mask, True)
-        x_pred = self.decode(z)
-        return {"x_pred": x_pred}
+    def intervene(self, x, concepts, mask, **kwargs):
+        enc = self.encode(x)
+        z = self.reparametrize(**enc)
+        cbm = self.cbm(**z, concepts=concepts, mask=mask, intervene=True)
+        dec = self.decode(**cbm)
+        return dec
 
     def orthogonality_loss(self, concept_emb, unk_emb):
         cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
         output = torch.abs(cos(concept_emb, unk_emb))
         return output.mean()
-
-    def binary_accuracy(self, preds, labels, threshold=0.5):
-        """
-        Calculate the binary accuracy of a batch.
-        Args:
-        preds (torch.Tensor): The predicted probabilities or logits.
-        labels (torch.Tensor): The true labels.
-        threshold (float): The threshold to convert probabilities to binary predictions.
-        Returns:
-        float: The binary accuracy.
-        """
-
-        # Convert probabilities to binary predictions
-        binary_preds = (preds >= threshold).float()
-
-        # Calculate the number of correct predictions
-        correct = (binary_preds == labels).float().sum()
-
-        # Calculate the accuracy
-        accuracy = correct / labels.numel()
-
-        return accuracy.item()
 
     def loss_function(
         self,
@@ -166,28 +134,6 @@ class CB_VAE(pl.LightningModule):
             loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
 
         return loss_dict
-
-    def _step(self, batch, batch_idx, prefix="train"):
-        x, concepts = batch
-        if prefix == "train" and self.independent_training:
-            out = self(x, concepts)
-
-        else:
-            out = self(x)
-        loss_dict = self.loss_function(x, concepts, **out)
-
-        for key, value in loss_dict.items():
-            self.log(f"{prefix}_{key}", value)
-        return loss_dict["Total_loss"]
-
-    def training_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, "train")
-
-    def validation_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, "val")
-
-    # def configure_optimizers(self):
-    # return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def configure_optimizers(
         self,
