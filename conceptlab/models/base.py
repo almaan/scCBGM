@@ -52,7 +52,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
     def forward(self, x, concepts=None):
         enc = self.encode(x)
         z = self.reparametrize(**enc)
-        cbm = self.cbm(**z, concepts=concepts)
+        cbm = self.cbm(**z, **enc, concepts=concepts)
         dec = self.decode(**enc, **z, **cbm)
 
         out = dict()

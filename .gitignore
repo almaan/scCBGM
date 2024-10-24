@@ -2,12 +2,10 @@ notebooks_local/
 __pycache__/
 plotting/
 rsc/
-<<<<<<< HEAD
 .DS_Store
 conceptlab/.DS_Store
-=======
 outputs/
 results/
 /data
 *.txt
->>>>>>> 9084dd42a3e103f1dc46efdb95261b92a8e1710f
+tmux*

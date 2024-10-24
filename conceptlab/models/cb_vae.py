@@ -84,7 +84,7 @@ class CB_VAE(BaseCBVAE):
     def intervene(self, x, concepts, mask, **kwargs):
         enc = self.encode(x)
         z = self.reparametrize(**enc)
-        cbm = self.cbm(**z, concepts=concepts, mask=mask, intervene=True)
+        cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
         dec = self.decode(**cbm)
         return dec
 
@@ -153,3 +153,43 @@ class CB_VAE(BaseCBVAE):
                 "monitor": "val_loss",  # Optional: if you use reduce-on-plateau schedulers
             },
         }
+
+
+class SCALED_CB_VAE(CB_VAE):
+    def __init__(self, config):
+        super().__init__(config)
+
+        # Amortized Scaling Factor
+        self.fcS = nn.Linear(self.input_dim, 1)
+
+    def encode(self, x, **kwargs):
+        h1 = F.relu(self.fc1(x))
+        h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
+        mu, logvar = self.fc21(h1), self.fc22(h1)
+        logvar = t.clip(logvar, -1e5, 1e5)
+
+        scale_factor = self.fcS(x)
+
+        return dict(mu=mu, logvar=logvar, scale_factor=scale_factor)
+
+    def cbm(self, z, scale_factor, concepts=None, mask=None, intervene=False, **kwargs):
+
+        known_concepts = F.sigmoid(self.fcCB1(z))
+        known_concepts_proj = self.fcCBproj(known_concepts)
+        unknown = F.relu(self.fcCB2(z))
+
+        if intervene:
+            concepts_ = known_concepts * (1 - mask) + concepts * mask
+            h = torch.cat((concepts_ * scale_factor, unknown), 1)
+        else:
+            if concepts == None:
+                h = torch.cat((known_concepts * scale_factor, unknown), 1)
+            else:
+                h = torch.cat((concepts * scale_factor, unknown), 1)
+
+        return dict(
+            pred_concept=known_concepts,
+            concept_proj=known_concepts_proj,
+            unknown=unknown,
+            h=h,
+        )

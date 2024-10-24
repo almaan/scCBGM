@@ -7,7 +7,7 @@ defaults:
 
 
 wandb:
-  project: cblab_dev
+  project: conceptlab_dev
   experiment: cb_vae_dev
 
 
