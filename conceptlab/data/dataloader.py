@@ -59,6 +59,7 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         val_split: float = 0.2,
         layer: str = None,
         add_concepts: bool = False,
+        concept_key: str = "concepts",
         normalize: bool = True,
         split_by: str | None = "split_label",
     ):
@@ -74,7 +75,7 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         elif isinstance(data, ad.AnnData):
             self.data = data.to_df(layer=layer)
             if self.add_concepts:
-                self.concepts = pd.DataFrame(data.obsm["concepts"])
+                self.concepts = pd.DataFrame(data.obsm[concept_key])
         elif isinstance(data, pd.DataFrame):
             self.data = data.copy()
         else:
