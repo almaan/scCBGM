@@ -210,7 +210,7 @@ def main(
         x_true = np.log1p(x_true)
 
     sub_idx = np.random.choice(
-        x_true.shape[0], replace=False, size=min(5000, x_true.shape[0])
+        x_true.shape[0], replace=False, size=min(500, x_true.shape[0])
     )
 
     ad_true = ad.AnnData(
@@ -332,9 +332,18 @@ def main(
         intervention_data = dict(On=dict(), Off=dict())
 
         logger.info("Evaluate Interventions")
-        for c in range(n_concepts_to_eval):
-            concept_name = original_test_concepts.columns[c]
+
+        test_concepts = cfg.dataset.get("test_concepts")
+        if test_concepts is not None:
+            concept_ivn_name = test_concepts
+            concept_ivn_num = np.where(coefs.index.values == test_concepts)[0]
+        else:
+            concept_ivn_name = coefs.index[0:n_concepts_to_eval]
+            concept_ivn_num = list(range(0, n_concepts_to_eval))
+
+        for c, concept_name in zip(concept_ivn_num, concept_ivn_name):
             concept_vars = dict()
+
             concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
             concept_vars["neg"] = coefs.columns[(coefs.iloc[c, :] < 0).values]
             concept_vars["neu"] = coefs.columns[(coefs.iloc[c, :] == 0).values]

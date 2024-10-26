@@ -287,10 +287,12 @@ def compute_correlation(
 
     if n_concepts is None:
         n_concepts = len(concept_coefs.index)
-    for concept_idx in range(n_concepts):
-        concept = concept_coefs.index[concept_idx]
 
-        concept_coef = concept_coefs.iloc[concept_idx, :]
+    concept_names = list(intervention_data["On"].keys())
+
+    for concept in concept_names:
+
+        concept_coef = concept_coefs.loc[concept, :]
         C_true = np.exp(concept_coef)
 
         on_data = intervention_data["On"][concept]
