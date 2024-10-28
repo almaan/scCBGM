@@ -336,9 +336,15 @@ def main(
         test_concepts = cfg.dataset.get("test_concepts")
         if test_concepts is not None:
             concept_ivn_name = test_concepts
-            concept_ivn_num = np.where(coefs.index.values == test_concepts)[0]
+            concept_ivn_num = np.array(
+                [
+                    np.argmax(x == concept_names)
+                    for x in test_concepts
+                    if x in concept_names
+                ]
+            )
         else:
-            concept_ivn_name = coefs.index[0:n_concepts_to_eval]
+            concept_ivn_name = concept_names[0:n_concepts_to_eval]
             concept_ivn_num = list(range(0, n_concepts_to_eval))
 
         for c, concept_name in zip(concept_ivn_num, concept_ivn_name):
@@ -379,6 +385,8 @@ def main(
                         cfg,
                     )
 
+                print(scores)
+                print(concept_name)
                 intervention_scores[intervention_type][concept_name] = scores[
                     concept_name
                 ]
