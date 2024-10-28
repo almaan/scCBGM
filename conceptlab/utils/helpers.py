@@ -3,6 +3,7 @@ import anndata as ad
 from conceptlab.utils.constants import DimNames, DataVars
 from conceptlab.utils.types import NonNegativeFloat
 from typing import Tuple
+from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -155,8 +156,11 @@ def add_extras_to_concepts(dataset, cfg) -> xr.Dataset:
 
 def dataset_to_anndata(
     dataset: xr.Dataset,
-    concepts: np.ndarray | None = None,
+    concepts: pd.DataFrame | None = None,
+    concept_coef: pd.DataFrame | None = None,
     adata_path: str | None = None,
+    concept_key: str = "concepts",
+    concept_coef_key: str = "concept_coef",
 ) -> ad.AnnData:
 
     adata = ad.AnnData(
@@ -170,12 +174,18 @@ def dataset_to_anndata(
     adata.obs["batch"] = dataset[DataVars.batch.value].values
 
     if concepts is None:
-        adata.obsm["concepts"] = dataset[DataVars.concept.value].values
+        adata.obsm[concept_key] = dataset[DataVars.concept.value].values
     else:
-        adata.obsm["concepts"] = concepts
+        adata.obsm[concept_key] = concepts
+
+    if concept_coef is None:
+        adata.varm[concept_coef_key] = dataset["concept_coef"].values.T
+    else:
+        adata.varm[concept_coef_key] = concept_coef
 
     if adata_path is not None:
         adata.write_h5ad(adata_path)
+
     return adata
 
 
@@ -273,7 +283,6 @@ def stratified_adata_train_test_split(
         raise ValueError(
             "p_test = {}, this is not in the interval (0,1)".format(p_test)
         )
-    from sklearn.model_selection import StratifiedShuffleSplit
 
     concept_vec = np.array(
         ["".join(map(str, row.astype(int))) for row in adata.obsm["concepts"]]
@@ -417,3 +426,31 @@ def matrix_covariance(O: np.ndarray | spmatrix, P: np.ndarray | spmatrix) -> np.
     cov = np.einsum("nm,nt->mt", DP, DO, optimize="optimal")
 
     return cov
+
+
+def controlled_adata_train_test_split(
+    adata: ad.AnnData,
+    split_col: str,
+    test_labels: str | None = None,
+    p_test=0.5,
+) -> ad.AnnData:
+    from sklearn.model_selection import StratifiedShuffleSplit
+
+    labels = adata.obs[split_col].values
+    if test_labels is None:
+        sss = StratifiedShuffleSplit(n_splits=1, test_size=p_test, random_state=69)
+        idx = np.arange(len(adata))
+        train_idx, test_idx = next(sss.split(idx, labels))
+    else:
+        test_idx = np.where(is_test)[0]
+        train_idx = np.where(~is_test)[0]
+
+    adata_test = adata[test_idx].copy()
+    adata_train = adata[train_idx].copy()
+
+    return (
+        adata_test,
+        adata_train,
+        len(adata_test),
+        np.concatenate((test_idx, train_idx)),
+    )

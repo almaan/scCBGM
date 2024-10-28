@@ -14,21 +14,23 @@ def create_plot_path(original_path, cfg):
     return plotting_folder_path
 
 
-def plot_generation(adata, plotting_folder_path, cfg, normalize=False):
+def plot_generation(
+    adata, plotting_folder_path, cfg, normalize=False, concept_key="concepts"
+):
 
     sc.pp.pca(adata)
     sc.pp.neighbors(adata)
     sc.tl.umap(adata)
 
-    colors = ["ident", "tissue", "celltype", "batch"]
+    colors = [col for col in adata.obs.columns if hasattr(adata.obs[col], "cat")]
 
     old_obs = adata.obs.copy()
 
-    if "concepts" in adata.obsm:
-        concepts = adata.obsm["concepts"].copy()
-        columns = [f"concept_{k}" for k in range(concepts.shape[1])]
+    if concept_key in adata.obsm:
+        concepts = adata.obsm[concept_key].copy()
+        columns = ["concept_{}".format(x) for x in concepts.columns.tolist()]
         concepts = pd.DataFrame(
-            concepts,
+            concepts.values,
             index=adata.obs.index,
             columns=columns,
         )

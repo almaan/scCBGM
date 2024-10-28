@@ -1,8 +1,6 @@
 import conceptlab as clab
 import numpy as np
 import xarray as xr
-
-
 import omegaconf
 
 import pandas as pd
@@ -24,6 +22,7 @@ import conceptlab.evaluation.generation as gen
 import conceptlab.evaluation.concepts as con
 from omegaconf import DictConfig
 import pickle
+from conceptlab.utils import logging
 
 import os
 
@@ -44,10 +43,14 @@ def main(
     cfg: DictConfig,
 ) -> None:
 
+    logger = logging.setup_logger()
+
     set_seed(cfg.constants.seed)
     original_path = get_original_cwd()
     checkpoint_dir = cfg.constants.checkpoint_dir
     normalize = cfg.model.get("normalize", True)
+    concept_key = cfg.dataset.get("concept_key", "concepts")
+    concept_coef_key = cfg.dataset.get("concept_coef_key", "concept_coef")
 
     if not os.path.exists(original_path + cfg.constants.data_path):
         os.makedirs(original_path + cfg.constants.data_path)
@@ -56,13 +59,14 @@ def main(
         original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".h5ad"
     )
 
-    dataset_path = (
-        original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".pkl"
-    )
+    logger.info(f"AnnData Path >>> {adata_path}")
 
-    generate_data = cfg.get("generate_data", True)
+    generate_data = cfg.get("generate_data", False)
 
     if not os.path.exists(adata_path) or generate_data:
+        dataset_path = (
+            original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".pkl"
+        )
 
         dataset = clab.datagen.omics.OmicsDataGenerator.generate(**cfg.dataset)
 
@@ -79,9 +83,11 @@ def main(
             adata.uns["concept_indicator"] = indicator
 
         else:
-            adata = helpers.dataset_to_anndata(dataset, adata_path=adata_path)
+            adata = helpers.dataset_to_anndata(
+                dataset, adata_path=adata_path, concept_key=concept_key
+            )
             adata.uns["concept_indicator"] = np.array(
-                [C.Mods.none] * adata.obsm["concepts"].shape[1], dtype="<U64"
+                [C.Mods.none] * adata.obsm[concept_key].shape[1], dtype="<U64"
             )
 
             # Saving the data object
@@ -90,30 +96,44 @@ def main(
 
     else:
         adata = ad.read_h5ad(adata_path)
-        # Loading the data object
-        with open(dataset_path, "rb") as file:
-            dataset = pickle.load(file)
-
-    adata_test, adata, n_test, idx = helpers.stratified_adata_train_test_split(adata)
-
-    if cfg.model.has_cbm:
-        data_module = clab.data.dataloader.GeneExpressionDataModule(
-            adata,
-            add_concepts=True,
-            batch_size=512,
-            normalize=normalize,
+        adata.X = adata.to_df().values
+        adata.uns["concept_indicator"] = np.array(
+            [C.Mods.none] * adata.obsm[concept_key].shape[1], dtype="<U64"
         )
 
+    train_test_col = cfg.dataset.get("train_test_col", None)
+
+    if train_test_col is not None:
+        logger.info(f"Splitting w.r.t column {train_test_col}")
+        test_labels = cfg.dataset.get("test_labels")
+        if test_labels is not None:
+            logger.info(f"Test Labels: {test_labels}")
+        adata_test, adata, n_test, idx = helpers.controlled_adata_train_test_split(
+            adata,
+            split_col=train_test_col,
+            test_labels=test_labels,
+        )
     else:
-        data_module = clab.data.dataloader.GeneExpressionDataModule(
+        adata_test, adata, n_test, idx = helpers.stratified_adata_train_test_split(
             adata,
-            batch_size=512,
-            normalize=normalize,
+            concept_key=concept_key,
         )
+
+    logger.info("Anndata Information")
+    print(adata)
+
+    data_module = clab.data.dataloader.GeneExpressionDataModule(
+        adata,
+        add_concepts=cfg.model.has_cbm,
+        concept_key=concept_key,
+        batch_size=512,
+        normalize=normalize,
+    )
 
     n_obs, n_vars = adata.shape
-    n_concepts = adata.obsm["concepts"].shape[1]
-    n_concepts_to_eval = cfg.dataset.n_concepts
+    n_concepts = adata.obsm[concept_key].shape[1]
+    # TODO: check if this makes sense
+    n_concepts_to_eval = cfg.dataset.get("n_concepts", n_concepts)
 
     try:
         model_to_call = getattr(clab.models, cfg.model.type, None)
@@ -142,6 +162,7 @@ def main(
     callbacks = []
 
     if cfg.save_checkpoints:
+        logger.info(f"Checkpoints are saved to >>> {checkpoint_dir}")
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             dirpath=checkpoint_dir,
             filename=cfg.wandb.experiment,
@@ -155,6 +176,7 @@ def main(
         callbacks.append(checkpoint_callback)
 
     if cfg.model.get("early_stopping", False):
+        logger.info("Using Early Stopping")
         early_stop_callback = pl.callbacks.EarlyStopping(
             monitor="val_concept_loss",
             min_delta=0.00,
@@ -166,11 +188,13 @@ def main(
 
     callbacks = callbacks if len(callbacks) > 0 else None
     max_epochs = cfg.trainer.max_epochs
+    logger.info("Fitting Model")
     trainer = pl.Trainer(
         max_epochs=max_epochs, logger=wandb_logger, callbacks=callbacks
     )
     trainer.fit(model, data_module)
 
+    logger.info("Activate Eval Mode and move to CPU")
     model.to("cpu")
     model.eval()
 
@@ -181,11 +205,12 @@ def main(
     x_true = adata_test.X.astype(np.float32).copy()
 
     if normalize:
+        logger.info("Normalize data")
         x_true = x_true / x_true.sum(axis=1, keepdims=True) * 1e4
         x_true = np.log1p(x_true)
 
     sub_idx = np.random.choice(
-        x_true.shape[0], replace=False, size=min(5000, x_true.shape[0])
+        x_true.shape[0], replace=False, size=min(500, x_true.shape[0])
     )
 
     ad_true = ad.AnnData(
@@ -196,7 +221,10 @@ def main(
     preds = model(torch.tensor(x_true))
 
     x_pred = preds["x_pred"].detach().numpy()
-    x_concepts = adata_test.obsm["concepts"].astype(np.float32).copy()
+    x_concepts = adata_test.obsm[concept_key].copy()
+    if isinstance(x_concepts, pd.DataFrame):
+        x_concepts = x_concepts.values
+    x_concepts = x_concepts.astype(np.float32).copy()
 
     if cfg.model.has_cbm:
         pred_concept = preds["pred_concept"].detach().numpy()
@@ -221,8 +249,8 @@ def main(
     merge_dict = dict()
     if cfg.model.has_cbm:
         c_pred = preds["pred_concept"].detach().numpy()
-        ad_pred.obsm["concepts"] = c_pred[sub_idx]
-        ad_true.obsm["concepts"] = x_concepts[sub_idx]
+        ad_pred.obsm[concept_key] = c_pred[sub_idx]
+        ad_true.obsm[concept_key] = x_concepts[sub_idx]
 
         if cfg.model.independent_training:
             x_pred_withGT = model(torch.tensor(x_true), torch.tensor(x_concepts))[
@@ -235,14 +263,14 @@ def main(
                 obs=adata_test.obs.iloc[sub_idx],
             )
 
-            ad_pred_withGT.obsm["concepts"] = x_concepts[sub_idx]
+            ad_pred_withGT.obsm[concept_key] = x_concepts[sub_idx]
             merge_dict["vae_cbm_withGT"] = ad_pred_withGT
 
             mse_loss_withGT = gen.mse_loss(x_true, x_pred_withGT, normalize=~normalize)
             wandb.log({"test_mse_loss_withGT": mse_loss_withGT})
     else:
-        ad_pred.obsm["concepts"] = x_concepts[sub_idx].copy()
-        ad_true.obsm["concepts"] = x_concepts[sub_idx].copy()
+        ad_pred.obsm[concept_key] = x_concepts[sub_idx].copy()
+        ad_true.obsm[concept_key] = x_concepts[sub_idx].copy()
 
     if cfg.plotting:
         merge_dict["vae_cbm"] = ad_pred
@@ -252,10 +280,19 @@ def main(
             axis=0,
             label="ident",
         )
+
+        ad_merge.obsm[concept_key] = pd.DataFrame(
+            ad_merge.obsm[concept_key],
+            index=ad_merge.obs_names,
+            columns=adata_test.obsm[concept_key].columns,
+        )
+
         ad_merge.obs_names_make_unique()
         plotting_folder_path = plot.create_plot_path(original_path, cfg)
 
-        plot_filename = plot.plot_generation(ad_merge, plotting_folder_path, cfg)
+        plot_filename = plot.plot_generation(
+            ad_merge, plotting_folder_path, cfg=cfg, concept_key=concept_key
+        )
         # Log the plot to wandb
         wandb.log({"generation_plot": wandb.Image(plot_filename)})
 
@@ -280,16 +317,12 @@ def main(
 
         indicator = adata_test.uns["concept_indicator"]
         ix_og_concepts = indicator == C.Mods.none
-        original_concepts = adata_test.obsm["concepts"][:, ix_og_concepts].copy()
-        original_concepts = pd.DataFrame(
-            original_concepts,
-            index=adata_test.obs_names,
-            columns=[f"concept_{k}" for k in range(original_concepts.shape[1])],
-        )
+        concept_names = adata_test.obsm[concept_key].columns
+        original_concepts = adata_test.obsm[concept_key].iloc[:, ix_og_concepts].copy()
 
-        test_index = ["obs_" + str(i) for i in idx[0:n_test]]
+        test_index = adata_test.obs_names
         original_test_concepts = original_concepts.loc[test_index]
-        coefs = dataset.concept_coef.to_dataframe().unstack()["concept_coef"]
+        coefs = adata.varm[concept_coef_key].T
 
         true_data = pd.DataFrame(x_true, columns=coefs.columns)
         genetrated_data = pd.DataFrame(x_pred, columns=coefs.columns)
@@ -298,9 +331,19 @@ def main(
         intervention_scores = dict(On=dict(), Off=dict())
         intervention_data = dict(On=dict(), Off=dict())
 
-        for c in range(n_concepts_to_eval):
-            concept_name = original_test_concepts.columns[c]
+        logger.info("Evaluate Interventions")
+
+        test_concepts = cfg.dataset.get("test_concepts")
+        if test_concepts is not None:
+            concept_ivn_name = test_concepts
+            concept_ivn_num = np.where(coefs.index.values == test_concepts)[0]
+        else:
+            concept_ivn_name = coefs.index[0:n_concepts_to_eval]
+            concept_ivn_num = list(range(0, n_concepts_to_eval))
+
+        for c, concept_name in zip(concept_ivn_num, concept_ivn_name):
             concept_vars = dict()
+
             concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
             concept_vars["neg"] = coefs.columns[(coefs.iloc[c, :] < 0).values]
             concept_vars["neu"] = coefs.columns[(coefs.iloc[c, :] == 0).values]
@@ -359,6 +402,7 @@ def main(
 
         if cfg.plotting.plot:
 
+            logger.info("Plot reconstruction UMAP")
             helpers.create_composite_image(
                 plotting_folder_path + cfg.wandb.experiment,
                 plotting_folder_path
@@ -376,7 +420,7 @@ def main(
             )
 
         if cfg.DEBUG:
-
+            logger.info("Enter DEBUG Mode")
             if not os.path.exists(original_path + "/results/"):
                 os.makedirs(original_path + "/results/")
 
@@ -399,14 +443,15 @@ def main(
 
             for _adata, split in zip([adata, adata_test], ["train", "test"]):
 
-                n_on_concepts = _adata.obsm["concepts"].sum(axis=0)
+                n_on_concepts = _adata.obsm[concept_key].sum(axis=0)
                 n_off_concepts = n_obs - n_on_concepts
+                concept_names = _adata.obsm[concept_key].columns
                 on_off_df = pd.DataFrame(
                     {
                         "1": n_on_concepts.tolist(),
                         "0": n_off_concepts.tolist(),
                     },
-                    index=[f"concept_{k}" for k in range(n_concepts)],
+                    index=concept_names,
                 )
 
                 on_off_df["concept"] = on_off_df.index
