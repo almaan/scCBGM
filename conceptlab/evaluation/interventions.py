@@ -271,7 +271,9 @@ def compute_acc(data):
 
         if pos > 0 and neg < 0 and abs(neu) < abs(pos) and abs(neu) < abs(neg):
             correct_count += 1
+
     average = correct_count / total_count if total_count > 0 else 0
+
     return average
 
 

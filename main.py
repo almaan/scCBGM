@@ -210,7 +210,7 @@ def main(
         x_true = np.log1p(x_true)
 
     sub_idx = np.random.choice(
-        x_true.shape[0], replace=False, size=min(500, x_true.shape[0])
+        x_true.shape[0], replace=False, size=min(5000, x_true.shape[0])
     )
 
     ad_true = ad.AnnData(
@@ -240,7 +240,9 @@ def main(
         obs=adata_test.obs.iloc[sub_idx],
     )
 
-    mse_loss = gen.mse_loss(x_true, x_pred, normalize=~normalize)
+    mse_loss = gen.mse_loss(
+        x_true, x_pred, normalize_true=(not normalize), normalize_pred=(not normalize)
+    )
     r2_score = gen.r2_score(x_true, x_pred)
 
     wandb.log({"test_MSE_loss": mse_loss})
@@ -266,7 +268,7 @@ def main(
             ad_pred_withGT.obsm[concept_key] = x_concepts[sub_idx]
             merge_dict["vae_cbm_withGT"] = ad_pred_withGT
 
-            mse_loss_withGT = gen.mse_loss(x_true, x_pred_withGT, normalize=~normalize)
+            mse_loss_withGT = gen.mse_loss(x_true, x_pred_withGT)
             wandb.log({"test_mse_loss_withGT": mse_loss_withGT})
     else:
         ad_pred.obsm[concept_key] = x_concepts[sub_idx].copy()
@@ -385,8 +387,6 @@ def main(
                         cfg,
                     )
 
-                print(scores)
-                print(concept_name)
                 intervention_scores[intervention_type][concept_name] = scores[
                     concept_name
                 ]
