@@ -268,7 +268,12 @@ def main(
             ad_pred_withGT.obsm[concept_key] = x_concepts[sub_idx]
             merge_dict["vae_cbm_withGT"] = ad_pred_withGT
 
-            mse_loss_withGT = gen.mse_loss(x_true, x_pred_withGT)
+            mse_loss_withGT = gen.mse_loss(
+                x_true,
+                x_pred_withGT,
+                normalize_true=(not normalize),
+                normalize_pred=(not normalize),
+            )
             wandb.log({"test_mse_loss_withGT": mse_loss_withGT})
     else:
         ad_pred.obsm[concept_key] = x_concepts[sub_idx].copy()
