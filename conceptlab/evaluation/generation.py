@@ -50,10 +50,12 @@ def r2_score(x_true, x_pred):
     return r2_score(x_true, x_pred)
 
 
-def mse_loss(gt, pred, raw_data=None, plot=True, normalize=False):
+def mse_loss(
+    gt, pred, raw_data=None, plot=True, normalize_pred=False, normalize_true=False
+):
 
-    x_pred = _normalize(gt, normalize)
-    x_true = _normalize(pred, normalize)
+    x_pred = _normalize(gt, normalize_pred)
+    x_true = _normalize(pred, normalize_true)
 
     mse = np.mean((x_true - x_pred) ** 2)
 
