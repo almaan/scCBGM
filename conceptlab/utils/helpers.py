@@ -174,12 +174,19 @@ def dataset_to_anndata(
     adata.obs["batch"] = dataset[DataVars.batch.value].values
 
     if concepts is None:
-        adata.obsm[concept_key] = dataset[DataVars.concept.value].values
+        _concepts = dataset[DataVars.concept.value].values
+        adata.obsm[concept_key] = pd.DataFrame(
+            _concepts,
+            index=dataset.coords["obs"].values,
+            columns=dataset.coords["concept"].values,
+        )
     else:
         adata.obsm[concept_key] = concepts
 
     if concept_coef is None:
-        adata.varm[concept_coef_key] = dataset["concept_coef"].values.T
+        adata.varm[concept_coef_key] = (
+            dataset["concept_coef"].to_dataframe().unstack()["concept_coef"].T
+        )
     else:
         adata.varm[concept_coef_key] = concept_coef
 
@@ -285,7 +292,7 @@ def stratified_adata_train_test_split(
         )
 
     concept_vec = np.array(
-        ["".join(map(str, row.astype(int))) for row in adata.obsm["concepts"]]
+        ["".join(map(str, row.astype(int))) for row in adata.obsm["concepts"].values]
     )
 
     uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)

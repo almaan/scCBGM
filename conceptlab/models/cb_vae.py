@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from wandb import Histogram
 
 from .base import BaseCBVAE
 
@@ -115,14 +116,18 @@ class CB_VAE(BaseCBVAE):
 
         loss_dict["Total_loss"] = MSE + self.beta * KLD
 
+        pred_concept_clipped = t.clip(pred_concept, 0, 1)
+
         if self.use_concept_loss:
 
             overall_concept_loss = self.n_concepts * F.binary_cross_entropy(
-                pred_concept, concepts, reduction="mean"
+                pred_concept_clipped, concepts, reduction="mean"
             )
 
             for c in range(self.n_concepts):
-                accuracy = self.binary_accuracy(pred_concept[:, c], concepts[:, c])
+                accuracy = self.binary_accuracy(
+                    pred_concept_clipped[:, c], concepts[:, c]
+                )
                 loss_dict[str(c) + "_acc"] = accuracy
 
             loss_dict["concept_loss"] = overall_concept_loss
