@@ -46,6 +46,12 @@ class CB_VAE(BaseCBVAE):
 
         self.save_hyperparameters()
 
+    @property
+    def has_concepts(
+        self,
+    ):
+        return True
+
     def encode(self, x, **kwargs):
         h1 = F.relu(self.fc1(x))
         h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)

@@ -21,6 +21,11 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.independent_training = config.independent_training
         self.beta = config.beta
 
+    @property
+    @abstractmethod
+    def has_concepts(self):
+        pass
+
     @abstractmethod
     def encode(self, *args, **kwargs):
         pass
@@ -50,7 +55,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         return dict(z=mu + eps * std)
 
     def forward(self, x, concepts=None, **kwargs):
-        enc = self.encode(x, concepts, **kwargs)
+        enc = self.encode(x, concepts=concepts, **kwargs)
         z = self.reparametrize(**enc)
         cbm = self.cbm(**z, concepts=concepts)
         dec = self.decode(**enc, **z, **cbm, concepts=concepts)
@@ -67,7 +72,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         if prefix == "train" and self.independent_training:
             out = self(x, concepts)
         else:
-            out = self(x)
+            out = self(x, concepts=concepts)
 
         loss_dict = self.loss_function(x, concepts, **out)
 

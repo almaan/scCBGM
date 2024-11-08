@@ -1,3 +1,13 @@
+import pytorch_lightning as pl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch as t
+from torch.optim.lr_scheduler import CosineAnnealingLR
+
+from .base import BaseCBVAE
+
+
 class CVAE(BaseCBVAE):
     def __init__(self, config):
         super().__init__(
@@ -16,9 +26,15 @@ class CVAE(BaseCBVAE):
 
         self.save_hyperparameters()
 
+    @property
+    def has_concepts(
+        self,
+    ):
+        return True
+
     def encode(self, x, concepts, **kwargs):
 
-        h0 = t.cat(x, concepts)
+        h0 = t.cat((x, concepts), dim=1)
         h1 = F.relu(self.fc1(h0))
         h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
         mu, logvar = self.fc21(h1), self.fc22(h1)
@@ -30,17 +46,18 @@ class CVAE(BaseCBVAE):
         return dict(h=z)
 
     def intervene(self, x, concepts, mask, **kwargs):
-        concepts * (1 - mask) + concepts * mask
-        enc = self.encode(x, concepts)
+        _concepts = concepts * (1 - mask) + concepts * mask
+        enc = self.encode(x, concepts=concepts)
         z = self.reparametrize(**enc)
         cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
         dec = self.decode(**cbm, concepts=_concepts)
         return dec
 
     def decode(self, h, concepts, **kwargs):
-        t.cat(h, concepts)
 
-        h3 = F.relu(self.fc3(h))
+        h0 = t.cat((h, concepts), dim=1)
+
+        h3 = F.relu(self.fc3(h0))
         h3 = F.dropout(h3, p=self.dropout, training=True, inplace=False)
         h4 = self.fc4(h3)
         return dict(x_pred=h4)
