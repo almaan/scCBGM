@@ -38,7 +38,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         pass
 
     @abstractmethod
-    def intervene(self, *args, **kwargs):
+    def intervene(self, x, concepts, mask):
         pass
 
     def log_parameters(self, *args, **kwargs):
@@ -49,11 +49,11 @@ class BaseCBVAE(pl.LightningModule, ABC):
         eps = torch.randn_like(std)
         return dict(z=mu + eps * std)
 
-    def forward(self, x, concepts=None):
-        enc = self.encode(x)
+    def forward(self, x, concepts=None, **kwargs):
+        enc = self.encode(x, concepts, **kwargs)
         z = self.reparametrize(**enc)
-        cbm = self.cbm(**z, **enc, concepts=concepts)
-        dec = self.decode(**enc, **z, **cbm)
+        cbm = self.cbm(**z, concepts=concepts)
+        dec = self.decode(**enc, **z, **cbm, concepts=concepts)
 
         out = dict()
         for d in [enc, z, cbm, dec]:
@@ -64,7 +64,6 @@ class BaseCBVAE(pl.LightningModule, ABC):
     def _step(self, batch, batch_idx, prefix="train"):
 
         x, concepts = batch
-
         if prefix == "train" and self.independent_training:
             out = self(x, concepts)
         else:
@@ -82,6 +81,10 @@ class BaseCBVAE(pl.LightningModule, ABC):
 
     def validation_step(self, batch, batch_idx):
         return self._step(batch, batch_idx, "val")
+
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        # Define the CosineAnnealingLR scheduler
+        scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
 
     def binary_accuracy(self, preds, labels, threshold=0.5):
         """
