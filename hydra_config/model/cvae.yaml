@@ -1,0 +1,11 @@
+type: CVAE
+has_condition: True
+has_cbm: False
+lr: 1e-3
+beta: 1e-5
+input_dim: 5000
+hidden_dim: 128
+latent_dim: 64
+n_concepts: 8
+concepts_hp: 0.005
+orthogonality_hp: 0.1

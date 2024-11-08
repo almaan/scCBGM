@@ -62,6 +62,12 @@ class SCBM(BaseCBVAE):
 
         self.save_hyperparameters()
 
+    @property
+    def has_concepts(
+        self,
+    ):
+        return True
+
     def encode(self, x, **kwargs):
         h = self.fc1(x)
         h = F.relu(h)

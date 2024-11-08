@@ -122,14 +122,6 @@ def main(
     logger.info("Anndata Information")
     print(adata)
 
-    data_module = clab.data.dataloader.GeneExpressionDataModule(
-        adata,
-        add_concepts=cfg.model.has_cbm,
-        concept_key=concept_key,
-        batch_size=512,
-        normalize=normalize,
-    )
-
     n_obs, n_vars = adata.shape
     n_concepts = adata.obsm[concept_key].shape[1]
     # TODO: check if this makes sense
@@ -142,6 +134,14 @@ def main(
         model = model_to_call(config=cfg.model)
     except NotImplementedError as e:
         print(f"Error: {e}")
+
+    data_module = clab.data.dataloader.GeneExpressionDataModule(
+        adata,
+        add_concepts=model.has_concepts,
+        concept_key=concept_key,
+        batch_size=512,
+        normalize=normalize,
+    )
 
     # this part is necessary for sweeps to work
     wandb.finish()
@@ -203,6 +203,7 @@ def main(
 
     x_raw = adata_test.X.astype(np.float32).copy()
     x_true = adata_test.X.astype(np.float32).copy()
+    c_true = adata_test.obsm["concepts"].values.copy().astype(np.float32)
 
     if normalize:
         logger.info("Normalize data")
@@ -218,7 +219,7 @@ def main(
         obs=adata_test.obs.iloc[sub_idx],
     )
 
-    preds = model(torch.tensor(x_true))
+    preds = model(torch.tensor(x_true), torch.tensor(c_true))
 
     x_pred = preds["x_pred"].detach().numpy()
     x_concepts = adata_test.obsm[concept_key].copy()
@@ -320,7 +321,7 @@ def main(
                 for key, val in ig_scores.items():
                     wandb.log({f"{ig_test}_{key}": val})
 
-    if cfg.model.has_cbm and cfg.test_intervention:
+    if model.has_concepts and cfg.test_intervention:
 
         indicator = adata_test.uns["concept_indicator"]
         ix_og_concepts = indicator == C.Mods.none
