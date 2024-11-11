@@ -79,7 +79,13 @@ def main(
             mod_fun = MODS[mod]
             mod_prms = cfg.modify.params
             concepts, indicator = mod_fun(dataset=dataset, **mod_prms)
-            adata = helpers.dataset_to_anndata(dataset, concepts, adata_path)
+            adata = helpers.dataset_to_anndata(
+                dataset,
+                adata_path=adata_path,
+                concepts=concepts,
+                concept_key=concept_key,
+            )
+
             adata.uns["concept_indicator"] = indicator
 
         else:
@@ -223,14 +229,14 @@ def main(
 
     x_pred = preds["x_pred"].detach().numpy()
     x_concepts = adata_test.obsm[concept_key].copy()
-    if isinstance(x_concepts, pd.DataFrame):
-        x_concepts = x_concepts.values
-    x_concepts = x_concepts.astype(np.float32).copy()
+    # if isinstance(x_concepts, pd.DataFrame):
+    #     x_concepts = x_concepts.values
+    # x_concepts = x_concepts.astype(np.float32).copy()
 
     if cfg.model.has_cbm:
         pred_concept = preds["pred_concept"].detach().numpy()
         concept_loss_dict = con.concept_accuarcy(
-            x_concepts,
+            x_concepts.values,
             pred_concept,
         )
         for key, value in concept_loss_dict.items():
@@ -252,13 +258,15 @@ def main(
     merge_dict = dict()
     if cfg.model.has_cbm:
         c_pred = preds["pred_concept"].detach().numpy()
-        ad_pred.obsm[concept_key] = c_pred[sub_idx]
-        ad_true.obsm[concept_key] = x_concepts[sub_idx]
+        ad_pred.obsm[concept_key] = pd.DataFrame(
+            c_pred[sub_idx], index=x_concepts.index[sub_idx], columns=x_concepts.columns
+        )
+        ad_true.obsm[concept_key] = x_concepts.iloc[sub_idx]
 
         if cfg.model.independent_training:
-            x_pred_withGT = model(torch.tensor(x_true), torch.tensor(x_concepts))[
-                "x_pred"
-            ]
+            x_pred_withGT = model(
+                helpers._to_tensor(x_true), helpers._to_tensor(x_concepts)
+            )["x_pred"]
             x_pred_withGT = x_pred_withGT.detach().numpy()
 
             ad_pred_withGT = ad.AnnData(
@@ -266,7 +274,7 @@ def main(
                 obs=adata_test.obs.iloc[sub_idx],
             )
 
-            ad_pred_withGT.obsm[concept_key] = x_concepts[sub_idx]
+            ad_pred_withGT.obsm[concept_key] = x_concepts.iloc[sub_idx]
             merge_dict["vae_cbm_withGT"] = ad_pred_withGT
 
             mse_loss_withGT = gen.mse_loss(
@@ -277,8 +285,8 @@ def main(
             )
             wandb.log({"test_mse_loss_withGT": mse_loss_withGT})
     else:
-        ad_pred.obsm[concept_key] = x_concepts[sub_idx].copy()
-        ad_true.obsm[concept_key] = x_concepts[sub_idx].copy()
+        ad_pred.obsm[concept_key] = x_concepts.iloc[sub_idx].copy()
+        ad_true.obsm[concept_key] = x_concepts.iloc[sub_idx].copy()
 
     if cfg.plotting:
         merge_dict["vae_cbm"] = ad_pred
@@ -324,9 +332,9 @@ def main(
     if model.has_concepts and cfg.test_intervention:
 
         indicator = adata_test.uns["concept_indicator"]
-        ix_og_concepts = indicator == C.Mods.none
-        concept_names = adata_test.obsm[concept_key].columns
+        ix_og_concepts = indicator.values == C.Mods.none
         original_concepts = adata_test.obsm[concept_key].iloc[:, ix_og_concepts].copy()
+        concept_names = original_concepts.columns
 
         test_index = adata_test.obs_names
         original_test_concepts = original_concepts.loc[test_index]
@@ -353,14 +361,16 @@ def main(
             )
         else:
             concept_ivn_name = concept_names[0:n_concepts_to_eval]
-            concept_ivn_num = list(range(0, n_concepts_to_eval))
+            list(range(0, n_concepts_to_eval))
 
-        for c, concept_name in zip(concept_ivn_num, concept_ivn_name):
+        for concept_name in concept_ivn_name:
             concept_vars = dict()
 
-            concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
-            concept_vars["neg"] = coefs.columns[(coefs.iloc[c, :] < 0).values]
-            concept_vars["neu"] = coefs.columns[(coefs.iloc[c, :] == 0).values]
+            concept_vars["pos"] = coefs.columns[(coefs.loc[concept_name, :] > 0).values]
+            concept_vars["neg"] = coefs.columns[(coefs.loc[concept_name, :] < 0).values]
+            concept_vars["neu"] = coefs.columns[
+                (coefs.loc[concept_name, :] == 0).values
+            ]
             concept_vars["all"] = coefs.columns
 
             interventions_type = ["On", "Off"]
@@ -371,7 +381,7 @@ def main(
                     perturbed_data,
                 ) = clab.evaluation.interventions.eval_intervention(
                     intervention_type,
-                    c,
+                    concept_name,
                     x_concepts,
                     x_true,
                     ix_og_concepts,
@@ -393,11 +403,11 @@ def main(
                         cfg,
                     )
 
-                intervention_scores[intervention_type][concept_name] = scores[
-                    concept_name
-                ]
-
-                intervention_data[intervention_type][concept_name] = perturbed_data
+                if scores is not None:
+                    intervention_scores[intervention_type][concept_name] = scores[
+                        concept_name
+                    ]
+                    intervention_data[intervention_type][concept_name] = perturbed_data
 
         joint_score = clab.evaluation.interventions.score_intervention(
             metrics=["auroc", "auprc", "acc", "corr"],
