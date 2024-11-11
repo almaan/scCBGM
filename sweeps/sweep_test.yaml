@@ -1,0 +1,18 @@
+program: main.py
+method: random
+metric:
+  goal: maximize
+  name: test/AVG_ACC
+parameters:
+  modify:
+    values: [add, drop]
+  model:
+    values: [cb_vae, vae]
+
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}

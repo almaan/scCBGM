@@ -1,4 +1,4 @@
 
 seed: 69
-checkpoint_dir: "/data/bucket/ismaia11/conceptlab/models/"
-data_path: "/data/"
+checkpoint_dir: "checkpoints/"
+data_path: "data/"

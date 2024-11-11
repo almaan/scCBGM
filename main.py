@@ -151,6 +151,7 @@ def main(
 
     # this part is necessary for sweeps to work
     wandb.finish()
+
     wandb_name = cfg.wandb.experiment + "_" + helpers.timestamp()
 
     wandb_logger = WandbLogger(

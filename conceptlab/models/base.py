@@ -18,7 +18,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.latent_dim = config.latent_dim
         self.n_concepts = config.n_concepts
         self.learning_rate = config.lr
-        self.independent_training = config.independent_training
+        self.independent_training = config.get("independent_training", False)
         self.beta = config.beta
 
     @property
