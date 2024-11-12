@@ -13,11 +13,11 @@ wandb:
 
 
 trainer:
-  max_epochs: 100
+  max_epochs: 200
 
 plotting:
   plot: False
-  plot_path: null
+  plot_path: plots
 
 test_intervention: False
 test_integration: ['modularity']

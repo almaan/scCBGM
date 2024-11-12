@@ -11,3 +11,5 @@ results/
 tmux*
 ckpts/
 wandb/
+.clean.sh
+jobs/

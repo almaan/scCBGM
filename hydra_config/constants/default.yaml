@@ -1,4 +1,4 @@
 
 seed: 69
-checkpoint_dir: "checkpoints/"
+checkpoint_dir: "ckpts/"
 data_path: "data/"

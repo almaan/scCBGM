@@ -10,3 +10,4 @@ min_bottleneck_size: 32
 independent_training: False
 concepts_hp: 0.005
 orthogonality_hp: 0.1
+normalize: True

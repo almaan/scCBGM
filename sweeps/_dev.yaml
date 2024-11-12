@@ -1,14 +1,15 @@
 program: main.py
-method: random
+method: grid
 metric:
   goal: maximize
-  name: test/AVG_ACC
+  name: AVG_ACC
 parameters:
-  modify:
-    values: [add, drop]
   model:
-    values: [cb_vae, vae]
-
+    value: vae
+  modify:
+    value: duplicate
+  dataset.n_obs:
+    values: [1000,1500]
 
 
 command:
