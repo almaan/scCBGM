@@ -48,8 +48,17 @@ class SCBM(BaseCBVAE):
         self.fcCB2 = nn.Linear(self.latent_dim, self.n_unknown)
 
         #  -- Decoder --
-        self.fc3 = nn.Linear((self.n_concepts + self.n_unknown), self.hidden_dim)
-        self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
+        layers = []
+        in_dim = self.n_concepts + self.n_unknown
+
+        for i in range(self.n_decoder_layers):
+            out_dim = (
+                self.input_dim if i == self.n_decoder_layers - 1 else self.hidden_dim
+            )
+            layers.append(nn.Linear(in_dim, out_dim))
+            in_dim = self.hidden_dim
+
+        self.decoder_layers = nn.ModuleList(layers)
 
         # -- hyperparams --
         self.concepts_hp = config.concepts_hp
@@ -140,10 +149,12 @@ class SCBM(BaseCBVAE):
         return self._cbm(*args, **kwargs)
 
     def decode(self, h, **kwargs):
-        h = self.fc3(h)
-        h = F.relu(h)
-        h = F.dropout(h, p=self.dropout, training=True, inplace=False)
-        h = self.fc4(h)
+        for i, layer in enumerate(self.decoder_layers):
+            h = layer(h)
+            if i < self.n_decoder_layers - 1:  # Apply dropout to all but the last layer
+                h = F.relu(h)
+                h = F.dropout(h, p=self.dropout, training=self.training)
+
         return dict(x_pred=h)
 
     def intervene(self, x, concepts, mask):

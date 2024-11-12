@@ -9,3 +9,4 @@ latent_dim: 64
 n_concepts: 8
 concepts_hp: 0.005
 orthogonality_hp: 0.1
+n_decoder_layers: 2

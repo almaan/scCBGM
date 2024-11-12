@@ -7,6 +7,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from wandb import Histogram
 
 from .base import BaseCBVAE
+from .utils import sigmoid
 
 
 class CB_VAE(BaseCBVAE):
@@ -34,8 +35,18 @@ class CB_VAE(BaseCBVAE):
         self.fcCB2 = nn.Linear(self.latent_dim, n_unknown)
 
         # Decoder
-        self.fc3 = nn.Linear((self.n_concepts + n_unknown), self.hidden_dim)
-        self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
+        layers = []
+        in_dim = self.n_concepts + n_unknown
+
+        for i in range(self.n_decoder_layers):
+            out_dim = (
+                self.input_dim if i == self.n_decoder_layers - 1 else self.hidden_dim
+            )
+            layers.append(nn.Linear(in_dim, out_dim))
+            in_dim = self.hidden_dim
+
+        self.decoder_layers = nn.ModuleList(layers)
+
         self.beta = config.beta
         self.concepts_hp = config.concepts_hp
         self.orthogonality_hp = config.orthogonality_hp
@@ -44,6 +55,16 @@ class CB_VAE(BaseCBVAE):
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
         self.use_concept_loss = config.get("use_concept_loss", True)
 
+        # -- if scaling concepts --
+
+        if self.scale_concept:
+            initial_std_dev = 0.01
+            self.learned_concept_scale_gamma = nn.Parameter(
+                torch.randn(self.n_concepts) * initial_std_dev
+            )
+            self.learned_concept_scale_beta = nn.Parameter(
+                torch.randn(self.n_concepts) * initial_std_dev
+            )
         self.save_hyperparameters()
 
     @property
@@ -62,18 +83,32 @@ class CB_VAE(BaseCBVAE):
 
     def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
 
-        known_concepts = F.sigmoid(self.fcCB1(z))
+        known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
         known_concepts_proj = self.fcCBproj(known_concepts)
         unknown = F.relu(self.fcCB2(z))
 
+        if self.scale_concept:
+            known_concepts_bar = (
+                known_concepts * self.learned_concept_scale_gamma
+                + self.learned_concept_scale_beta
+            )
+            concepts_bar = (
+                concepts * self.learned_concept_scale_gamma
+                + self.learned_concept_scale_beta
+            )
+
+        else:
+            known_concepts_bar = known_concepts
+            concepts_bar = concepts
+
         if intervene:
-            concepts_ = known_concepts * (1 - mask) + concepts * mask
+            concepts_ = known_concepts_bar * (1 - mask) + concepts_bar * mask
             h = torch.cat((concepts_, unknown), 1)
         else:
             if concepts == None:
-                h = torch.cat((known_concepts, unknown), 1)
+                h = torch.cat((known_concepts_bar, unknown), 1)
             else:
-                h = torch.cat((concepts, unknown), 1)
+                h = torch.cat((concepts_bar, unknown), 1)
 
         return dict(
             pred_concept=known_concepts,
@@ -83,10 +118,16 @@ class CB_VAE(BaseCBVAE):
         )
 
     def decode(self, h, **kwargs):
-        h3 = F.relu(self.fc3(h))
-        h3 = F.dropout(h3, p=self.dropout, training=True, inplace=False)
-        h4 = self.fc4(h3)
-        return dict(x_pred=h4)
+        for i, layer in enumerate(self.decoder_layers):
+            if self.n_decoder_layers == 1:
+                h = F.relu(layer(h))
+            else:
+                h = layer(h)
+            if i < self.n_decoder_layers - 1:  # Apply dropout to all but the last layer
+                h = F.relu(h)
+                h = F.dropout(h, p=self.dropout, training=self.training)
+
+        return dict(x_pred=h)
 
     def intervene(self, x, concepts, mask, **kwargs):
         enc = self.encode(x)
@@ -115,7 +156,23 @@ class CB_VAE(BaseCBVAE):
         loss_dict = {}
         MSE = F.mse_loss(x_pred, x, reduction="mean")
 
-        KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+        if self.use_gaussian_mixture_KL:
+            # KL loss for individual elements
+            kl_loss_ind = -0.1 * (1 + logvar - logvar.exp())
+            kl_loss_ind = torch.mean(torch.sum(kl_loss_ind, dim=1))
+
+            # Population Gaussian P(Z)
+            Z_mean = torch.mean(mu, dim=0)
+            Z_log_var = torch.log(
+                torch.var(mu, dim=0, unbiased=False)
+            )  # Use unbiased=False to match TensorFlow's behavior
+            KLD = -0.5 * torch.sum((1 + Z_log_var - Z_mean.pow(2) - Z_log_var.exp()))
+
+        else:
+            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+
+            # kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
+            # kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
 
         loss_dict["rec_loss"] = MSE
         loss_dict["KL_loss"] = KLD
@@ -185,7 +242,7 @@ class SCALED_CB_VAE(CB_VAE):
 
     def cbm(self, z, scale_factor, concepts=None, mask=None, intervene=False, **kwargs):
 
-        known_concepts = F.sigmoid(self.fcCB1(z))
+        known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
         known_concepts_proj = self.fcCBproj(known_concepts)
         unknown = F.relu(self.fcCB2(z))
 

@@ -1,14 +1,15 @@
 # @package _global_
 
 defaults:
-  - override /model: cb_vae.yaml
+  - override /model: scbm.yaml
   - override /dataset: simple.yaml
 
 
 
 wandb:
   project: conceptlab_leaderboard2
-  experiment: cb_vae
+  experiment: scbm_no_orthogonality
+
 
 
 trainer:
@@ -22,6 +23,8 @@ plotting:
 
 model:
   independent_training: True
+  use_orthogonality_loss: False
+
 
 test_intervention: True
 test_integration: ['modularity']

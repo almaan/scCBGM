@@ -7,8 +7,9 @@ defaults:
 
 
 wandb:
-  project: clab_scbm
-  experiment: dev
+  project: conceptlab_leaderboard2
+  experiment: scbm
+
 
 
 trainer:
@@ -22,6 +23,7 @@ plotting:
 
 model:
   independent_training: True
+  amortized: True
 
 test_intervention: True
 test_integration: ['modularity']

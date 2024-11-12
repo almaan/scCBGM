@@ -14,3 +14,5 @@ n_unknown: 32
 early_stopping: False
 use_orthogonality_loss: True
 amortized: True
+n_decoder_layers: 2
+scale_concept: False

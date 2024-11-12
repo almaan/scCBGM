@@ -8,7 +8,7 @@ defaults:
 
 wandb:
   project: conceptlab_leaderboard2
-  experiment: cb_vae
+  experiment: cb_vae_linear
 
 
 trainer:
@@ -22,6 +22,8 @@ plotting:
 
 model:
   independent_training: True
+  min_bottleneck_size: 128
+  n_decoder_layers: 1
 
 test_intervention: True
 test_integration: ['modularity']
