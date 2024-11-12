@@ -18,7 +18,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.latent_dim = config.latent_dim
         self.n_concepts = config.n_concepts
         self.learning_rate = config.lr
-        self.independent_training = config.independent_training
+        self.independent_training = config.get("independent_training", False)
         self.beta = config.beta
 
     @property
@@ -57,7 +57,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
     def forward(self, x, concepts=None, **kwargs):
         enc = self.encode(x, concepts=concepts, **kwargs)
         z = self.reparametrize(**enc)
-        cbm = self.cbm(**z, concepts=concepts)
+        cbm = self.cbm(**z, concepts=concepts, **enc)
         dec = self.decode(**enc, **z, **cbm, concepts=concepts)
 
         out = dict()

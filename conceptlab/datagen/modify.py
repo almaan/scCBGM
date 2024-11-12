@@ -49,7 +49,7 @@ def drop_concepts(
 ) -> np.ndarray:
 
     concepts, n_concepts = _get_concepts(dataset, concepts)
-    indicator = _get_indicator(n_concepts)
+    indicator = _get_indicator(n_concepts - n_drop)
 
     if n_drop == 0:
         return concepts, indicator
@@ -179,6 +179,6 @@ def add_duplicate(
         [f"{C.Mods.duplicate}_{k}" for k in dup_idx], dtype=DTYPE_STR
     )
     indicator = np.append(indicator, add_indicator)
-    indicator = pd.Series(indicator, index=concepts.columns)
+    indicator = pd.Series(indicator, index=new_concepts.columns)
 
     return new_concepts, indicator

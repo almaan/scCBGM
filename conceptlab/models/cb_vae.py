@@ -183,7 +183,9 @@ class SCALED_CB_VAE(CB_VAE):
 
         return dict(mu=mu, logvar=logvar, scale_factor=scale_factor)
 
-    def cbm(self, z, scale_factor, concepts=None, mask=None, intervene=False, **kwargs):
+    def cbm(
+        self, z, scale_factor=None, concepts=None, mask=None, intervene=False, **kwargs
+    ):
 
         known_concepts = F.sigmoid(self.fcCB1(z))
         known_concepts_proj = self.fcCBproj(known_concepts)

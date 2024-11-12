@@ -23,6 +23,7 @@ import conceptlab.evaluation.concepts as con
 from omegaconf import DictConfig
 import pickle
 from conceptlab.utils import logging
+import os.path as osp
 
 import os
 
@@ -43,25 +44,38 @@ def main(
     cfg: DictConfig,
 ) -> None:
 
+    wandb.config = omegaconf.OmegaConf.to_container(
+        cfg, resolve=True, throw_on_missing=True
+    )
+
+    wandb_name = cfg.wandb.experiment + "_" + helpers.timestamp()
+    run = wandb.init(project=cfg.wandb.project, name=wandb_name)
+
     logger = logging.setup_logger()
 
     set_seed(cfg.constants.seed)
     original_path = get_original_cwd()
-    checkpoint_dir = cfg.constants.checkpoint_dir
+    checkpoint_dir = osp.join(original_path, cfg.constants.checkpoint_dir)
     normalize = cfg.model.get("normalize", True)
     concept_key = cfg.dataset.get("concept_key", "concepts")
     concept_coef_key = cfg.dataset.get("concept_coef_key", "concept_coef")
+    data_dir = osp.join(original_path, cfg.constants.data_path)
 
-    if not os.path.exists(original_path + cfg.constants.data_path):
-        os.makedirs(original_path + cfg.constants.data_path)
-
-    adata_path = (
-        original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".h5ad"
+    wandb_logger = WandbLogger(
+        project=cfg.wandb.project,
+        name=wandb_name,
+        log_model=False,
     )
+
+    if not os.path.exists(data_dir):
+        logger.info("Creating Data Directory >>> {}")
+        os.makedirs(data_dir)
+
+    adata_path = osp.join(data_dir, cfg.dataset.dataset_name + ".h5ad")
 
     logger.info(f"AnnData Path >>> {adata_path}")
 
-    generate_data = cfg.get("generate_data", False)
+    generate_data = cfg.get("generate_data", True)
 
     if not os.path.exists(adata_path) or generate_data:
         dataset_path = (
@@ -149,26 +163,15 @@ def main(
         normalize=normalize,
     )
 
-    # this part is necessary for sweeps to work
-    wandb.finish()
-    wandb_name = cfg.wandb.experiment + "_" + helpers.timestamp()
-
-    wandb_logger = WandbLogger(
-        project=cfg.wandb.project,
-        name=wandb_name,
-        log_model=False,
-    )
-
-    wandb_config = omegaconf.OmegaConf.to_container(
-        cfg, resolve=True, throw_on_missing=True
-    )
-
-    wandb_logger.experiment.config.update(wandb_config)
-
     callbacks = []
 
     if cfg.save_checkpoints:
-        logger.info(f"Checkpoints are saved to >>> {checkpoint_dir}")
+        if not osp.isdir(checkpoint_dir):
+            logger.info(f"Creating checkpoint directory >>> {checkpoint_dir}")
+            os.makedirs(checkpoint_dir)
+        else:
+            logger.info(f"Checkpoints are saved to >>> {checkpoint_dir}")
+
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             dirpath=checkpoint_dir,
             filename=cfg.wandb.experiment,
@@ -288,22 +291,24 @@ def main(
         ad_pred.obsm[concept_key] = x_concepts.iloc[sub_idx].copy()
         ad_true.obsm[concept_key] = x_concepts.iloc[sub_idx].copy()
 
-    if cfg.plotting:
-        merge_dict["vae_cbm"] = ad_pred
-        merge_dict["true"] = ad_true
-        ad_merge = ad.concat(
-            merge_dict,
-            axis=0,
-            label="ident",
-        )
+    merge_dict["vae_cbm"] = ad_pred
+    merge_dict["true"] = ad_true
+    ad_merge = ad.concat(
+        merge_dict,
+        axis=0,
+        label="ident",
+    )
 
-        ad_merge.obsm[concept_key] = pd.DataFrame(
-            ad_merge.obsm[concept_key],
-            index=ad_merge.obs_names,
-            columns=adata_test.obsm[concept_key].columns,
-        )
+    ad_merge.obsm[concept_key] = pd.DataFrame(
+        ad_merge.obsm[concept_key],
+        index=ad_merge.obs_names,
+        columns=adata_test.obsm[concept_key].columns,
+    )
 
-        ad_merge.obs_names_make_unique()
+    ad_merge.obs_names_make_unique()
+
+    if cfg.plotting.plot:
+
         plotting_folder_path = plot.create_plot_path(original_path, cfg)
 
         plot_filename = plot.plot_generation(
