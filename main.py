@@ -23,6 +23,7 @@ import conceptlab.evaluation.concepts as con
 from omegaconf import DictConfig
 import pickle
 from conceptlab.utils import logging
+import os.path as osp
 
 import os
 
@@ -43,25 +44,38 @@ def main(
     cfg: DictConfig,
 ) -> None:
 
+    wandb.config = omegaconf.OmegaConf.to_container(
+        cfg, resolve=True, throw_on_missing=True
+    )
+
+    wandb_name = cfg.wandb.experiment + "_" + helpers.timestamp()
+    run = wandb.init(project=cfg.wandb.project, name=wandb_name)
+
     logger = logging.setup_logger()
 
     set_seed(cfg.constants.seed)
     original_path = get_original_cwd()
-    checkpoint_dir = cfg.constants.checkpoint_dir
+    checkpoint_dir = osp.join(original_path, cfg.constants.checkpoint_dir)
     normalize = cfg.model.get("normalize", True)
     concept_key = cfg.dataset.get("concept_key", "concepts")
     concept_coef_key = cfg.dataset.get("concept_coef_key", "concept_coef")
+    data_dir = osp.join(original_path, cfg.constants.data_path)
 
-    if not os.path.exists(original_path + cfg.constants.data_path):
-        os.makedirs(original_path + cfg.constants.data_path)
-
-    adata_path = (
-        original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".h5ad"
+    wandb_logger = WandbLogger(
+        project=cfg.wandb.project,
+        name=wandb_name,
+        log_model=False,
     )
+
+    if not os.path.exists(data_dir):
+        logger.info("Creating Data Directory >>> {}")
+        os.makedirs(data_dir)
+
+    adata_path = osp.join(data_dir, cfg.dataset.dataset_name + ".h5ad")
 
     logger.info(f"AnnData Path >>> {adata_path}")
 
-    generate_data = cfg.get("generate_data", False)
+    generate_data = cfg.get("generate_data", True)
 
     if not os.path.exists(adata_path) or generate_data:
         dataset_path = (
@@ -79,7 +93,13 @@ def main(
             mod_fun = MODS[mod]
             mod_prms = cfg.modify.params
             concepts, indicator = mod_fun(dataset=dataset, **mod_prms)
-            adata = helpers.dataset_to_anndata(dataset, concepts, adata_path)
+            adata = helpers.dataset_to_anndata(
+                dataset,
+                adata_path=adata_path,
+                concepts=concepts,
+                concept_key=concept_key,
+            )
+
             adata.uns["concept_indicator"] = indicator
 
         else:
@@ -143,26 +163,15 @@ def main(
         normalize=normalize,
     )
 
-    # this part is necessary for sweeps to work
-    wandb.finish()
-    wandb_name = cfg.wandb.experiment + "_" + helpers.timestamp()
-
-    wandb_logger = WandbLogger(
-        project=cfg.wandb.project,
-        name=wandb_name,
-        log_model=False,
-    )
-
-    wandb_config = omegaconf.OmegaConf.to_container(
-        cfg, resolve=True, throw_on_missing=True
-    )
-
-    wandb_logger.experiment.config.update(wandb_config)
-
     callbacks = []
 
     if cfg.save_checkpoints:
-        logger.info(f"Checkpoints are saved to >>> {checkpoint_dir}")
+        if not osp.isdir(checkpoint_dir):
+            logger.info(f"Creating checkpoint directory >>> {checkpoint_dir}")
+            os.makedirs(checkpoint_dir)
+        else:
+            logger.info(f"Checkpoints are saved to >>> {checkpoint_dir}")
+
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             dirpath=checkpoint_dir,
             filename=cfg.wandb.experiment,
@@ -223,14 +232,14 @@ def main(
 
     x_pred = preds["x_pred"].detach().numpy()
     x_concepts = adata_test.obsm[concept_key].copy()
-    if isinstance(x_concepts, pd.DataFrame):
-        x_concepts = x_concepts.values
-    x_concepts = x_concepts.astype(np.float32).copy()
+    # if isinstance(x_concepts, pd.DataFrame):
+    #     x_concepts = x_concepts.values
+    # x_concepts = x_concepts.astype(np.float32).copy()
 
     if cfg.model.has_cbm:
         pred_concept = preds["pred_concept"].detach().numpy()
         concept_loss_dict = con.concept_accuarcy(
-            x_concepts,
+            x_concepts.values,
             pred_concept,
         )
         for key, value in concept_loss_dict.items():
@@ -252,13 +261,15 @@ def main(
     merge_dict = dict()
     if cfg.model.has_cbm:
         c_pred = preds["pred_concept"].detach().numpy()
-        ad_pred.obsm[concept_key] = c_pred[sub_idx]
-        ad_true.obsm[concept_key] = x_concepts[sub_idx]
+        ad_pred.obsm[concept_key] = pd.DataFrame(
+            c_pred[sub_idx], index=x_concepts.index[sub_idx], columns=x_concepts.columns
+        )
+        ad_true.obsm[concept_key] = x_concepts.iloc[sub_idx]
 
         if cfg.model.independent_training:
-            x_pred_withGT = model(torch.tensor(x_true), torch.tensor(x_concepts))[
-                "x_pred"
-            ]
+            x_pred_withGT = model(
+                helpers._to_tensor(x_true), helpers._to_tensor(x_concepts)
+            )["x_pred"]
             x_pred_withGT = x_pred_withGT.detach().numpy()
 
             ad_pred_withGT = ad.AnnData(
@@ -266,7 +277,7 @@ def main(
                 obs=adata_test.obs.iloc[sub_idx],
             )
 
-            ad_pred_withGT.obsm[concept_key] = x_concepts[sub_idx]
+            ad_pred_withGT.obsm[concept_key] = x_concepts.iloc[sub_idx]
             merge_dict["vae_cbm_withGT"] = ad_pred_withGT
 
             mse_loss_withGT = gen.mse_loss(
@@ -277,25 +288,27 @@ def main(
             )
             wandb.log({"test_mse_loss_withGT": mse_loss_withGT})
     else:
-        ad_pred.obsm[concept_key] = x_concepts[sub_idx].copy()
-        ad_true.obsm[concept_key] = x_concepts[sub_idx].copy()
+        ad_pred.obsm[concept_key] = x_concepts.iloc[sub_idx].copy()
+        ad_true.obsm[concept_key] = x_concepts.iloc[sub_idx].copy()
 
-    if cfg.plotting:
-        merge_dict["vae_cbm"] = ad_pred
-        merge_dict["true"] = ad_true
-        ad_merge = ad.concat(
-            merge_dict,
-            axis=0,
-            label="ident",
-        )
+    merge_dict["vae_cbm"] = ad_pred
+    merge_dict["true"] = ad_true
+    ad_merge = ad.concat(
+        merge_dict,
+        axis=0,
+        label="ident",
+    )
 
-        ad_merge.obsm[concept_key] = pd.DataFrame(
-            ad_merge.obsm[concept_key],
-            index=ad_merge.obs_names,
-            columns=adata_test.obsm[concept_key].columns,
-        )
+    ad_merge.obsm[concept_key] = pd.DataFrame(
+        ad_merge.obsm[concept_key],
+        index=ad_merge.obs_names,
+        columns=adata_test.obsm[concept_key].columns,
+    )
 
-        ad_merge.obs_names_make_unique()
+    ad_merge.obs_names_make_unique()
+
+    if cfg.plotting.plot:
+
         plotting_folder_path = plot.create_plot_path(original_path, cfg)
 
         plot_filename = plot.plot_generation(
@@ -324,9 +337,9 @@ def main(
     if model.has_concepts and cfg.test_intervention:
 
         indicator = adata_test.uns["concept_indicator"]
-        ix_og_concepts = indicator == C.Mods.none
-        concept_names = adata_test.obsm[concept_key].columns
+        ix_og_concepts = indicator.values == C.Mods.none
         original_concepts = adata_test.obsm[concept_key].iloc[:, ix_og_concepts].copy()
+        concept_names = original_concepts.columns
 
         test_index = adata_test.obs_names
         original_test_concepts = original_concepts.loc[test_index]
@@ -353,14 +366,16 @@ def main(
             )
         else:
             concept_ivn_name = concept_names[0:n_concepts_to_eval]
-            concept_ivn_num = list(range(0, n_concepts_to_eval))
+            list(range(0, n_concepts_to_eval))
 
-        for c, concept_name in zip(concept_ivn_num, concept_ivn_name):
+        for concept_name in concept_ivn_name:
             concept_vars = dict()
 
-            concept_vars["pos"] = coefs.columns[(coefs.iloc[c, :] > 0).values]
-            concept_vars["neg"] = coefs.columns[(coefs.iloc[c, :] < 0).values]
-            concept_vars["neu"] = coefs.columns[(coefs.iloc[c, :] == 0).values]
+            concept_vars["pos"] = coefs.columns[(coefs.loc[concept_name, :] > 0).values]
+            concept_vars["neg"] = coefs.columns[(coefs.loc[concept_name, :] < 0).values]
+            concept_vars["neu"] = coefs.columns[
+                (coefs.loc[concept_name, :] == 0).values
+            ]
             concept_vars["all"] = coefs.columns
 
             interventions_type = ["On", "Off"]
@@ -371,7 +386,7 @@ def main(
                     perturbed_data,
                 ) = clab.evaluation.interventions.eval_intervention(
                     intervention_type,
-                    c,
+                    concept_name,
                     x_concepts,
                     x_true,
                     ix_og_concepts,
@@ -393,11 +408,11 @@ def main(
                         cfg,
                     )
 
-                intervention_scores[intervention_type][concept_name] = scores[
-                    concept_name
-                ]
-
-                intervention_data[intervention_type][concept_name] = perturbed_data
+                if scores is not None:
+                    intervention_scores[intervention_type][concept_name] = scores[
+                        concept_name
+                    ]
+                    intervention_data[intervention_type][concept_name] = perturbed_data
 
         joint_score = clab.evaluation.interventions.score_intervention(
             metrics=["auroc", "auprc", "acc", "corr"],

@@ -1,0 +1,19 @@
+program: main.py
+method: grid
+metric:
+  goal: maximize
+  name: AVG_ACC
+parameters:
+  model:
+    value: vae
+  modify:
+    value: duplicate
+  dataset.n_obs:
+    values: [1000,1500]
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}

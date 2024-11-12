@@ -1,0 +1,20 @@
+program: main.py
+method: grid
+metric:
+  goal: maximize
+  name: AVG_ACC
+parameters:
+  model:
+    values: [cb_vae, vae]
+  modify:
+    values: [add, noise, drop, duplicate]
+  dataset.n_concepts:
+    values: [8, 50, 250]
+  dataset.use_concept_dependency:
+    values: [ True, False]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}

@@ -3,20 +3,28 @@ from conceptlab.utils.types import *
 import conceptlab.utils.constants as C
 import numpy as np
 from typing import List, Literal
+import pandas as pd
 
 DTYPE_STR = "<U64"
 
 
 def _get_concepts(
-    dataset: xr.Dataset | None, concepts: np.ndarray | None = None, return_coefs=False
+    dataset: xr.Dataset | None, concepts: pd.DataFrame | None = None, return_coefs=False
 ) -> np.ndarray:
     if dataset is not None:
-        concepts = dataset[C.DataVars.concept.value].to_numpy().copy()
+        _concepts = dataset[C.DataVars.concept.value].values
+        concepts = pd.DataFrame(
+            _concepts,
+            index=dataset.coords["obs"].values,
+            columns=dataset.coords["concept"].values,
+        )
+
     elif concepts is None:
-        raise ValueError("Ond of datast and concepts has to not be None")
+        raise ValueError("Ond of dataset and concepts has to not be None")
     n_concepts = concepts.shape[1]
 
-    coefs = dataset["concept_coef"].to_numpy().copy()
+    coefs = dataset["concept_coef"].to_dataframe().unstack()["concept_coef"].T.copy()
+
     if return_coefs:
         return concepts, n_concepts, coefs
 
@@ -35,13 +43,13 @@ def _get_indicator(n_concepts: PositiveInt) -> np.ndarray:
 
 def drop_concepts(
     dataset: xr.Dataset | None = None,
-    concepts: np.ndarray | None = None,
+    concepts: pd.DataFrame | None = None,
     n_drop: PositiveInt | PositiveFloat = 1,
     **kwargs,
 ) -> np.ndarray:
 
     concepts, n_concepts = _get_concepts(dataset, concepts)
-    indicator = _get_indicator(n_concepts)
+    indicator = _get_indicator(n_concepts - n_drop)
 
     if n_drop == 0:
         return concepts, indicator
@@ -53,8 +61,9 @@ def drop_concepts(
 
     drop_idx = np.random.choice(n_concepts, replace=False, size=n_drop)
 
-    concepts[:, drop_idx] = 0
-    indicator[drop_idx] = C.Mods.drop
+    concepts = concepts.drop(columns=concepts.columns[drop_idx])
+
+    indicator = pd.Series(indicator, index=concepts.columns)
 
     return concepts, indicator
 
@@ -85,8 +94,16 @@ def add_concepts(
         [np.random.binomial(1, p=p, size=n_obs)[:, None] for p in p_active]
     )
 
-    new_concepts = np.hstack((concepts, new_concepts))
+    new_concepts = pd.DataFrame(
+        new_concepts,
+        index=concepts.index,
+        columns=[f"{C.Mods.add}_{k}" for k in range(n_add)],
+    )
+
+    new_concepts = pd.concat((concepts, new_concepts), axis=1)
+
     indicator = np.append(indicator, np.array([C.Mods.add] * n_add, dtype=DTYPE_STR))
+    indicator = pd.Series(indicator, index=new_concepts.columns)
 
     return new_concepts, indicator
 
@@ -116,11 +133,13 @@ def add_noise(
     mod_idx = np.random.choice(n_concepts, replace=False, size=n_modified)
 
     mask = np.random.binomial(1, p=p_noise, size=int(n_modified * n_obs)).astype(bool)
-    mod_concepts = concepts[:, mod_idx].flatten().copy()
+    mod_concepts = concepts.values[:, mod_idx].flatten().copy()
     mod_concepts[mask] = 1 - mod_concepts[mask]
-    concepts[:, mod_idx] = mod_concepts.reshape((n_obs, n_modified))
+
+    concepts.iloc[:, mod_idx] = mod_concepts.reshape((n_obs, n_modified))
 
     indicator[mod_idx] = C.Mods.noise
+    indicator = pd.Series(indicator, index=concepts.columns)
 
     return concepts, indicator
 
@@ -151,11 +170,15 @@ def add_duplicate(
     if n_replica > 1:
         dup_idx = np.repeat(dup_idx, n_replica)
 
-    concepts = np.hstack((concepts, concepts[:, dup_idx]))
+    new_concepts = concepts.iloc[:, dup_idx]
+    new_concepts.columns = [f"{C.Mods.duplicate}_{k}" for k in dup_idx]
+
+    new_concepts = pd.concat((concepts, new_concepts), axis=1)
 
     add_indicator = np.array(
         [f"{C.Mods.duplicate}_{k}" for k in dup_idx], dtype=DTYPE_STR
     )
     indicator = np.append(indicator, add_indicator)
+    indicator = pd.Series(indicator, index=new_concepts.columns)
 
-    return concepts, indicator
+    return new_concepts, indicator
