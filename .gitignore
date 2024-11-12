@@ -12,4 +12,4 @@ tmux*
 ckpts/
 wandb/
 .clean.sh
-jobs/
+local.*
