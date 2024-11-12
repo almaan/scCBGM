@@ -5,7 +5,7 @@ defaults:
   - override /dataset: simple.yaml
 
 wandb:
-  project: cblab_dev
+  project: conceptlab_leaderboard2
   experiment: scaled_cb_vae
 
 
