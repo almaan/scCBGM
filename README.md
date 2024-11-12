@@ -49,7 +49,7 @@ $ wandb: Run sweep agent with: wandb agent andera29/conceptlab/wuw4xyb0
 
 ```
 
-### 3. Launch the swee
+### 3. Launch the sweep
 
 To launch the sweep you can simply do `wandb agent andera29/conceptlab/wuw4xyb0`
 as the statement above suggests. This needs to be done on a GPU session.
