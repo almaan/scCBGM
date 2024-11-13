@@ -25,6 +25,17 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.scale_concept = config.get("scale_concept", False)
         self.use_gaussian_mixture_KL = config.get("use_gaussian_mixture_KL", False)
 
+        # -- if scaling concepts --
+
+        if self.scale_concept:
+            initial_std_dev = 0.01
+            self.learned_concept_scale_gamma = nn.Parameter(
+                torch.randn(self.n_concepts) * initial_std_dev
+            )
+            self.learned_concept_scale_beta = nn.Parameter(
+                torch.randn(self.n_concepts) * initial_std_dev
+            )
+
     @property
     @abstractmethod
     def has_concepts(self):
@@ -94,6 +105,22 @@ class BaseCBVAE(pl.LightningModule, ABC):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         # Define the CosineAnnealingLR scheduler
         scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
+
+    def KL_loss(self, mu, logvar):
+        if self.use_gaussian_mixture_KL:
+            # KL loss for individual elements
+            kl_loss_ind = -0.1 * (1 + logvar - logvar.exp())
+            kl_loss_ind = torch.mean(torch.sum(kl_loss_ind, dim=1))
+
+            # Population Gaussian P(Z)
+            Z_mean = torch.mean(mu, dim=0)
+            Z_log_var = torch.log(torch.var(mu, dim=0, unbiased=False))
+            KLD = -0.5 * torch.sum((1 + Z_log_var - Z_mean.pow(2) - Z_log_var.exp()))
+
+        else:
+            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+
+        return KLD
 
     def binary_accuracy(self, preds, labels, threshold=0.5):
         """

@@ -215,7 +215,6 @@ class CEM_VAE(pl.LightningModule):
     ):
         loss_dict = {}
         MSE = F.mse_loss(x_pred, x, reduction="mean")
-        KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
 
         overall_concept_loss = self.n_concepts * F.mse_loss(
             pred_concept, concepts, reduction="mean"
@@ -228,7 +227,7 @@ class CEM_VAE(pl.LightningModule):
         orth_loss = self.orthogonality_loss(known_concepts, unknown)
         loss_dict["concept_loss"] = overall_concept_loss
         loss_dict["orth_loss"] = orth_loss
-
+        KLD = self.KL_loss(mu, logvar)
         loss_dict["rec_loss"] = MSE
         loss_dict["KL_loss"] = KLD
         loss_dict["Total_loss"] = (

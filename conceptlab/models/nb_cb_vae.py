@@ -163,8 +163,7 @@ class NB_CB_VAE(pl.LightningModule):
 
         REC = nb.log_prob(x).mean()
 
-        KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-
+        KLD = self.KL_loss(mu, logvar)
         loss_dict["rec_loss"] = REC
         loss_dict["KL_loss"] = KLD
         loss_dict["MSE_loss"] = MSE

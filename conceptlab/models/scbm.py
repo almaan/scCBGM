@@ -102,14 +102,29 @@ class SCBM(BaseCBVAE):
         unknown = self.fcCB2(z)
         unknown = F.relu(unknown)
 
+        if self.scale_concept:
+            known_concepts_bar = (
+                known_concepts * self.learned_concept_scale_gamma
+                + self.learned_concept_scale_beta
+            )
+            if concepts is not None:
+                concepts_bar = (
+                    concepts * self.learned_concept_scale_gamma
+                    + self.learned_concept_scale_beta
+                )
+
+        else:
+            known_concepts_bar = known_concepts
+            concepts_bar = concepts
+
         if intervene:
-            concepts_ = known_concepts * (1 - mask) + concepts * mask
+            concepts_ = known_concepts_bar * (1 - mask) + concepts_bar * mask
             h = torch.cat((concepts_, unknown), 1)
         else:
             if concepts == None:
-                h = torch.cat((known_concepts, unknown), 1)
+                h = torch.cat((known_concepts_bar, unknown), 1)
             else:
-                h = torch.cat((concepts, unknown), 1)
+                h = torch.cat((concepts_bar, unknown), 1)
 
         return dict(
             pred_concept=known_concepts,
@@ -186,8 +201,7 @@ class SCBM(BaseCBVAE):
 
         MSE = F.mse_loss(x_pred, x, reduction="mean")
 
-        KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-
+        KLD = self.KL_loss(mu, logvar)
         loss_dict["rec_loss"] = MSE
         loss_dict["KL_loss"] = KLD
 

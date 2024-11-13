@@ -55,16 +55,6 @@ class CB_VAE(BaseCBVAE):
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
         self.use_concept_loss = config.get("use_concept_loss", True)
 
-        # -- if scaling concepts --
-
-        if self.scale_concept:
-            initial_std_dev = 0.01
-            self.learned_concept_scale_gamma = nn.Parameter(
-                torch.randn(self.n_concepts) * initial_std_dev
-            )
-            self.learned_concept_scale_beta = nn.Parameter(
-                torch.randn(self.n_concepts) * initial_std_dev
-            )
         self.save_hyperparameters()
 
     @property
@@ -92,12 +82,15 @@ class CB_VAE(BaseCBVAE):
                 known_concepts * self.learned_concept_scale_gamma
                 + self.learned_concept_scale_beta
             )
-            concepts_bar = (
-                concepts * self.learned_concept_scale_gamma
-                + self.learned_concept_scale_beta
-            )
+            if concepts is not None:
+
+                concepts_bar = (
+                    concepts * self.learned_concept_scale_gamma
+                    + self.learned_concept_scale_beta
+                )
 
         else:
+
             known_concepts_bar = known_concepts
             concepts_bar = concepts
 
@@ -156,23 +149,7 @@ class CB_VAE(BaseCBVAE):
         loss_dict = {}
         MSE = F.mse_loss(x_pred, x, reduction="mean")
 
-        if self.use_gaussian_mixture_KL:
-            # KL loss for individual elements
-            kl_loss_ind = -0.1 * (1 + logvar - logvar.exp())
-            kl_loss_ind = torch.mean(torch.sum(kl_loss_ind, dim=1))
-
-            # Population Gaussian P(Z)
-            Z_mean = torch.mean(mu, dim=0)
-            Z_log_var = torch.log(
-                torch.var(mu, dim=0, unbiased=False)
-            )  # Use unbiased=False to match TensorFlow's behavior
-            KLD = -0.5 * torch.sum((1 + Z_log_var - Z_mean.pow(2) - Z_log_var.exp()))
-
-        else:
-            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-
-            # kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
-            # kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+        KLD = self.KL_loss(mu, logvar)
 
         loss_dict["rec_loss"] = MSE
         loss_dict["KL_loss"] = KLD
@@ -207,7 +184,9 @@ class CB_VAE(BaseCBVAE):
         self,
     ):
 
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate
+        )
         # Define the CosineAnnealingLR scheduler
         scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
 
@@ -240,7 +219,9 @@ class SCALED_CB_VAE(CB_VAE):
 
         return dict(mu=mu, logvar=logvar, scale_factor=scale_factor)
 
-    def cbm(self, z, scale_factor, concepts=None, mask=None, intervene=False, **kwargs):
+    def cbm(
+        self, z, scale_factor=None, concepts=None, mask=None, intervene=False, **kwargs
+    ):
 
         known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
         known_concepts_proj = self.fcCBproj(known_concepts)

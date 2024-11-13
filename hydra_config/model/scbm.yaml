@@ -9,7 +9,7 @@ n_concepts: 8
 min_bottleneck_size: 32
 independent_training: False
 concepts_hp: 0.005
-orthogonality_hp: 0.1
+orthogonality_hp: 0.5
 n_unknown: 32
 early_stopping: False
 use_orthogonality_loss: True
