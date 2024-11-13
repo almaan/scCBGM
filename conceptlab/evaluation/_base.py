@@ -77,9 +77,6 @@ class EvaluationClass(ABCMeta):
             else:
                 var_names_dict["neu"] = coefs_k.index[coefs_k.values == 0]
 
-            X_new.values
-            X_old.values
-
             for delta, dropped, ivn in zip(
                 [pos_delta, neg_delta], [False, True], ["0->1", "1->0"]
             ):

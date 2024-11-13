@@ -461,3 +461,12 @@ def controlled_adata_train_test_split(
         len(adata_test),
         np.concatenate((test_idx, train_idx)),
     )
+
+
+def _to_tensor(x: pd.DataFrame | np.ndarray) -> torch.Tensor:
+    if isinstance(x, pd.DataFrame):
+        return torch.tensor(x.values.astype(np.float32))
+    elif isinstance(x, np.ndarray):
+        return torch.tensor(x.astype(np.float32))
+    else:
+        raise NotImplementedError

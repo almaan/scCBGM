@@ -9,6 +9,7 @@ n_concepts: 8
 min_bottleneck_size: 32
 independent_training: False
 concepts_hp: 0.005
+normalize: True
 orthogonality_hp: 0.5
 n_decoder_layers: 2
 scale_concept: False

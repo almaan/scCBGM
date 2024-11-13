@@ -37,7 +37,7 @@ class DistributionShift(EvaluationClass):
 
 def eval_intervention(
     intervention_type,
-    concept_idx,
+    concept_name,
     x_concepts,
     x_true,
     ix_og_concepts,
@@ -50,23 +50,23 @@ def eval_intervention(
     cfg,
 ):
 
-    mask = np.zeros_like(x_concepts)
-    mask[:, concept_idx] = 1
+    mask = np.zeros_like(x_concepts.values)
+    mask[:, x_concepts.columns.get_loc(concept_name)] = 1
 
     x_concepts_intervene = x_concepts.copy()
 
     if intervention_type == "On":
-        x_concepts_intervene[:, concept_idx] = 1
-        indices = np.where(x_concepts[:, concept_idx] == 0)[0]
+        x_concepts_intervene.loc[:, concept_name] = 1
+        indices = np.where(x_concepts.loc[:, concept_name] == 0)[0]
 
     else:
-        x_concepts_intervene[:, concept_idx] = 0
-        indices = np.where(x_concepts[:, concept_idx] == 1)[0]
+        x_concepts_intervene.loc[:, concept_name] = 0
+        indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
 
     x_pred_withIntervention = model.intervene(
-        torch.tensor(x_true),
-        torch.tensor(x_concepts_intervene),
-        torch.tensor(mask),
+        helpers._to_tensor(x_true),
+        helpers._to_tensor(x_concepts_intervene),
+        helpers._to_tensor(mask),
     )["x_pred"]
 
     x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
@@ -105,11 +105,7 @@ def eval_intervention(
         results["data"], ["perturbed", "genetrated", "original"]
     )
 
-    concepts = pd.DataFrame(
-        x_concepts_intervene[:, ix_og_concepts],
-        index=original_test_concepts.index,
-        columns=original_test_concepts.columns,
-    )
+    concepts = x_concepts_intervene.iloc[:, ix_og_concepts]
 
     # get subset
     subset_original_test_concepts = original_test_concepts.iloc[indices]

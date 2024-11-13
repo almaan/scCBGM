@@ -1,4 +1,4 @@
-dataset_name: "default"
+dataset_name: "complete_set_dataset"
 n_obs: 50000
 n_vars:  5000
 n_tissues: 3
