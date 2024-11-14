@@ -73,7 +73,8 @@ def main(
 
     adata_path = osp.join(data_dir, cfg.dataset.dataset_name + ".h5ad")
 
-    logger.info(f"AnnData Path >>> {adata_path}")
+    if cfg.save_generated_data:
+        logger.info(f"AnnData Path >>> {adata_path}")
 
     generate_data = cfg.get("generate_data", True)
 

@@ -296,7 +296,7 @@ class OmicsDataGenerator(DataGenerator):
 
         # dirichlet priors
         alpha_U = np.ones(U)  # for cell type
-        alpha_C = np.ones(C) / C  # for concepts
+        alpha_C = np.ones(C) / 5  # for concepts
         alpha_B = 10 * np.ones(B)  # for batches
         alpha_T = 10 * np.ones(T)  # for tisse types
 

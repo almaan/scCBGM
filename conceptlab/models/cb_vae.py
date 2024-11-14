@@ -164,12 +164,6 @@ class CB_VAE(BaseCBVAE):
                 pred_concept_clipped, concepts, reduction="mean"
             )
 
-            for c in range(self.n_concepts):
-                accuracy = self.binary_accuracy(
-                    pred_concept_clipped[:, c], concepts[:, c]
-                )
-                loss_dict[str(c) + "_acc"] = accuracy
-
             loss_dict["concept_loss"] = overall_concept_loss
             loss_dict["Total_loss"] += self.concepts_hp * overall_concept_loss
 
