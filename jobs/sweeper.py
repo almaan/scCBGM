@@ -1,6 +1,7 @@
 import argparse as arp
 import uuid
 import subprocess
+import os.path as osp
 
 
 if __name__ == "__main__":
@@ -39,14 +40,14 @@ if __name__ == "__main__":
 
     lsf_parser.add_argument("--queue", type=str, default="short", help="Queue")
 
+    lsf_parser.add_argument("--job_name", type=str, default=None, help="Shared jobname")
+
     lsf_parser.add_argument(
         "--out_dir", type=str, default="outputs/jobs", help="Output directory"
     )
 
     # Parse the arguments
     args = parser.parse_args()
-
-    identifier = uuid.uuid4()
 
     # Example: Access parsed arguments
 
@@ -58,6 +59,10 @@ if __name__ == "__main__":
             "bsub",
             "-q",
             args.queue,
+            "-oo",
+            osp.join(args.out_dir, "stdout.{identifier}"),
+            "-eo",
+            osp.join(args.out_dir, "stderr.{identifier}"),
             "-M",
             memory,
             "-n",
@@ -70,9 +75,13 @@ if __name__ == "__main__":
                 "-sla",
                 args.sla,
             ]
-        cmd += ["wandb", "agent", args.sweep_id]
+        if args.job_name is not None:
+            cmd += ["-J", args.job_name]
 
-        for ii in range(args.n_jobs):
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            # Print the output
-            print(result.stdout)
+    cmd += ["wandb", "agent", args.sweep_id]
+
+    for ii in range(args.n_jobs):
+        identifier = uuid.uuid4()
+        cmd_unique = [x.replace("{identifier}", str(identifier)) for x in cmd]
+
+        result = subprocess.run(cmd_unique, capture_output=True, text=True)

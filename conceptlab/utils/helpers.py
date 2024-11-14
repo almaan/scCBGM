@@ -158,7 +158,6 @@ def dataset_to_anndata(
     dataset: xr.Dataset,
     concepts: pd.DataFrame | None = None,
     concept_coef: pd.DataFrame | None = None,
-    adata_path: str | None = None,
     concept_key: str = "concepts",
     concept_coef_key: str = "concept_coef",
 ) -> ad.AnnData:
@@ -189,9 +188,6 @@ def dataset_to_anndata(
         )
     else:
         adata.varm[concept_coef_key] = concept_coef
-
-    if adata_path is not None:
-        adata.write_h5ad(adata_path)
 
     return adata
 
