@@ -49,7 +49,8 @@ def main(
     )
 
     wandb_name = cfg.wandb.experiment + "_" + helpers.timestamp()
-    run = wandb.init(project=cfg.wandb.project, name=wandb_name)
+    wandb_entity = cfg.wandb.get("entity", None)
+    run = wandb.init(project=cfg.wandb.project, name=wandb_name, entity=wandb_entity)
 
     logger = logging.setup_logger()
 
@@ -62,8 +63,6 @@ def main(
     data_dir = osp.join(original_path, cfg.constants.data_path)
 
     wandb_logger = WandbLogger(
-        project=cfg.wandb.project,
-        name=wandb_name,
         log_model=False,
     )
 
