@@ -57,13 +57,16 @@ as the statement above suggests. This needs to be done on a GPU session.
 If you have a large sweep with multiple configurations, it might be smarter to
 distribute this across multiple GPUs. This is where the beauty of `wandb agents`
 come into play, you can launch multiple jobs that all connects to the same
-agent. To automate this we also provide a simple script that is compatible with lsf schedulers but that can easily be adapted to others (e.g., slurm).
+agent. To automate this we also provide a CLI application that is can launch the
+sweep agents via a scheduler. Currently we only have support for LSF, but this
+can be extended to other schedulers like SLURM on request.
 
-You can find this script in `jobs/lsf_sweeps.sh`, the way you use it is:
+To use the script do (in `root`)
+
 
 ```sh
 # in root
-./jobs/lsf_sweep.sh SWEEP_AGENT NUM_JOBS
+python jobs/sweeper.py --sweep_id SWEEP_AGENT --num_jobs NUM_JOBS lsf
 
 ```
 
@@ -72,8 +75,29 @@ Where `SWEEP_AGENT` is the sweep command you get from running `wandb sweep` and
 over them). Using the example above with 10 jobs this would be:
 
 
+
+The lsf subparser have multiple additional commands that you can use to specify the SLA, number of cores, name of the job etc.
+
+```
+$ python jobs/sweeper.py lsf --help
+usage: sweeper.py lsf [-h] [--memory MEMORY] [--num_cores NUM_CORES] [--sla SLA] [--queue QUEUE] [--job_name JOB_NAME] [--out_dir OUT_DIR]
+
+options:
+  -h, --help            show this help message and exit
+  --memory MEMORY       Memory required (in GB).
+  --num_cores NUM_CORES
+                        Number of CPU cores required.
+  --sla SLA             Service Level Agreement (SLA) name.
+  --queue QUEUE         Queue
+  --job_name JOB_NAME   Shared jobname
+  --out_dir OUT_DIR     Output directory
+```
+
+One example of how you could run this is:
+
+
 ```sh
 # in root
-./jobs/lsf_sweep.sh andera29/conceptlab/wuw4xyb0 10
+python jobs/sweeper.py --n_jobs 50 --sweep_id andera29/conceptlab/2wfnbcy8 lsf --sla gRED_braid_gpu --job_name sweep
 
 ```

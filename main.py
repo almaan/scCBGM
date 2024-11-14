@@ -87,6 +87,12 @@ def main(
         if cfg.dataset.add_all_effects_as_concepts:
             dataset = helpers.add_extras_to_concepts(dataset, cfg)
 
+        if cfg.save_generated_data:
+            adata.write_h5ad(adata_path)
+
+            with open(dataset_path, "wb") as file:
+                pickle.dump(dataset, file)
+
         mod = cfg.modify.mod
 
         if mod is not None:
@@ -95,7 +101,6 @@ def main(
             concepts, indicator = mod_fun(dataset=dataset, **mod_prms)
             adata = helpers.dataset_to_anndata(
                 dataset,
-                adata_path=adata_path,
                 concepts=concepts,
                 concept_key=concept_key,
             )
@@ -103,16 +108,10 @@ def main(
             adata.uns["concept_indicator"] = indicator
 
         else:
-            adata = helpers.dataset_to_anndata(
-                dataset, adata_path=adata_path, concept_key=concept_key
-            )
+            adata = helpers.dataset_to_anndata(dataset, concept_key=concept_key)
             adata.uns["concept_indicator"] = np.array(
                 [C.Mods.none] * adata.obsm[concept_key].shape[1], dtype="<U64"
             )
-
-            # Saving the data object
-        with open(dataset_path, "wb") as file:
-            pickle.dump(dataset, file)
 
     else:
         adata = ad.read_h5ad(adata_path)

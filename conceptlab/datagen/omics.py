@@ -109,9 +109,8 @@ class OmicsDataGenerator(DataGenerator):
             t_n = categorical(p_Q)
             # get cell type
             u_n = categorical(p_T[t_n])
-
             # get type specific concept probabilities, transform to logits
-            mu = np.log(p_C[u_n] / (1 - p_C[u_n]))
+            mu = np.log((p_C[u_n] + 1e-8) / (1 - p_C[u_n] + 1e-8))
             # sample logits with dependency
             logits = rng.multivariate_normal(mean=mu, cov=cov)
             # convert logits to probabilities
