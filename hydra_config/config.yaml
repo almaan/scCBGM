@@ -10,6 +10,7 @@ defaults:
 wandb:
   experiment: conceptlab
   project: conceptlab
+  entity: null
 
 
 trainer:

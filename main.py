@@ -49,7 +49,8 @@ def main(
     )
 
     wandb_name = cfg.wandb.experiment + "_" + helpers.timestamp()
-    run = wandb.init(project=cfg.wandb.project, name=wandb_name)
+    wandb_entity = cfg.wandb.get("entity", None)
+    run = wandb.init(project=cfg.wandb.project, name=wandb_name, entity=wandb_entity)
 
     logger = logging.setup_logger()
 
@@ -62,8 +63,6 @@ def main(
     data_dir = osp.join(original_path, cfg.constants.data_path)
 
     wandb_logger = WandbLogger(
-        project=cfg.wandb.project,
-        name=wandb_name,
         log_model=False,
     )
 
@@ -73,7 +72,8 @@ def main(
 
     adata_path = osp.join(data_dir, cfg.dataset.dataset_name + ".h5ad")
 
-    logger.info(f"AnnData Path >>> {adata_path}")
+    if cfg.save_generated_data:
+        logger.info(f"AnnData Path >>> {adata_path}")
 
     generate_data = cfg.get("generate_data", True)
 

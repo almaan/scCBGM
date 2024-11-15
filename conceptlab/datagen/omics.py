@@ -296,7 +296,7 @@ class OmicsDataGenerator(DataGenerator):
 
         # dirichlet priors
         alpha_U = np.ones(U)  # for cell type
-        alpha_C = np.ones(C) / C  # for concepts
+        alpha_C = np.ones(C) / 5  # for concepts
         alpha_B = 10 * np.ones(B)  # for batches
         alpha_T = 10 * np.ones(T)  # for tisse types
 
@@ -330,6 +330,8 @@ class OmicsDataGenerator(DataGenerator):
             tril_indices = np.tril_indices_from(scale_matrix)
             scale_matrix[tril_indices[0], tril_indices[1]] = scale_matrix_elements
             scale_matrix = scale_matrix @ scale_matrix.T
+            # we have to do this for numerical stability
+            scale_matrix += np.eye(C) * 1e-6
             cov = wishart.rvs(df=C, scale=scale_matrix, random_state=rng)
         else:
             cov = np.zeros((C, C))
