@@ -15,6 +15,13 @@ if __name__ == "__main__":
         "--n_jobs", type=int, default=1, required=False, help="Number of jobs to submit"
     )
 
+    parser.add_argument(
+        "--max_count",
+        default=None,
+        required=False,
+        help="Max counts per agent",
+    )
+
     # Create subparsers and define the 'lsf' subparser
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     lsf_parser = subparsers.add_parser("lsf", help="LSF job configuration")
@@ -79,6 +86,8 @@ if __name__ == "__main__":
             cmd += ["-J", args.job_name]
 
     cmd += ["wandb", "agent", args.sweep_id]
+    if args.max_count is not None:
+        cmd += ["--count", args.max_count]
 
     for ii in range(args.n_jobs):
         identifier = uuid.uuid4()
