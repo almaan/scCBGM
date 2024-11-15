@@ -109,8 +109,8 @@ def main(
 
         else:
             adata = helpers.dataset_to_anndata(dataset, concept_key=concept_key)
-            adata.uns["concept_indicator"] = np.array(
-                [C.Mods.none] * adata.obsm[concept_key].shape[1], dtype="<U64"
+            adata.uns["concept_indicator"] = pd.Series(
+                np.array([C.Mods.none] * adata.obsm[concept_key].shape[1], dtype="<U64")
             )
 
     else:
@@ -407,14 +407,18 @@ def main(
                         cfg,
                     )
 
-                if scores is not None:
+                if (scores is not None) and (concept_name in scores):
                     intervention_scores[intervention_type][concept_name] = scores[
                         concept_name
                     ]
                     intervention_data[intervention_type][concept_name] = perturbed_data
 
         joint_score = clab.evaluation.interventions.score_intervention(
-            metrics=["auroc", "auprc", "acc", "corr"],
+            metrics=[
+                "auroc",
+                "auprc",
+                "acc",
+            ],
             scores=intervention_scores,
             data=intervention_data,
             concept_coefs=coefs,

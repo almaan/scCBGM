@@ -22,6 +22,7 @@ def concept_accuarcy(concepts, pred_concept, debug=False):
         concepts = concepts.values
 
     threshold = 0.5
+    n_valid_concepts = 0
 
     for c in range(n_concept):
         c_true = concepts[:, c]
@@ -30,18 +31,17 @@ def concept_accuarcy(concepts, pred_concept, debug=False):
         n_true = np.sum(c_true)
         n_false = c_true.shape[0] - n_true
 
-        n_valid_concepts = 0
         c_pred_bin = (c_pred >= threshold).astype(int)
 
         if (n_true > 0) and (n_false > 0):
+
+            n_valid_concepts += 1
 
             # Calculate F1 score
             f1 = f1_score(c_true, c_pred_bin)
             all_f1 += f1
 
             # Calculate AUPRC
-            n_valid_concepts += 1
-
             precision, recall, _ = precision_recall_curve(c_true, c_pred)
             auprc = auc(recall, precision)
             all_auprc += auprc
@@ -68,7 +68,6 @@ def concept_accuarcy(concepts, pred_concept, debug=False):
             loss_dict["test_concept_" + str(c) + "_auroc"] = auroc
 
     loss_dict["test_avg_concept_acc"] = all_acc / n_concept
-
     loss_dict["test_avg_concept_f1"] = all_f1 / max(n_valid_concepts, 1)
     loss_dict["test_avg_concept_auprc"] = all_auprc / max(n_valid_concepts, 1)
     loss_dict["test_avg_concept_auroc"] = all_auroc / max(n_valid_concepts, 1)

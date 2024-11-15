@@ -113,6 +113,7 @@ class OmicsDataGenerator(DataGenerator):
             mu = np.log((p_C[u_n] + 1e-8) / (1 - p_C[u_n] + 1e-8))
             # sample logits with dependency
             logits = rng.multivariate_normal(mean=mu, cov=cov)
+            logits = np.clip(logits, -8, 8)
             # convert logits to probabilities
             p_v_n = 1 / (1 + np.exp(-logits))
             # store probabilities

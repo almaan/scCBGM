@@ -55,6 +55,9 @@ class EvaluationClass(ABCMeta):
                 concepts_new.loc[:, concept_name] - concepts_old.loc[:, concept_name]
             ).values
 
+            if len(concept_delta) < 0:
+                continue
+
             concept_delta_mean = concept_delta.mean()
 
             if concept_delta_mean == 0:
@@ -103,8 +106,11 @@ class EvaluationClass(ABCMeta):
                     # Negate the negative values as required
                     d_dict["neg"] = -d_dict["neg"]
 
-                results[concept_name].update({k: v.mean() for k, v in d_dict.items()})
+                results[concept_name].update(
+                    {k: v.mean() for k, v in d_dict.items() if len(v) > 0}
+                )
 
-            results = {k: v for k, v in results.items() if len(v) > 0}
+            if len(results) > 0:
+                results = {k: v for k, v in results.items() if len(v) > 0}
 
             return results

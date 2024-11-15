@@ -261,9 +261,9 @@ def compute_acc(data):
     total_count = len(data)
 
     for concept, values in data.items():
-        pos = values["pos"]
-        neg = values["neg"]
-        neu = values["neu"]
+        pos = values.get("pos", 1)
+        neg = values.get("neg", -1)
+        neu = values.get("neu", 0)
 
         if pos > 0 and neg < 0 and abs(neu) < abs(pos) and abs(neu) < abs(neg):
             correct_count += 1
