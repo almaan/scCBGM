@@ -15,7 +15,12 @@ def create_plot_path(original_path, cfg):
 
 
 def plot_generation(
-    adata, plotting_folder_path, cfg, normalize=False, concept_key="concepts"
+    adata,
+    plotting_folder_path,
+    cfg,
+    normalize=False,
+    concept_key="concepts",
+    plot_concepts: bool = False,
 ):
 
     sc.pp.pca(adata)
@@ -26,18 +31,19 @@ def plot_generation(
 
     old_obs = adata.obs.copy()
 
-    if concept_key in adata.obsm:
-        concepts = adata.obsm[concept_key].copy()
-        columns = ["concept_{}".format(x) for x in concepts.columns.tolist()]
-        concepts = pd.DataFrame(
-            concepts.values,
-            index=adata.obs.index,
-            columns=columns,
-        )
+    if plot_concepts:
+        if concept_key in adata.obsm:
+            concepts = adata.obsm[concept_key].copy()
+            columns = ["concept_{}".format(x) for x in concepts.columns.tolist()]
+            concepts = pd.DataFrame(
+                concepts.values,
+                index=adata.obs.index,
+                columns=columns,
+            )
 
-        adata.obs = pd.concat((old_obs, concepts), axis=1)
+            adata.obs = pd.concat((old_obs, concepts), axis=1)
 
-        colors += columns
+            colors += columns
 
     fig = sc.pl.umap(adata, color=colors, ncols=len(colors), return_fig=True)
 

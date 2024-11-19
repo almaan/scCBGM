@@ -240,6 +240,7 @@ def main(
         concept_loss_dict = con.concept_accuarcy(
             x_concepts.values,
             pred_concept,
+            debug=cfg.DEBUG,
         )
         for key, value in concept_loss_dict.items():
             wandb.log({f"{key}": value})
