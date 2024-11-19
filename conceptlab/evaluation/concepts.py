@@ -31,7 +31,7 @@ def concept_accuarcy(concepts, pred_concept, debug=False):
         n_true = np.sum(c_true)
         n_false = c_true.shape[0] - n_true
 
-        c_pred_bin = (c_pred >= threshold).astype(int)
+        c_pred_bin = (c_pred >= threshold).astype(float)
 
         if (n_true > 0) and (n_false > 0):
 
