@@ -1,4 +1,5 @@
 import logging
+from rich.logging import RichHandler
 
 
 def setup_logger(log_level=logging.INFO, log_file=None):
@@ -10,11 +11,11 @@ def setup_logger(log_level=logging.INFO, log_file=None):
     child_logger1 = logging.getLogger(
         "conceptlab"
     )  # This logger is a child of the root logger
-    child_handler1 = logging.StreamHandler()
+    child_handler1 = RichHandler(rich_tracebacks=True, markup=True)
     child_handler1.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter(
-        "{asctime} - {levelname} - {message}",
+        "{message}",
         style="{",
         datefmt="%Y-%m-%d %H:%M",
     )

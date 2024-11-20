@@ -46,6 +46,7 @@ def plot_generation(
             colors += columns
 
     fig = sc.pl.umap(adata, color=colors, ncols=len(colors), return_fig=True)
+    fig.tight_layout()
 
     plot_filename = plotting_folder_path + cfg.wandb.experiment + ".png"
     plt.savefig(plot_filename)
