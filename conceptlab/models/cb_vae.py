@@ -8,19 +8,33 @@ from wandb import Histogram
 
 from .base import BaseCBVAE
 from .utils import sigmoid
+from .encoder import DefaultEncoderBlock
+from .decoder import DefaultDecoderBlock, SkipDecoderBlock
 
 
 class CB_VAE(BaseCBVAE):
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        _encoder: nn.Module = DefaultEncoderBlock,
+        _decoder: nn.Module = DefaultDecoderBlock,
+    ):
 
-        super().__init__(config)
+        super().__init__(
+            config,
+        )
+
+        self.dropout = config.get("dropout", 0.0)
 
         # Encoder
-        self.fc1 = nn.Linear(self.input_dim, self.hidden_dim)
-        self.fc21 = nn.Linear(self.hidden_dim, self.latent_dim)  # Mean
-        self.fc22 = nn.Linear(self.hidden_dim, self.latent_dim)  # Log variance
 
-        self.fcCB1 = nn.Linear(self.latent_dim, self.n_concepts)
+        self._encoder = _encoder(
+            input_dim=self.input_dim,
+            n_concepts=self.n_concepts,
+            hidden_dim=self.hidden_dim,
+            latent_dim=self.latent_dim,
+            dropout=self.dropout,
+        )
 
         if "n_unknown" in config:
             n_unknown = config["n_unknown"]
@@ -31,26 +45,21 @@ class CB_VAE(BaseCBVAE):
         else:
             n_unknown = 32
 
+        self.fcCB1 = nn.Linear(self.latent_dim, self.n_concepts)
         self.fcCBproj = nn.Linear(self.n_concepts, n_unknown)
         self.fcCB2 = nn.Linear(self.latent_dim, n_unknown)
 
-        # Decoder
-        layers = []
-        in_dim = self.n_concepts + n_unknown
-
-        for i in range(self.n_decoder_layers):
-            out_dim = (
-                self.input_dim if i == self.n_decoder_layers - 1 else self.hidden_dim
-            )
-            layers.append(nn.Linear(in_dim, out_dim))
-            in_dim = self.hidden_dim
-
-        self.decoder_layers = nn.ModuleList(layers)
+        self._decoder = _decoder(
+            input_dim=self.input_dim,
+            n_concepts=self.n_concepts,
+            n_unknown=n_unknown,
+            hidden_dim=self.hidden_dim,
+            dropout=self.dropout,
+        )
 
         self.beta = config.beta
         self.concepts_hp = config.concepts_hp
         self.orthogonality_hp = config.orthogonality_hp
-        self.dropout = config.get("dropout", 0.0)
 
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
         self.use_concept_loss = config.get("use_concept_loss", True)
@@ -64,12 +73,10 @@ class CB_VAE(BaseCBVAE):
         return True
 
     def encode(self, x, **kwargs):
-        h1 = F.relu(self.fc1(x))
-        h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
-        mu, logvar = self.fc21(h1), self.fc22(h1)
-        logvar = t.clip(logvar, -1e5, 1e5)
+        return self._encoder(x, **kwargs)
 
-        return dict(mu=mu, logvar=logvar)
+    def decode(self, h, **kwargs):
+        return self._decoder(h, **kwargs)
 
     def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
 
@@ -109,18 +116,6 @@ class CB_VAE(BaseCBVAE):
             unknown=unknown,
             h=h,
         )
-
-    def decode(self, h, **kwargs):
-        for i, layer in enumerate(self.decoder_layers):
-            if self.n_decoder_layers == 1:
-                h = F.relu(layer(h))
-            else:
-                h = layer(h)
-            if i < self.n_decoder_layers - 1:  # Apply dropout to all but the last layer
-                h = F.relu(h)
-                h = F.dropout(h, p=self.dropout, training=self.training)
-
-        return dict(x_pred=h)
 
     def intervene(self, x, concepts, mask, **kwargs):
         enc = self.encode(x)
@@ -196,26 +191,11 @@ class CB_VAE(BaseCBVAE):
         }
 
 
-class SCALED_CB_VAE(CB_VAE):
+class SKIP_CB_VAE(CB_VAE):
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__(config, _decoder=SkipDecoderBlock)
 
-        # Amortized Scaling Factor
-        self.fcS = nn.Linear(self.input_dim, 1)
-
-    def encode(self, x, **kwargs):
-        h1 = F.relu(self.fc1(x))
-        h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
-        mu, logvar = self.fc21(h1), self.fc22(h1)
-        logvar = t.clip(logvar, -1e5, 1e5)
-
-        scale_factor = self.fcS(x)
-
-        return dict(mu=mu, logvar=logvar, scale_factor=scale_factor)
-
-    def cbm(
-        self, z, scale_factor=None, concepts=None, mask=None, intervene=False, **kwargs
-    ):
+    def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
 
         known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
         known_concepts_proj = self.fcCBproj(known_concepts)
@@ -223,12 +203,12 @@ class SCALED_CB_VAE(CB_VAE):
 
         if intervene:
             concepts_ = known_concepts * (1 - mask) + concepts * mask
-            h = torch.cat((concepts_ * scale_factor, unknown), 1)
+            h = torch.cat((concepts_, unknown), 1)
         else:
             if concepts == None:
-                h = torch.cat((known_concepts * scale_factor, unknown), 1)
+                h = torch.cat((known_concepts, unknown), 1)
             else:
-                h = torch.cat((concepts * scale_factor, unknown), 1)
+                h = torch.cat((concepts, unknown), 1)
 
         return dict(
             pred_concept=known_concepts,

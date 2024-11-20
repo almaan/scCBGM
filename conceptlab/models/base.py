@@ -20,7 +20,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.learning_rate = config.lr
         self.independent_training = config.get("independent_training", False)
         self.beta = config.beta
-        self.n_decoder_layers = config.n_decoder_layers
+        # self.n_decoder_layers = config.n_decoder_layers
         self.sigmoid_temp = config.get("sigmoid_temp", 1)
         self.scale_concept = config.get("scale_concept", False)
         self.use_gaussian_mixture_KL = config.get("use_gaussian_mixture_KL", False)

@@ -54,6 +54,8 @@ def main(
 
     logger = logging.setup_logger()
 
+    logger.info(":zap: Initate Program :zap:")
+
     set_seed(cfg.constants.seed)
     original_path = get_original_cwd()
     checkpoint_dir = osp.join(original_path, cfg.constants.checkpoint_dir)
@@ -67,22 +69,24 @@ def main(
     )
 
     if not os.path.exists(data_dir):
-        logger.info("Creating Data Directory >>> {}")
+        logger.info(" :sparkles: Creating Data Directory :point_right: {}")
         os.makedirs(data_dir)
 
     adata_path = osp.join(data_dir, cfg.dataset.dataset_name + ".h5ad")
 
     if cfg.save_generated_data:
-        logger.info(f"AnnData Path >>> {adata_path}")
+        logger.info(f"AnnData Path :point_right: {adata_path}")
 
     generate_data = cfg.get("generate_data", True)
 
     if not os.path.exists(adata_path) or generate_data:
+        logger.info(":seedling: Initiated Data Generation :seedling:")
         dataset_path = (
             original_path + cfg.constants.data_path + cfg.dataset.dataset_name + ".pkl"
         )
 
         dataset = clab.datagen.omics.OmicsDataGenerator.generate(**cfg.dataset)
+        logger.info(":evergreen_tree: Completed Data Generation :evergreen_tree:")
 
         if cfg.dataset.add_all_effects_as_concepts:
             dataset = helpers.add_extras_to_concepts(dataset, cfg)
@@ -200,6 +204,9 @@ def main(
     trainer = pl.Trainer(
         max_epochs=max_epochs, logger=wandb_logger, callbacks=callbacks
     )
+
+    logger.info("Model>>")
+    print(model)
     trainer.fit(model, data_module)
 
     logger.info("Activate Eval Mode and move to CPU")

@@ -1,5 +1,5 @@
-dataset_name: "complete_set_dataset"
-n_obs: 50000
+dataset_name: "simple"
+n_obs: 1000
 n_vars:  5000
 n_tissues: 3
 n_celltypes:  10
