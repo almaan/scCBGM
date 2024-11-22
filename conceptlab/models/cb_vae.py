@@ -5,11 +5,14 @@ import torch.nn.functional as F
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from wandb import Histogram
+import wandb
 
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import DefaultEncoderBlock
 from .decoder import DefaultDecoderBlock, SkipDecoderBlock
+
+EPS = 1e-6
 
 
 class CB_VAE(BaseCBVAE):
@@ -72,6 +75,9 @@ class CB_VAE(BaseCBVAE):
     ):
         return True
 
+    def _extra_loss(self, loss_dict, *args, **kwargs):
+        return loss_dict
+
     def encode(self, x, **kwargs):
         return self._encoder(x, **kwargs)
 
@@ -129,6 +135,15 @@ class CB_VAE(BaseCBVAE):
         output = torch.abs(cos(concept_emb, unk_emb))
         return output.mean()
 
+    def rec_loss(self, x_pred, x):
+        return F.mse_loss(x_pred, x, reduction="mean")
+
+    def concept_loss(self, pred_concept, concepts):
+        overall_concept_loss = self.n_concepts * F.binary_cross_entropy(
+            pred_concept, concepts, reduction="mean"
+        )
+        return overall_concept_loss
+
     def loss_function(
         self,
         x,
@@ -142,8 +157,8 @@ class CB_VAE(BaseCBVAE):
         **kwargs,
     ):
         loss_dict = {}
-        MSE = F.mse_loss(x_pred, x, reduction="mean")
 
+        MSE = self.rec_loss(x_pred, x)
         KLD = self.KL_loss(mu, logvar)
 
         loss_dict["rec_loss"] = MSE
@@ -154,11 +169,7 @@ class CB_VAE(BaseCBVAE):
         pred_concept_clipped = t.clip(pred_concept, 0, 1)
 
         if self.use_concept_loss:
-
-            overall_concept_loss = self.n_concepts * F.binary_cross_entropy(
-                pred_concept_clipped, concepts, reduction="mean"
-            )
-
+            overall_concept_loss = self.concept_loss(pred_concept_clipped, concepts)
             loss_dict["concept_loss"] = overall_concept_loss
             loss_dict["Total_loss"] += self.concepts_hp * overall_concept_loss
 
@@ -166,6 +177,19 @@ class CB_VAE(BaseCBVAE):
             orth_loss = self.orthogonality_loss(concept_proj, unknown)
             loss_dict["orth_loss"] = orth_loss
             loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
+
+        loss_dict = self._extra_loss(
+            loss_dict,
+            x=x,
+            concepts=concepts,
+            x_pred=x_pred,
+            mu=mu,
+            logvar=logvar,
+            pred_concept=pred_concept,
+            concept_proj=concept_proj,
+            unknown=unknown,
+            **kwargs,
+        )
 
         return loss_dict
 
@@ -216,3 +240,63 @@ class SKIP_CB_VAE(CB_VAE):
             unknown=unknown,
             h=h,
         )
+
+
+class ALEA_CB_VAE(CB_VAE):
+    def __init__(self, config, _decoder=DefaultDecoderBlock):
+        super().__init__(config, _decoder=_decoder)
+
+        self.a = nn.Parameter(6 * t.ones(self.n_concepts), requires_grad=True)
+        self.cos = nn.CosineSimilarity(dim=0)
+
+    def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
+
+        w = sigmoid(self.a, self.sigmoid_temp)
+        self.w = t.clip(w, 1e-3, 1)
+
+        known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
+
+        known_concepts_proj = self.fcCBproj(known_concepts)
+        unknown = F.relu(self.fcCB2(z))
+
+        if intervene:
+            concepts_ = known_concepts * (1 - mask) + concepts * mask
+            h = torch.cat((w * concepts_, unknown), 1)
+        else:
+            if concepts == None:
+                h = torch.cat((w * known_concepts, unknown), 1)
+            else:
+                h = torch.cat((w * concepts, unknown), 1)
+
+        return dict(
+            pred_concept=known_concepts,
+            concept_proj=known_concepts_proj,
+            unknown=unknown,
+            h=h,
+        )
+
+    def concept_loss(self, pred_concept, concepts):
+        overall_concept_loss = self.n_concepts * F.binary_cross_entropy(
+            pred_concept, concepts, weight=self.w.detach(), reduction="mean"
+        )
+        return overall_concept_loss
+
+    def _extra_loss(self, loss_dict, pred_concept, **kwargs):
+
+        log_B = t.log(t.tensor(pred_concept.size(0)))
+
+        s = pred_concept / t.sum(pred_concept, dim=0)
+        e = -t.sum(t.log(s + 1e-8) * s, dim=0)
+        e = (log_B - e) / log_B
+
+        alea_loss = 1 - self.cos(self.w, e)
+
+        loss_dict["Alea_loss"] = alea_loss
+        loss_dict["Total_loss"] += alea_loss
+
+        return loss_dict
+
+
+class SKIP_ALEA_CB_VAE(ALEA_CB_VAE):
+    def __init__(self, config):
+        super().__init__(config, _decoder=SkipDecoderBlock)
