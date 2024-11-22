@@ -1,4 +1,4 @@
-type: SKIP_CB_VAE
+type: ALEA_CB_VAE
 has_cbm: True
 lr: 1e-3
 beta: 1e-5
@@ -11,5 +11,5 @@ independent_training: False
 concepts_hp: 0.005
 normalize: True
 orthogonality_hp: 0.5
-scale_concept: False
 n_decoder_layers: 2
+scale_concept: False

@@ -87,7 +87,8 @@ class SkipDecoderBlock(nn.Module):
 
         self.fc_skip = nn.Linear(self.hidden_dim[-1] + cbm_dim, self.input_dim)
 
-    def forward(self, h, pred_concept, **kwargs):
+    def forward(self, h, **kwargs):
+
         h_tail = self.decoder_layers(h)
         h_joint = t.cat((h_tail, h), dim=1)
         h_head = self.fc_skip(h_joint)

@@ -106,8 +106,9 @@ class BaseCBVAE(pl.LightningModule, ABC):
         scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
 
     def KL_loss(self, mu, logvar):
+        # TODO: the Z_log_var definition does not seem correct
         if self.use_gaussian_mixture_KL:
-            # KL loss for individual elements
+            # KL loss for individual elements (to penalize individual variances too close to zero)
             kl_loss_ind = -0.1 * (1 + logvar - logvar.exp())
             kl_loss_ind = torch.mean(torch.sum(kl_loss_ind, dim=1))
 
