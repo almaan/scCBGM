@@ -1,13 +1,4 @@
 split_col: null
 test_labels: null
-pred_schema:
-  label1:
-    1: ['horse']
-    0: ['cat','dog']
-    target: null
-  label2:
-    1: ['cat']
-    0: ['horse','dog']
-    target: null
-
+pred_schema: null
 split_pred: null
