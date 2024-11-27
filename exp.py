@@ -193,13 +193,31 @@ def main(
 
     for label, schema in pred_schema.items():
 
-        schema.get(1, None)
-        schema.get(0, None)
+        on_concepts = schema.get(1, [])
+        off_concepts = schema.get(0, [])
+
+        on_concepts_txt = ",".join(on_concepts)
+        off_concepts_txt = ",".join(off_concepts)
+
+        logger.info(
+            f"{label} : On :zap: [ {on_concepts_txt} ] | Off :zap: [ {off_concepts_txt} ]"
+        )
+
+        x_ivn = clab.evaluation.interventions.intervene(
+            x_pred, c_pred, model, on_concepts=on_concepts, off_concepts=off_concepts
+        )
+
         target = schema.get("target", None)
 
-        x_ivn = clab.evaluation.interventions.intervene(x_pred, c_pred, model)
         if target is not None:
             is_target = adata_test.obs[cfg.analysis.split_col] == target
+            is_target = None if len(is_target) < 1 else is_target
+        else:
+            is_target = helpers.find_matching_target(
+                on_concepts, off_concepts, target_concepts
+            )
+
+        if is_target is not None:
             x_target = adata_test[is_target].to_df()
 
             target_score = (
@@ -210,7 +228,8 @@ def main(
                 )
             )
 
-            wandb.log({f"ivn_{label}_vs_{target}_score": target_score})
+            for key, val in target_score.items():
+                wandb.log({f"{label}_{key}": val})
 
     wandb.finish()
 

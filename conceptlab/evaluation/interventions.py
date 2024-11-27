@@ -2,7 +2,7 @@ from conceptlab.evaluation._base import EvaluationClass
 from conceptlab.utils import helpers
 import pandas as pd
 import plotly.graph_objects as go
-from typing import Literal, List
+from typing import Literal, List, Dict, Any
 from torch.nn import Module
 import numpy as np
 from sklearn.metrics import (
@@ -379,18 +379,18 @@ def intervene(
     on_concepts = [] if on_concepts is None else on_concepts
     off_concepts = [] if off_concepts is None else off_concepts
 
-    concepts_ivn = concepts.copy()
+    concepts_ivn = concepts.values.copy()
     mask = np.zeros_like(concepts)
 
     np.array([])
 
     for concept_name in on_concepts:
-        column = concepts.get_loc(concept_name)
+        column = concepts.columns.get_loc(concept_name)
         mask[:, column] = 1
         concepts_ivn[:, column] = 1
 
     for concept_name in off_concepts:
-        column = concepts.get_loc(concept_name)
+        column = concepts.concepts.get_loc(concept_name)
         mask[:, column] = 1
         concepts_ivn[:, column] = 0
 
@@ -415,19 +415,20 @@ def evaluate_intervention_with_target(
     x_og,
     x_new,
     x_target,
-    method: Literal["pearon", "mse"] = "pearson",
-):
+    method: Literal["pearson", "mse"] = "pearson",
+) -> Dict[str, Any]:
+    from sklearn.metrics import r2_score
 
-    d_og_new = cohens_d(x_og, x_new)
-    d_og_target = cohens_d(x_og, x_target)
+    mean_og = x_og.mean(axis=0)
+    mean_new = x_new.mean(axis=0)
+    mean_target = x_target.mean(axis=0)
 
-    match method:
-        case "pearson":
-            r, p = pearsonr(d_og_new, d_og_target)
-            score = r
-        case "mse":
-            score = np.mean((d_og_new - d_og_target) ** 2)
-        case _:
-            raise ValueError("must chose a valid method")
+    new_score = r2_score(mean_target, mean_new)
+    old_score = r2_score(mean_target, mean_og)
+
+    score = dict(
+        og_r2_score=old_score,
+        ivn_r2_score=new_score,
+    )
 
     return score

@@ -22,5 +22,5 @@ plotting:
 model:
   use_gaussian_mixture_KL: False
 
-save_checkpoints: True
+save_checkpoints: False
 save_generated_data: False

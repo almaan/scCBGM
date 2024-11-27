@@ -465,7 +465,7 @@ def custom_adata_train_test_split(
     test_labels: List[str],
     pred_labels: List[str],
     split_pred: bool = False,
-    split_pred_p: float = 0.5,
+    split_pred_p: float = 0.8,
 ) -> Tuple[ad.AnnData, ad.AnnData, ad.AnnData]:
 
     labels = adata.obs[split_col].values
@@ -499,3 +499,24 @@ def _to_tensor(x: pd.DataFrame | np.ndarray) -> torch.Tensor:
         return torch.tensor(x.astype(np.float32))
     else:
         raise NotImplementedError
+
+
+def find_matching_target(on_concepts, off_concepts, target_concepts):
+
+    on_filter = (
+        target_concepts[on_concepts].eq(1).all(axis=1)
+        if on_concepts
+        else pd.Series(True, index=target_concepts.index)
+    )
+    off_filter = (
+        target_concepts[off_concepts].eq(0).all(axis=1)
+        if off_concepts
+        else pd.Series(True, index=target_concepts.index)
+    )
+
+    filtered_observations = target_concepts[on_filter & off_filter]
+
+    if len(filtered_observations) < 1:
+        return None
+
+    return filtered_observations
