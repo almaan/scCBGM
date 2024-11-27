@@ -390,7 +390,7 @@ def intervene(
         concepts_ivn[:, column] = 1
 
     for concept_name in off_concepts:
-        column = concepts.concepts.get_loc(concept_name)
+        column = concepts.columns.get_loc(concept_name)
         mask[:, column] = 1
         concepts_ivn[:, column] = 0
 
@@ -427,8 +427,8 @@ def evaluate_intervention_with_target(
     old_score = r2_score(mean_target, mean_og)
 
     score = dict(
-        og_r2_score=old_score,
-        ivn_r2_score=new_score,
+        pre_ivn_r2_score=old_score,
+        post_ivn_r2_score=new_score,
     )
 
     return score

@@ -1,7 +1,11 @@
 split_col: 'cell_stim'
-test_labels: ['CD4 T cells_stim']
+test_labels: ['CD4 T cells_stim', "B cells_ctrl"]
 pred_schema:
   CD4 T cells_ctrl:
     1: ['stim']
     target: 'CD4 T cells_stim'
+  B cells_stim:
+    0: ['stim']
+    target: "B cells_ctrl"
 split_pred: True
+split_pred_p: 200

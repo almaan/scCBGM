@@ -465,7 +465,8 @@ def custom_adata_train_test_split(
     test_labels: List[str],
     pred_labels: List[str],
     split_pred: bool = False,
-    split_pred_p: float = 0.8,
+    split_pred_p: float | int = 0.2,
+    verbose: bool = True,
 ) -> Tuple[ad.AnnData, ad.AnnData, ad.AnnData]:
 
     labels = adata.obs[split_col].values
@@ -473,21 +474,42 @@ def custom_adata_train_test_split(
     is_train = ~is_test
     is_pred = np.isin(labels, pred_labels)
 
+    lo_pred_ix = np.array([])
+    kp_pred_ix = np.array([])
+
     if split_pred:
-        pred_ix = np.where(is_pred)[0]
-        np.random.shuffle(pred_ix)
-        n_pred = len(pred_ix)
-        p_pred = int(n_pred * split_pred_p)
 
-        lo_pred_ix = pred_ix[0:p_pred]
-        kp_pred_ix = pred_ix[p_pred::]
+        for label in pred_labels:
+            is_label = labels == label
+            pred_ix = np.where(is_pred & is_label)[0]
+            np.random.shuffle(pred_ix)
+            n_pred = len(pred_ix)
 
-        is_pred[lo_pred_ix] = False
-        is_train[kp_pred_ix] = False
+            if split_pred_p > 1:
+                p_pred = min(n_pred, split_pred_p)
+            else:
+                p_pred = int(n_pred * split_pred_p)
+
+            lo_pred_ix = np.append(lo_pred_ix, pred_ix[0:p_pred])
+            kp_pred_ix = np.append(kp_pred_ix, pred_ix[p_pred::])
+
+        lo_pred_ix = lo_pred_ix.astype(int)
+        kp_pred_ix = kp_pred_ix.astype(int)
+
+        is_pred[kp_pred_ix] = False
+        is_train[lo_pred_ix] = False
 
     adata_train = adata[is_train].copy()
     adata_test = adata[is_test].copy()
     adata_pred = adata[is_pred].copy()
+
+    if verbose:
+        print("TRAIN")
+        print(adata_train.obs[split_col].value_counts())
+        print("TEST")
+        print(adata_test.obs[split_col].value_counts())
+        print("VAL")
+        print(adata_pred.obs[split_col].value_counts())
 
     return adata_train, adata_test, adata_pred
 

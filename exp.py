@@ -87,7 +87,9 @@ def main(
         test_labels=test_labels,
         pred_labels=pred_labels,
         split_pred=cfg.analysis.split_pred,
+        split_pred_p=cfg.analysis.get("split_pred_p", 0.2),
     )
+
     del adata
 
     # -- setup model -- #
@@ -193,18 +195,26 @@ def main(
 
     for label, schema in pred_schema.items():
 
+        is_label = adata_pred.obs[cfg.analysis.split_col].values == label
+        x_pred_label = x_pred[is_label]
+        c_pred_label = c_pred[is_label]
+
         on_concepts = schema.get(1, [])
         off_concepts = schema.get(0, [])
 
-        on_concepts_txt = ",".join(on_concepts)
-        off_concepts_txt = ",".join(off_concepts)
+        on_concepts_txt = ",".join(on_concepts) if len(on_concepts) > 0 else "none"
+        off_concepts_txt = ",".join(off_concepts) if len(off_concepts) > 0 else "none"
 
         logger.info(
             f"{label} : On :zap: [ {on_concepts_txt} ] | Off :zap: [ {off_concepts_txt} ]"
         )
 
         x_ivn = clab.evaluation.interventions.intervene(
-            x_pred, c_pred, model, on_concepts=on_concepts, off_concepts=off_concepts
+            x_pred_label,
+            c_pred_label,
+            model,
+            on_concepts=on_concepts,
+            off_concepts=off_concepts,
         )
 
         target = schema.get("target", None)
@@ -222,14 +232,16 @@ def main(
 
             target_score = (
                 clab.evaluation.interventions.evaluate_intervention_with_target(
-                    x_pred,
+                    x_pred_label,
                     x_ivn,
                     x_target,
                 )
             )
 
             for key, val in target_score.items():
-                wandb.log({f"{label}_{key}": val})
+                wandb.log(
+                    {f"{label}_On_{on_concepts_txt}_Off_{off_concepts_txt}_{key}": val}
+                )
 
     wandb.finish()
 
