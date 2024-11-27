@@ -2,7 +2,7 @@ import xarray as xr
 import anndata as ad
 from conceptlab.utils.constants import DimNames, DataVars
 from conceptlab.utils.types import NonNegativeFloat
-from typing import Tuple
+from typing import Tuple, List
 from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import pandas as pd
@@ -457,6 +457,39 @@ def controlled_adata_train_test_split(
         len(adata_test),
         np.concatenate((test_idx, train_idx)),
     )
+
+
+def custom_adata_train_test_split(
+    adata: ad.AnnData,
+    split_col: str,
+    test_labels: List[str],
+    pred_labels: List[str],
+    split_pred: bool = False,
+    split_pred_p: float = 0.5,
+) -> Tuple[ad.AnnData, ad.AnnData, ad.AnnData]:
+
+    labels = adata.obs[split_col].values
+    is_test = np.isin(labels, test_labels)
+    is_train = ~is_test
+    is_pred = np.isin(labels, pred_labels)
+
+    if split_pred:
+        pred_ix = np.where(is_pred)[0]
+        np.random.shuffle(pred_ix)
+        n_pred = len(pred_ix)
+        p_pred = int(n_pred * split_pred_p)
+
+        lo_pred_ix = pred_ix[0:p_pred]
+        kp_pred_ix = pred_ix[p_pred::]
+
+        is_pred[lo_pred_ix] = False
+        is_train[kp_pred_ix] = False
+
+    adata_train = adata[is_train].copy()
+    adata_test = adata[is_test].copy()
+    adata_pred = adata[is_pred].copy()
+
+    return adata_train, adata_test, adata_pred
 
 
 def _to_tensor(x: pd.DataFrame | np.ndarray) -> torch.Tensor:

@@ -1,12 +1,15 @@
-type: CB_VAE
+type: ALEA_CB_VAE
 has_cbm: True
 lr: 1e-3
 beta: 1e-5
+input_dim: 5000
 hidden_dim: 128
 latent_dim: 64
+n_concepts: 8
 min_bottleneck_size: 32
 independent_training: False
 concepts_hp: 0.005
+normalize: True
 orthogonality_hp: 0.5
 n_decoder_layers: 2
 scale_concept: False

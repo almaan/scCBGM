@@ -10,10 +10,6 @@ class EvaluationClass(ABCMeta):
         pass
 
     @abstractclassmethod
-    def score(cls, *args, **kwargs) -> Dict[str, Any]:
-        pass
-
-    @abstractclassmethod
     def save(cls, *args, **kwargs) -> None:
         pass
 

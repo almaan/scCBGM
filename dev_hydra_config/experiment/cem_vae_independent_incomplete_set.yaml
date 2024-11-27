@@ -1,0 +1,24 @@
+# @package _global_
+
+defaults:
+  - override /model: cem_vae.yaml
+
+wandb:
+  project: conceptlab2
+  experiment: cem_vae_independent_incomplete_set
+
+
+trainer:
+  max_epochs: 200
+
+
+plotting:
+  plot: True
+  plot_path: "/plotting/"
+
+
+model:
+  independent_training: True
+
+test_intervention: True
+test_integration: ['modularity']

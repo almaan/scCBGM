@@ -39,7 +39,7 @@ MODS = {
 }
 
 
-@hydra.main(config_path="./hydra_config/", config_name="config.yaml")
+@hydra.main(config_path="./dev_hydra_config/", config_name="config.yaml")
 def main(
     cfg: DictConfig,
 ) -> None:
@@ -260,6 +260,7 @@ def main(
     mse_loss = gen.mse_loss(
         x_true, x_pred, normalize_true=(not normalize), normalize_pred=(not normalize)
     )
+
     r2_score = gen.r2_score(x_true, x_pred)
 
     wandb.log({"test_MSE_loss": mse_loss})

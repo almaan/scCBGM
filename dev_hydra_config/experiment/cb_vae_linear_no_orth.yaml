@@ -1,0 +1,33 @@
+# @package _global_
+
+defaults:
+  - override /model: cb_vae.yaml
+  - override /dataset: simple.yaml
+
+
+
+wandb:
+  project: conceptlab_leaderboard2
+  experiment: cb_vae_linear_no_orthognaility
+
+
+trainer:
+  max_epochs: 200
+
+
+plotting:
+  plot: True
+  plot_path: "/plotting/"
+
+
+model:
+  independent_training: True
+  min_bottleneck_size: 128
+  n_decoder_layers: 1
+  use_orthogonality_loss: False
+
+test_intervention: True
+test_integration: ['modularity']
+save_checkpoints: False
+
+DEBUG: False

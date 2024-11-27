@@ -1,9 +1,10 @@
 defaults:
   - _self_
-  - constants: default.yaml
-  - model: cb_vae.yaml
-  - analysis: default.yaml
   - dataset: default.yaml
+  - constants: default.yaml
+  - model: vae.yaml
+  - modify: default.yaml
+  - experiment: null
 
 
 wandb:
@@ -22,5 +23,10 @@ plotting:
 model:
   use_gaussian_mixture_KL: False
 
+
+test_intervention: False
+test_integration: ['modularity']
+
 save_checkpoints: True
+DEBUG: False
 save_generated_data: False
