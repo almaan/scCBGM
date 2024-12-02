@@ -1,4 +1,4 @@
-dataset_name: "kang_dataset"
-n_obs: null
-train_test_col: 'cell_stim'
-concept_coef_key: 'concepts_coef_soft'
+path: data/scgen/curated/kang.h5ad
+concept_key: 'concepts'
+concept_coef_key: 'concepts_coef_hard'
+normalize: False

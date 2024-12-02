@@ -21,10 +21,12 @@ class CB_VAE(BaseCBVAE):
         config,
         _encoder: nn.Module = DefaultEncoderBlock,
         _decoder: nn.Module = DefaultDecoderBlock,
+        **kwargs,
     ):
 
         super().__init__(
             config,
+            **kwargs,
         )
 
         self.dropout = config.get("dropout", 0.0)

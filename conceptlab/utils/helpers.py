@@ -2,7 +2,7 @@ import xarray as xr
 import anndata as ad
 from conceptlab.utils.constants import DimNames, DataVars
 from conceptlab.utils.types import NonNegativeFloat
-from typing import Tuple
+from typing import Tuple, List
 from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import pandas as pd
@@ -459,6 +459,61 @@ def controlled_adata_train_test_split(
     )
 
 
+def custom_adata_train_test_split(
+    adata: ad.AnnData,
+    split_col: str,
+    test_labels: List[str],
+    pred_labels: List[str],
+    split_pred: bool = False,
+    split_pred_p: float | int = 0.2,
+    verbose: bool = True,
+) -> Tuple[ad.AnnData, ad.AnnData, ad.AnnData]:
+
+    labels = adata.obs[split_col].values
+    is_test = np.isin(labels, test_labels)
+    is_train = ~is_test
+    is_pred = np.isin(labels, pred_labels)
+
+    lo_pred_ix = np.array([])
+    kp_pred_ix = np.array([])
+
+    if split_pred:
+
+        for label in pred_labels:
+            is_label = labels == label
+            pred_ix = np.where(is_pred & is_label)[0]
+            np.random.shuffle(pred_ix)
+            n_pred = len(pred_ix)
+
+            if split_pred_p > 1:
+                p_pred = min(n_pred, split_pred_p)
+            else:
+                p_pred = int(n_pred * split_pred_p)
+
+            lo_pred_ix = np.append(lo_pred_ix, pred_ix[0:p_pred])
+            kp_pred_ix = np.append(kp_pred_ix, pred_ix[p_pred::])
+
+        lo_pred_ix = lo_pred_ix.astype(int)
+        kp_pred_ix = kp_pred_ix.astype(int)
+
+        is_pred[kp_pred_ix] = False
+        is_train[lo_pred_ix] = False
+
+    adata_train = adata[is_train].copy()
+    adata_test = adata[is_test].copy()
+    adata_pred = adata[is_pred].copy()
+
+    if verbose:
+        print("TRAIN")
+        print(adata_train.obs[split_col].value_counts())
+        print("TEST")
+        print(adata_test.obs[split_col].value_counts())
+        print("VAL")
+        print(adata_pred.obs[split_col].value_counts())
+
+    return adata_train, adata_test, adata_pred
+
+
 def _to_tensor(x: pd.DataFrame | np.ndarray) -> torch.Tensor:
     if isinstance(x, pd.DataFrame):
         return torch.tensor(x.values.astype(np.float32))
@@ -466,3 +521,24 @@ def _to_tensor(x: pd.DataFrame | np.ndarray) -> torch.Tensor:
         return torch.tensor(x.astype(np.float32))
     else:
         raise NotImplementedError
+
+
+def find_matching_target(on_concepts, off_concepts, target_concepts):
+
+    on_filter = (
+        target_concepts[on_concepts].eq(1).all(axis=1)
+        if on_concepts
+        else pd.Series(True, index=target_concepts.index)
+    )
+    off_filter = (
+        target_concepts[off_concepts].eq(0).all(axis=1)
+        if off_concepts
+        else pd.Series(True, index=target_concepts.index)
+    )
+
+    filtered_observations = target_concepts[on_filter & off_filter]
+
+    if len(filtered_observations) < 1:
+        return None
+
+    return filtered_observations

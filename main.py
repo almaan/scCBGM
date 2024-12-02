@@ -39,7 +39,7 @@ MODS = {
 }
 
 
-@hydra.main(config_path="./hydra_config/", config_name="config.yaml")
+@hydra.main(config_path="./dev_hydra_config/", config_name="config.yaml")
 def main(
     cfg: DictConfig,
 ) -> None:
@@ -218,7 +218,7 @@ def main(
 
     x_raw = adata_test.X.astype(np.float32).copy()
     x_true = adata_test.X.astype(np.float32).copy()
-    c_true = adata_test.obsm["concepts"].values.copy().astype(np.float32)
+    adata_test.obsm["concepts"].values.copy().astype(np.float32)
 
     if normalize:
         logger.info("Normalize data")
@@ -234,7 +234,7 @@ def main(
         obs=adata_test.obs.iloc[sub_idx],
     )
 
-    preds = model(torch.tensor(x_true), torch.tensor(c_true))
+    preds = model(torch.tensor(x_true))
 
     x_pred = preds["x_pred"].detach().numpy()
     x_concepts = adata_test.obsm[concept_key].copy()
@@ -260,6 +260,7 @@ def main(
     mse_loss = gen.mse_loss(
         x_true, x_pred, normalize_true=(not normalize), normalize_pred=(not normalize)
     )
+
     r2_score = gen.r2_score(x_true, x_pred)
 
     wandb.log({"test_MSE_loss": mse_loss})
