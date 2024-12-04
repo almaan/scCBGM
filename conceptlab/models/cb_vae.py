@@ -71,7 +71,7 @@ class CB_VAE(BaseCBVAE):
 
         if config.get("use_soft_concepts", False):
             self.concept_loss = self._soft_concept_loss
-            self.concept_transform = nn.Identity()
+            self.concept_transform = sigmoid
         else:
             self.concept_loss = self._hard_concept_loss
             self.concept_transform = sigmoid
