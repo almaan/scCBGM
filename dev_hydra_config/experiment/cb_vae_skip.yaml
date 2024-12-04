@@ -25,7 +25,7 @@ model:
 
 
 dataset:
-  n_concepts: 75
+  n_concepts: 50
 
 
 test_intervention: True

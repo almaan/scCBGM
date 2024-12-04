@@ -218,7 +218,7 @@ def main(
 
     x_raw = adata_test.X.astype(np.float32).copy()
     x_true = adata_test.X.astype(np.float32).copy()
-    adata_test.obsm["concepts"].values.copy().astype(np.float32)
+    c_true= adata_test.obsm["concepts"].values.copy().astype(np.float32)
 
     if normalize:
         logger.info("Normalize data")
@@ -234,7 +234,11 @@ def main(
         obs=adata_test.obs.iloc[sub_idx],
     )
 
-    preds = model(torch.tensor(x_true))
+
+    if cfg.model.type=="CVAE":
+        preds = model(torch.tensor(x_true),torch.tensor(c_true))
+    else:
+        preds = model(torch.tensor(x_true))
 
     x_pred = preds["x_pred"].detach().numpy()
     x_concepts = adata_test.obsm[concept_key].copy()

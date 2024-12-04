@@ -64,11 +64,20 @@ def eval_intervention(
         x_concepts_intervene.loc[:, concept_name] = 0
         indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
 
-    x_pred_withIntervention = model.intervene(
-        helpers._to_tensor(x_true),
-        helpers._to_tensor(x_concepts_intervene),
-        helpers._to_tensor(mask),
-    )["x_pred"]
+    if cfg.model.type=="CVAE":
+        print("HERE")
+        x_pred_withIntervention = model.intervene(
+            helpers._to_tensor(x_true),
+            helpers._to_tensor(original_test_concepts),
+            helpers._to_tensor(x_concepts_intervene),
+            helpers._to_tensor(mask),
+        )["x_pred"]
+    else:
+        x_pred_withIntervention = model.intervene(
+            helpers._to_tensor(x_true),
+            helpers._to_tensor(x_concepts_intervene),
+            helpers._to_tensor(mask),
+        )["x_pred"]
 
     x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
 

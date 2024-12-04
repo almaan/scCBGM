@@ -2,7 +2,7 @@
 
 defaults:
   - override /model: vae.yaml
-  - override /dataset: simple.yaml
+  - override /dataset: default.yaml
 
 
 
