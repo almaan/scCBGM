@@ -57,7 +57,6 @@ class SkipDecoderBlock(nn.Module):
         hidden_dim: int,
         dropout: float,
         n_concepts: int = 0,
-        concept_eff_dim:int = 0,
         **kwargs,
     ):
         super().__init__()
@@ -67,11 +66,10 @@ class SkipDecoderBlock(nn.Module):
             hidden_dim if isinstance(hidden_dim, (list, tuple)) else [hidden_dim]
         )
         self.n_concepts = n_concepts
-        self.concept_eff_dim=concept_eff_dim
         self.n_unknown = n_unknown
         self.dropout = dropout
 
-        cbm_dim = self.concept_eff_dim + self.n_unknown
+        cbm_dim = self.n_concepts + self.n_unknown
 
         layers = []
         layers_dim = [cbm_dim] + self.hidden_dim
@@ -88,15 +86,13 @@ class SkipDecoderBlock(nn.Module):
 
         self.decoder_layers = nn.Sequential(*layers)
 
-        self.fc_dim_reduction = nn.Linear(self.n_concepts,self.concept_eff_dim)
-        self.fc_skip = nn.Linear(self.hidden_dim[-1] + self.concept_eff_dim, self.input_dim)
+        self.fc_skip = nn.Linear(self.hidden_dim[-1] + self.n_concepts, self.input_dim)
 
 
     def forward(self, input_concept,unknown, **kwargs):
-        input_concept_bar = self.fc_dim_reduction(input_concept)
-        h= t.cat((input_concept_bar,unknown), dim=1)
+        h= t.cat((input_concept,unknown), dim=1)
         h_tail = self.decoder_layers(h)
-        h_joint = t.cat((h_tail, input_concept_bar), dim=1)
+        h_joint = t.cat((h_tail, input_concept), dim=1)
         h_head = self.fc_skip(h_joint)
 
         return dict(x_pred=h_head)

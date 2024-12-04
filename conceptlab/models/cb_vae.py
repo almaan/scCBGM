@@ -57,7 +57,6 @@ class CB_VAE(BaseCBVAE):
         self._decoder = _decoder(
             input_dim=self.input_dim,
             n_concepts=self.n_concepts,
-            concept_eff_dim=self.concept_eff_dim,
             n_unknown=n_unknown,
             hidden_dim=self.hidden_dim,
             dropout=self.dropout,
