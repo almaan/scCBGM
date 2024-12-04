@@ -17,6 +17,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.hidden_dim = config.get("hidden_dim", kwargs.get("hidden_dim"))
         self.latent_dim = config.get("latent_dim", kwargs.get("latent_dim"))
         self.n_concepts = config.get("n_concepts", kwargs.get("n_concepts"))
+        self.concept_eff_dim = config.get("concept_eff_dim", 0)
         self.learning_rate = config.lr
         self.independent_training = config.get("independent_training", False)
         self.beta = config.beta
