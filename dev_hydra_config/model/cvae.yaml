@@ -9,3 +9,4 @@ latent_dim: 64
 n_concepts: 8
 n_decoder_layers: 2
 min_bottleneck_size: 32
+scale_concept: False
