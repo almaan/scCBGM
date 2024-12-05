@@ -6,23 +6,44 @@ import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from .base import BaseCBVAE
+from .encoder import ConditionalEncoderBlock
+from .decoder import ConditionalDecoderBlock
 
 
 class CVAE(BaseCBVAE):
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        _encoder: nn.Module = ConditionalEncoderBlock,
+        _decoder: nn.Module = ConditionalDecoderBlock,
+        **kwargs,
+    ):
         super().__init__(
             config,
+            **kwargs,
         )
+
+        self.beta = config.beta
+        self.dropout = config.get("dropout", 0.0)
+
         # Encoder
-        self.fc1 = nn.Linear(self.input_dim + self.n_concepts, self.hidden_dim)
-        self.fc21 = nn.Linear(self.hidden_dim, self.latent_dim)  # Mean
-        self.fc22 = nn.Linear(self.hidden_dim, self.latent_dim)  # Log variance
+
+        self._encoder = _encoder(
+            input_dim=self.input_dim,
+            n_concepts=self.n_concepts,
+            hidden_dim=self.hidden_dim,
+            latent_dim=self.latent_dim,
+            dropout=self.dropout,
+        )
 
         # Decoder
-        self.fc3 = nn.Linear(self.latent_dim + self.n_concepts, self.hidden_dim)
-        self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
-        self.beta = config.beta
-        self.dropout = config.get("dropout", 0.3)
+        self._decoder = _decoder(
+            input_dim=self.input_dim,
+            n_concepts=self.n_concepts,
+            n_unknown=self.latent_dim,
+            hidden_dim=self.hidden_dim,
+            dropout=self.dropout,
+        )
 
         self.save_hyperparameters()
 
@@ -32,15 +53,11 @@ class CVAE(BaseCBVAE):
     ):
         return True
 
-    def encode(self, x, concepts, **kwargs):
+    def encode(self, x, **kwargs):
+        return self._encoder(x, **kwargs)
 
-        h0 = t.cat((x, concepts), dim=1)
-        h1 = F.relu(self.fc1(h0))
-        h1 = F.dropout(h1, p=self.dropout, training=True, inplace=False)
-        mu, logvar = self.fc21(h1), self.fc22(h1)
-        logvar = t.clip(logvar, -1e5, 1e5)
-
-        return dict(mu=mu, logvar=logvar)
+    def decode(self, h, **kwargs):
+        return self._decoder(h, **kwargs)
 
     def cbm(self, z, **kwargs):
         return dict(h=z)
@@ -52,15 +69,6 @@ class CVAE(BaseCBVAE):
         cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
         dec = self.decode(**cbm, concepts=_concepts)
         return dec
-
-    def decode(self, h, concepts, **kwargs):
-
-        h0 = t.cat((h, concepts), dim=1)
-
-        h3 = F.relu(self.fc3(h0))
-        h3 = F.dropout(h3, p=self.dropout, training=True, inplace=False)
-        h4 = self.fc4(h3)
-        return dict(x_pred=h4)
 
     def loss_function(self, x, concepts, x_pred, mu, logvar, **kwargs):
 
