@@ -6,4 +6,6 @@ hidden_dim: 128
 latent_dim: 64
 input_dim: 5000
 min_bottleneck_size: 32
+n_decoder_layers: 2
 n_concepts: null
+scale_concept: False
