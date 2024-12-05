@@ -45,14 +45,12 @@ class CVAE(BaseCBVAE):
     def cbm(self, z, **kwargs):
         return dict(h=z)
 
-    def intervene(self, x, orignal_concepts, intervene_concepts, mask, **kwargs):
-        _concepts = (intervene_concepts * (1 - mask) + intervene_concepts * mask)+\
-                    (orignal_concepts * (mask) + orignal_concepts * (1-mask))
+    def intervene(self, x, concepts, mask, **kwargs):
 
-        enc = self.encode(x, concepts=_concepts)
+        enc = self.encode(x, concepts=concepts)
         z = self.reparametrize(**enc)
-        cbm = self.cbm(**z, **enc, concepts=_concepts, mask=mask, intervene=True)
-        dec = self.decode(**cbm, concepts=_concepts)
+        cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
+        dec = self.decode(**cbm, concepts=concepts)
         return dec
 
     def decode(self, h, concepts, **kwargs):

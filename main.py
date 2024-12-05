@@ -364,6 +364,7 @@ def main(
         intervention_scores = dict(On=dict(), Off=dict())
         intervention_data = dict(On=dict(), Off=dict())
 
+
         logger.info("Evaluate Interventions")
 
         test_concepts = cfg.dataset.get("test_concepts")
