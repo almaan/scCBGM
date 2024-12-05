@@ -22,7 +22,7 @@ class CVAE(BaseCBVAE):
         self.fc3 = nn.Linear(self.latent_dim + self.n_concepts, self.hidden_dim)
         self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
         self.beta = config.beta
-        self.dropout = config.get("dropout", 0.3)
+        self.dropout = config.get("dropout", 0.0)
 
         self.save_hyperparameters()
 
