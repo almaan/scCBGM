@@ -55,6 +55,6 @@ def annotate_set_concepts(
     C = C / Ms / Xv
 
     if unit_interval:
-        C = np.tanh(C / temp)
+        C = 1 - np.exp(-temp * C)
 
     return C
