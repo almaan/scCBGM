@@ -56,13 +56,34 @@ class ConditionalDecoderBlock(DefaultDecoderBlock):
         return dict(x_pred=h)
 
 
+class SkipLayer(nn.Module):
+    def __init__(
+        self, input_dim, hidden_dim, layer_norm_dim, dropout_p=0.0, is_last_layer=False
+    ):
+        super(SkipLayer, self).__init__()
+        self.layer_norm = nn.LayerNorm(layer_norm_dim)
+        self.fc = nn.Linear(layer_norm_dim, hidden_dim)
+        self.dropout = nn.Dropout(p=dropout_p)
+        self.is_last_layer = is_last_layer
+
+    def forward(self, inputs):
+        h, c = inputs
+        x = t.cat((h, c), dim=-1)
+        x = self.layer_norm(x)
+        x = self.fc(x)
+        if not self.is_last_layer:
+            x = F.relu(x)
+            x = self.dropout(x)
+        return x, c
+
+
 class SkipDecoderBlock(nn.Module):
     def __init__(
         self,
         input_dim: int,
         n_unknown: int,
         hidden_dim: int,
-        dropout: float,
+        dropout: float = 0.0,
         n_concepts: int = 0,
         **kwargs,
     ):
@@ -75,32 +96,35 @@ class SkipDecoderBlock(nn.Module):
         self.n_concepts = n_concepts
         self.n_unknown = n_unknown
         self.dropout = dropout
+        cbm_dim = self.n_unknown + self.n_unknown
 
-        cbm_dim = self.n_concepts + self.n_unknown
-
-        layers = []
         layers_dim = [cbm_dim] + self.hidden_dim
+        layers = []
 
         for k in range(0, len(layers_dim) - 1):
+            layers.append(
+                SkipLayer(
+                    layers_dim[k],
+                    layers_dim[k + 1],
+                    layers_dim[k],
+                    self.dropout,
+                    is_last_layer=False,
+                )
+            )
 
-            layer_k = [
-                nn.Linear(layers_dim[k], layers_dim[k + 1]),
-                nn.ReLU(),
-                nn.Dropout(p=self.dropout),
-            ]
+        layers.append(
+            SkipLayer(
+                self.hidden_dim[-1] + self.n_concepts,
+                self.input_dim,
+                self.hidden_dim[-1] + self.n_concepts,
+                is_last_layer=True,
+            )
+        )
 
-            layers += layer_k
-
+        if len(self.hidden_dim) == 1 and (self.hidden_dim[0] == self.input_dim):
+            layers.append(nn.ReLU())
         self.decoder_layers = nn.Sequential(*layers)
 
-        self.fc_skip = nn.Linear(self.hidden_dim[-1] + self.n_concepts, self.input_dim)
-
-
-    def forward(self, input_concept,unknown, **kwargs):
-        h= t.cat((input_concept,unknown), dim=1)
-        h_tail = self.decoder_layers(h)
-        h_joint = t.cat((h_tail, input_concept), dim=1)
-        h_head = self.fc_skip(h_joint)
-
-        return dict(x_pred=h_head)
-
+    def forward(self, input_concept, unknown, **kwargs):
+        h, _ = self.decoder_layers((unknown, input_concept))
+        return dict(x_pred=h)

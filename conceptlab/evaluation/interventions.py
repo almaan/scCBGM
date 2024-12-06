@@ -62,7 +62,7 @@ def eval_intervention(
     else:
         x_concepts_intervene.loc[:, concept_name] = 0
         indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
-    
+
     # print("eval_intervention",x_concepts_intervene.shape,mask.shape,x_concepts.shape)
 
     # if cfg.model.type=="CVAE":

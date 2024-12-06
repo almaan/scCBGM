@@ -5,9 +5,8 @@ defaults:
   - override /dataset: default.yaml
 
 
-
 wandb:
-  project: cblab_dev
+  project: conceptlab_dev
   experiment: skip_cb_vae
 
 
