@@ -1,14 +1,14 @@
 # @package _global_
 
 defaults:
-  - override /model: vae.yaml
+  - override /model: skip_cb_vae.yaml
   - override /dataset: default.yaml
 
 
 
 wandb:
-  project: conceptlab_dev
-  experiment: vae_pos
+  project: cblab_dev
+  experiment: skip_cb_vae
 
 
 trainer:
@@ -23,6 +23,13 @@ plotting:
 model:
   independent_training: True
 
+
+dataset:
+  n_concepts: 8
+
+
 test_intervention: True
 test_integration: ['modularity']
 save_checkpoints: False
+
+DEBUG: False

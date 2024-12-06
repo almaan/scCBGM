@@ -233,6 +233,9 @@ class CB_VAE(BaseCBVAE):
 class SKIP_CB_VAE(CB_VAE):
     def __init__(self, config):
         super().__init__(config, _decoder=SkipDecoderBlock)
+   
+    def decode(self, input_concept, unknown, **kwargs):
+        return self._decoder(input_concept, unknown, **kwargs)
 
     def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
 
@@ -240,21 +243,27 @@ class SKIP_CB_VAE(CB_VAE):
         known_concepts_proj = self.fcCBproj(known_concepts)
         unknown = F.relu(self.fcCB2(z))
 
+
         if intervene:
             concepts_ = known_concepts * (1 - mask) + concepts * mask
             h = torch.cat((concepts_, unknown), 1)
+            input_concept= concepts_
         else:
             if concepts == None:
+                input_concept= known_concepts
                 h = torch.cat((known_concepts, unknown), 1)
             else:
+                input_concept= concepts
                 h = torch.cat((concepts, unknown), 1)
 
         return dict(
+            input_concept=input_concept,
             pred_concept=known_concepts,
             concept_proj=known_concepts_proj,
             unknown=unknown,
             h=h,
         )
+
 
 
 class ALEA_CB_VAE(CB_VAE):
