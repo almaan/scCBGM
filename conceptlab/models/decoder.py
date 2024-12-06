@@ -99,14 +99,6 @@ class SkipDecoderBlock(nn.Module):
         cbm_dim = self.n_unknown + self.n_unknown
 
         layers_dim = [cbm_dim] + self.hidden_dim
-        # for i in range(n_layers):
-        #     is_last_layer = (i == n_layers - 1)
-        #     layers.append(CustomLayer(input_dim, hidden_dim, layer_norm_dim, dropout_p, is_last_layer))
-
-        # self.layers = nn.Sequential(*layers)
-        print(layers_dim)
-        print(cbm_dim)
-
         layers = []
 
         for k in range(0, len(layers_dim) - 1):
