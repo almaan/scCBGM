@@ -87,7 +87,6 @@ class GeneExpressionDataModule(pl.LightningDataModule):
             self.concepts = None
 
         if normalize:
-            print("we are here")
             X = self.data.values
             X = X / np.sum(X, axis=1, keepdims=True) * 1e4
             X = np.log1p(X)

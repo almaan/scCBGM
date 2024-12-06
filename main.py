@@ -212,7 +212,7 @@ def main(
 
     x_raw = adata_test.X.astype(np.float32).copy()
     x_true = adata_test.X.astype(np.float32).copy()
-    c_true= adata_test.obsm["concepts"].values.copy().astype(np.float32)
+    c_true = adata_test.obsm["concepts"].values.copy().astype(np.float32)
 
     if normalize:
         logger.info("Normalize data")
@@ -228,9 +228,8 @@ def main(
         obs=adata_test.obs.iloc[sub_idx],
     )
 
-
-    if cfg.model.type=="CVAE":
-        preds = model(torch.tensor(x_true),torch.tensor(c_true))
+    if cfg.model.type == "CVAE":
+        preds = model(torch.tensor(x_true), torch.tensor(c_true))
     else:
         preds = model(torch.tensor(x_true))
 
@@ -354,7 +353,6 @@ def main(
 
         intervention_scores = dict(On=dict(), Off=dict())
         intervention_data = dict(On=dict(), Off=dict())
-
 
         logger.info("Evaluate Interventions")
 

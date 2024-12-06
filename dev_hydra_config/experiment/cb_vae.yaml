@@ -2,12 +2,11 @@
 
 defaults:
   - override /model: cb_vae.yaml
-  - override /dataset: simple.yaml
-
+  - override /dataset: default.yaml
 
 
 wandb:
-  project: conceptlab_leaderboard2
+  project: conceptlab_dev
   experiment: cb_vae
 
 
