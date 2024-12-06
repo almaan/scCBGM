@@ -48,6 +48,13 @@ class DefaultDecoderBlock(nn.Module):
         return dict(x_pred=h)
 
 
+class ConditionalDecoderBlock(DefaultDecoderBlock):
+    def forward(self, h, concepts=None, **kwargs):
+        h0 = t.cat((h, concepts), dim=1)
+        h = self.decoder_layers(h0)
+
+        return dict(x_pred=h)
+
 
 class SkipDecoderBlock(nn.Module):
     def __init__(

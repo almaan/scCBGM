@@ -10,3 +10,4 @@ concepts_hp: 0.005
 orthogonality_hp: 0.5
 n_decoder_layers: 2
 scale_concept: False
+use_soft_concepts: False

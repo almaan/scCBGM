@@ -69,6 +69,13 @@ class CB_VAE(BaseCBVAE):
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
         self.use_concept_loss = config.get("use_concept_loss", True)
 
+        if config.get("use_soft_concepts", False):
+            self.concept_loss = self._soft_concept_loss
+            self.concept_transform = sigmoid
+        else:
+            self.concept_loss = self._hard_concept_loss
+            self.concept_transform = sigmoid
+
         self.save_hyperparameters()
 
     @property
@@ -140,7 +147,13 @@ class CB_VAE(BaseCBVAE):
     def rec_loss(self, x_pred, x):
         return F.mse_loss(x_pred, x, reduction="mean")
 
-    def concept_loss(self, pred_concept, concepts):
+    def _soft_concept_loss(self, pred_concept, concepts, **kwargs):
+        overall_concept_loss = self.n_concepts * F.mse_loss(
+            pred_concept, concepts, reduction="mean"
+        )
+        return overall_concept_loss
+
+    def _hard_concept_loss(self, pred_concept, concepts, **kwargs):
         overall_concept_loss = self.n_concepts * F.binary_cross_entropy(
             pred_concept, concepts, reduction="mean"
         )

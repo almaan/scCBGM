@@ -3,9 +3,9 @@ has_condition: True
 has_cbm: False
 lr: 5e-4
 beta: 1e-5
-input_dim: 5000
 hidden_dim: 128
 latent_dim: 64
+input_dim: 5000
 n_concepts: 8
 n_decoder_layers: 2
 min_bottleneck_size: 32

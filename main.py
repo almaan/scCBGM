@@ -36,6 +36,8 @@ MODS = {
     "add": modify.add_concepts,
     "noise": modify.add_noise,
     "duplicate": modify.add_duplicate,
+    "identity": modify.identity,
+    "default": modify.identity,
 }
 
 
@@ -98,24 +100,16 @@ def main(
                 pickle.dump(dataset, file)
 
         mod = cfg.modify.mod
+        mod_fun = MODS[mod]
+        mod_prms = cfg.modify.params
+        concepts, indicator = mod_fun(dataset=dataset, **mod_prms)
+        adata = helpers.dataset_to_anndata(
+            dataset,
+            concepts=concepts,
+            concept_key=concept_key,
+        )
 
-        if mod is not None:
-            mod_fun = MODS[mod]
-            mod_prms = cfg.modify.params
-            concepts, indicator = mod_fun(dataset=dataset, **mod_prms)
-            adata = helpers.dataset_to_anndata(
-                dataset,
-                concepts=concepts,
-                concept_key=concept_key,
-            )
-
-            adata.uns["concept_indicator"] = indicator
-
-        else:
-            adata = helpers.dataset_to_anndata(dataset, concept_key=concept_key)
-            adata.uns["concept_indicator"] = pd.Series(
-                np.array([C.Mods.none] * adata.obsm[concept_key].shape[1], dtype="<U64")
-            )
+        adata.uns["concept_indicator"] = indicator
 
     else:
         adata = ad.read_h5ad(adata_path)
@@ -242,9 +236,6 @@ def main(
 
     x_pred = preds["x_pred"].detach().numpy()
     x_concepts = adata_test.obsm[concept_key].copy()
-    # if isinstance(x_concepts, pd.DataFrame):
-    #     x_concepts = x_concepts.values
-    # x_concepts = x_concepts.astype(np.float32).copy()
 
     if cfg.model.has_cbm:
         pred_concept = preds["pred_concept"].detach().numpy()
@@ -303,7 +294,7 @@ def main(
         ad_pred.obsm[concept_key] = x_concepts.iloc[sub_idx].copy()
         ad_true.obsm[concept_key] = x_concepts.iloc[sub_idx].copy()
 
-    merge_dict["vae_cbm"] = ad_pred
+    merge_dict[f"{cfg.model.type}"] = ad_pred
     merge_dict["true"] = ad_true
     ad_merge = ad.concat(
         merge_dict,
@@ -379,7 +370,6 @@ def main(
             )
         else:
             concept_ivn_name = concept_names[0:n_concepts_to_eval]
-            list(range(0, n_concepts_to_eval))
 
         for concept_name in concept_ivn_name:
             concept_vars = dict()

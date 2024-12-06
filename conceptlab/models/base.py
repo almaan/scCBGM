@@ -101,10 +101,6 @@ class BaseCBVAE(pl.LightningModule, ABC):
     def validation_step(self, batch, batch_idx):
         return self._step(batch, batch_idx, "val")
 
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        # Define the CosineAnnealingLR scheduler
-        scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
-
     def KL_loss(self, mu, logvar):
         # TODO: the Z_log_var definition does not seem correct
         if self.use_gaussian_mixture_KL:
