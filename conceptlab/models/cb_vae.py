@@ -50,15 +50,11 @@ class CB_VAE(BaseCBVAE):
             n_unknown = 32
 
         self.fcCB1 = nn.Linear(self.latent_dim, self.n_concepts)
-
-        self.fcCBproj = nn.Linear(self.n_concepts, n_unknown)
-        self.fcCBproj = param.orthogonal(self.fcCBproj, name="weight")
-
         self.fcCB2 = nn.Linear(self.latent_dim, n_unknown)
 
         self._decoder = _decoder(
             input_dim=self.input_dim,
-            n_concepts=n_unknown,
+            n_concepts=self.n_concepts,
             n_unknown=n_unknown,
             hidden_dim=self.hidden_dim,
             dropout=self.dropout,
@@ -101,40 +97,19 @@ class CB_VAE(BaseCBVAE):
     def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
 
         known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
-        known_concepts_proj = self.fcCBproj(known_concepts)
         unknown = F.relu(self.fcCB2(z))
-
-        if self.scale_concept:
-            known_concepts_bar = (
-                known_concepts * self.learned_concept_scale_gamma
-                + self.learned_concept_scale_beta
-            )
-            if concepts is not None:
-
-                concepts_bar = (
-                    concepts * self.learned_concept_scale_gamma
-                    + self.learned_concept_scale_beta
-                )
-
-        else:
-
-            known_concepts_bar = known_concepts
-            concepts_bar = concepts
 
         if intervene:
             concepts_ = known_concepts * (1 - mask) + concepts * mask
-            concepts_ = self.fcCBproj(concepts_)
             h = torch.cat((concepts_, unknown), 1)
         else:
             if concepts == None:
-                known_concepts_bar = known_concepts_proj
-                h = torch.cat((known_concepts_bar, unknown), 1)
+                h = torch.cat((known_concepts, unknown), 1)
             else:
-                concepts_bar = self.fcCBproj(concepts_bar)
-                h = torch.cat((concepts_bar, unknown), 1)
+                h = torch.cat((concepts, unknown), 1)
+
         return dict(
             pred_concept=known_concepts,
-            concept_proj=known_concepts_proj,
             unknown=unknown,
             h=h,
         )
@@ -146,10 +121,25 @@ class CB_VAE(BaseCBVAE):
         dec = self.decode(**cbm)
         return dec
 
-    def orthogonality_loss(self, concept_emb, unk_emb):
-        cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
-        output = torch.abs(cos(concept_emb, unk_emb))
-        return output.mean()
+    def orthogonality_loss(self, c, u):
+
+        batch_size = u.size(0)
+
+        # Compute means along the batch dimension
+        u_mean = u.mean(dim=0, keepdim=True)
+        c_mean = c.mean(dim=0, keepdim=True)
+
+        # Center the variables in-place to save memory
+        u_centered = u - u_mean
+        c_centered = c - c_mean
+
+        # Compute the cross-covariance matrix using batch dimension
+        cross_covariance = torch.matmul(u_centered.T, c_centered) / (batch_size - 1)
+
+        # Frobenius norm squared of the cross-covariance matrix
+        loss = (cross_covariance**2).sum()
+
+        return loss
 
     def rec_loss(self, x_pred, x):
         return F.mse_loss(x_pred, x, reduction="mean")
@@ -174,7 +164,7 @@ class CB_VAE(BaseCBVAE):
         mu,
         logvar,
         pred_concept,
-        concept_proj,
+        # concept_proj,
         unknown,
         **kwargs,
     ):
@@ -196,7 +186,7 @@ class CB_VAE(BaseCBVAE):
             loss_dict["Total_loss"] += self.concepts_hp * overall_concept_loss
 
         if self.use_orthogonality_loss:
-            orth_loss = self.orthogonality_loss(concept_proj, unknown)
+            orth_loss = self.orthogonality_loss(pred_concept_clipped, unknown)
             loss_dict["orth_loss"] = orth_loss
             loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
 
@@ -208,7 +198,7 @@ class CB_VAE(BaseCBVAE):
             mu=mu,
             logvar=logvar,
             pred_concept=pred_concept,
-            concept_proj=concept_proj,
+            # concept_proj=concept_proj,
             unknown=unknown,
             **kwargs,
         )

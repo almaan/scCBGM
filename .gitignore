@@ -13,3 +13,4 @@ ckpts/
 wandb/
 .clean.sh
 local.*
+tmp/

@@ -417,8 +417,8 @@ def main(
 
         joint_score = clab.evaluation.interventions.score_intervention(
             metrics=[
-                "auroc",
-                "auprc",
+                # "auroc",
+                # "auprc",
                 "acc",
             ],
             scores=intervention_scores,
