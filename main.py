@@ -251,7 +251,7 @@ def main(
                 columns=x_concepts.columns,
             )
 
-            preds = model(torch.tensor(x_true), torch.tensor(c_mean))
+            preds = model(helpers._to_tensor(x_true), helpers._to_tensor(c_mean))
 
     else:
         c_mean = None
