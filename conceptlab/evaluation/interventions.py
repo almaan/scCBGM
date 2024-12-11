@@ -56,16 +56,25 @@ def eval_intervention(
 
     if (not cfg.model.type == "CVAE") or (cfg.given_gt):
         x_concepts_intervene = x_concepts.copy()
+
+        if intervention_type == "On":
+            x_concepts_intervene.loc[:, concept_name] = 1
+            indices = np.where(x_concepts.loc[:, concept_name] == 0)[0]
+
+        else:
+            x_concepts_intervene.loc[:, concept_name] = 0
+            indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
+
     else:
         x_concepts_intervene = x_mean_concepts.copy()
 
-    if intervention_type == "On":
-        x_concepts_intervene.loc[:, concept_name] = 1
-        indices = np.where(x_concepts.loc[:, concept_name] == 0)[0]
+        if intervention_type == "On":
+            x_concepts_intervene.loc[:, concept_name] = 1
+            indices = np.arange(x_concepts_intervene.shape[0])
 
-    else:
-        x_concepts_intervene.loc[:, concept_name] = 0
-        indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
+        else:
+            x_concepts_intervene.loc[:, concept_name] = 0
+            indices = np.arange(x_concepts_intervene.shape[0])
 
     if cfg.model.type == "CVAE":
 
