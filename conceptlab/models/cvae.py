@@ -62,12 +62,13 @@ class CVAE(BaseCBVAE):
     def cbm(self, z, **kwargs):
         return dict(h=z)
 
-    def intervene(self, x, concepts, mask, **kwargs):
+    def intervene(self, x, concepts, new_concepts, mask, **kwargs):
 
         enc = self.encode(x, concepts=concepts)
         z = self.reparametrize(**enc)
         cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
-        dec = self.decode(**cbm, concepts=concepts)
+        i_concepts = (1 - mask) * concepts + mask * new_concepts
+        dec = self.decode(**cbm, concepts=i_concepts)
         return dec
 
     def loss_function(self, x, concepts, x_pred, mu, logvar, **kwargs):
