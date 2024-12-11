@@ -227,6 +227,7 @@ def main(
         x_true[sub_idx],
         obs=adata_test.obs.iloc[sub_idx],
     )
+    x_concepts = adata_test.obsm[concept_key].copy()
 
     if cfg.model.type == "CVAE":
         if cfg.given_gt:
@@ -244,6 +245,11 @@ def main(
             # c_mean = np.tile(c_mean, (x, 1))
             print("random")
             c_mean = np.random.choice([0, 1], size=c_true.shape)
+            c_mean = pd.DataFrame(
+                c_mean,
+                index=x_concepts.index,
+                columns=x_concepts.columns,
+            )
 
             preds = model(torch.tensor(x_true), torch.tensor(c_mean))
 
@@ -252,7 +258,6 @@ def main(
         preds = model(torch.tensor(x_true))
 
     x_pred = preds["x_pred"].detach().numpy()
-    x_concepts = adata_test.obsm[concept_key].copy()
 
     if cfg.model.has_cbm:
         pred_concept = preds["pred_concept"].detach().numpy()

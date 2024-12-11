@@ -54,7 +54,10 @@ def eval_intervention(
     mask = np.zeros_like(x_concepts.values)
     mask[:, x_concepts.columns.get_loc(concept_name)] = 1
 
-    x_concepts_intervene = x_concepts.copy()
+    if (not cfg.model.type == "CVAE") or (cfg.given_gt):
+        x_concepts_intervene = x_concepts.copy()
+    else:
+        x_concepts_intervene = x_mean_concepts.copy()
 
     if intervention_type == "On":
         x_concepts_intervene.loc[:, concept_name] = 1
@@ -66,7 +69,6 @@ def eval_intervention(
 
     if cfg.model.type == "CVAE":
 
-
         if cfg.given_gt:
 
             x_pred_withIntervention = model.intervene(
@@ -76,9 +78,10 @@ def eval_intervention(
                 helpers._to_tensor(mask),
             )["x_pred"]
         else:
+
             x_pred_withIntervention = model.intervene(
                 helpers._to_tensor(x_true),
-                helpers._to_tensor(x_mean_concepts) ,
+                helpers._to_tensor(x_mean_concepts),
                 helpers._to_tensor(x_concepts_intervene),
                 helpers._to_tensor(mask),
             )["x_pred"]
