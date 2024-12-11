@@ -54,9 +54,10 @@ def eval_intervention(
     mask = np.zeros_like(x_concepts.values)
     mask[:, x_concepts.columns.get_loc(concept_name)] = 1
 
-    if (not cfg.model.type == "CVAE") or (cfg.given_gt):
+    if (not cfg.model.type == "CVAE") or (not cfg.given_gt):
         x_concepts_intervene = x_concepts.copy()
     else:
+        print("tadaaa")
         x_concepts_intervene = x_mean_concepts.copy()
 
     if intervention_type == "On":

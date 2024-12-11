@@ -235,7 +235,7 @@ def main(
             c_mean = None
         else:
             # c_mean = np.mean(
-            #     adata.obsm["concepts"].values.copy().astype(np.float32),
+            #     adata_train.obsm["concepts"].values.copy().astype(np.float32),
             #     axis=0,
             #     keepdims=True,
             # )
