@@ -49,6 +49,7 @@ def eval_intervention(
     concept_vars,
     model,
     cfg,
+    x_mean_concepts=None,
 ):
     mask = np.zeros_like(x_concepts.values)
     mask[:, x_concepts.columns.get_loc(concept_name)] = 1
@@ -63,21 +64,23 @@ def eval_intervention(
         x_concepts_intervene.loc[:, concept_name] = 0
         indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
 
-    # print("eval_intervention",x_concepts_intervene.shape,mask.shape,x_concepts.shape)
+    if cfg.model.type == "CVAE" and not cfg.given_gt:
 
-    # if cfg.model.type=="CVAE":
-    #     x_pred_withIntervention = model.intervene(
-    #         helpers._to_tensor(x_true),
-    #         helpers._to_tensor(original_test_concepts),
-    #         helpers._to_tensor(x_concepts_intervene),
-    #         helpers._to_tensor(mask),
-    #     )["x_pred"]
-    # else:
-    x_pred_withIntervention = model.intervene(
-        helpers._to_tensor(x_true),
-        helpers._to_tensor(x_concepts_intervene),
-        helpers._to_tensor(mask),
-    )["x_pred"]
+        input_concept = x_mean_concepts * (1 - mask) + x_concepts_intervene * mask
+
+        x_pred_withIntervention = model.intervene(
+            helpers._to_tensor(x_true),
+            helpers._to_tensor(input_concept),
+            helpers._to_tensor(mask),
+        )["x_pred"]
+
+    else:
+
+        x_pred_withIntervention = model.intervene(
+            helpers._to_tensor(x_true),
+            helpers._to_tensor(x_concepts_intervene),
+            helpers._to_tensor(mask),
+        )["x_pred"]
 
     x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
 

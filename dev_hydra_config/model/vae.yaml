@@ -1,11 +1,10 @@
 type: VAE
 has_cbm: False
-lr: 5e-4
-beta: 1e-5
-hidden_dim: 128
+lr: 0.0005
+beta: 1.0e-05
+hidden_dim: 256
 latent_dim: 64
 input_dim: 5000
-min_bottleneck_size: 32
 n_decoder_layers: 2
 n_concepts: null
 scale_concept: False

@@ -1,0 +1,33 @@
+program: main.py
+method: grid
+metric:
+  goal: minimize
+  name: test_MSE_loss
+parameters:
+  constants.seed:
+    values: [13,42,1337,69]
+  given_gt:
+    values: [False, True]
+  model:
+    value: cvae
+  modify:
+    values: [default, add, noise, drop, duplicate]
+  dataset.n_concepts:
+    values: [8,25,50,75]
+  dataset.use_concept_dependency:
+    value: False
+  model.n_decoder_layers:
+    value: 2
+  model.scale_concept:
+    value: False
+  model.use_gaussian_mixture_KL:
+    value: False
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.entity=rb-aiml
+  - wandb.project=conceptlab
+  - test_intervention=True
+  - plotting.plot=False

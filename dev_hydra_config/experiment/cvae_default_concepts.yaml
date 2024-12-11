@@ -22,8 +22,7 @@ plotting:
 model:
   independent_training: True
 
-
-given_gt: True
+given_gt: False
 test_intervention: True
 test_integration: ['modularity']
 save_checkpoints: False
