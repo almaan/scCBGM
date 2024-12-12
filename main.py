@@ -251,6 +251,8 @@ def main(
                 columns=x_concepts.columns,
             )
 
+            print(c_mean)
+
             preds = model(helpers._to_tensor(x_true), helpers._to_tensor(c_mean))
 
     else:

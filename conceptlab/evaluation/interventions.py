@@ -51,6 +51,7 @@ def eval_intervention(
     cfg,
     x_mean_concepts=None,
 ):
+
     mask = np.zeros_like(x_concepts.values)
     mask[:, x_concepts.columns.get_loc(concept_name)] = 1
 
@@ -66,6 +67,7 @@ def eval_intervention(
             indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
 
     else:
+
         x_concepts_intervene = x_mean_concepts.copy()
 
         if intervention_type == "On":

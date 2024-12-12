@@ -109,4 +109,4 @@ class EvaluationClass(ABCMeta):
             if len(results) > 0:
                 results = {k: v for k, v in results.items() if len(v) > 0}
 
-            return results
+        return results
