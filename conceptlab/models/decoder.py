@@ -122,7 +122,7 @@ class SkipDecoderBlock(nn.Module):
                 in_dim=self.hidden_dim[k-1]
 
             layers.append(
-                SkipLayer(å
+                SkipLayer(
                     layers_dim[k],
                     layers_dim[k + 1],
                     self.dropout,
