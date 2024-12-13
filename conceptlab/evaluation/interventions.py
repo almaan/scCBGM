@@ -154,6 +154,7 @@ def eval_intervention(
         concepts_new=subset_concepts,
         concept_coefs=coefs,
         use_neutral=False,
+        concept_names=concept_name,
     )
 
     return results, scores, genetrated_data_after_intervention

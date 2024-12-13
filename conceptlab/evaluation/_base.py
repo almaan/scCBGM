@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractclassmethod
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 import pandas as pd
 from typing import Dict, Any, Tuple
 import numpy as np
@@ -27,9 +27,18 @@ class EvaluationClass(ABCMeta):
         concept_coefs: pd.DataFrame,
         use_neutral: bool = True,
         invert_neg: bool = False,
+        concept_names: List[str] | None = None,
     ) -> Tuple[Dict[str, Any]]:
 
-        concept_names = concepts_old.columns
+        if concept_names is None:
+            concept_names = concepts_old.columns
+        else:
+            concept_names = (
+                [concept_names]
+                if not isinstance(concept_names, (pd.Index, list, tuple, np.ndarray))
+                else concept_names
+            )
+
         concept_uni_vars = (concept_coefs != 0).sum(axis=0)
         concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
 
