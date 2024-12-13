@@ -514,13 +514,17 @@ def custom_adata_train_test_split(
     return adata_train, adata_test, adata_pred
 
 
-def _to_tensor(x: pd.DataFrame | np.ndarray) -> torch.Tensor:
+def _to_tensor(x: pd.DataFrame | np.ndarray, device: str = "cpu") -> torch.Tensor:
     if isinstance(x, pd.DataFrame):
-        return torch.tensor(x.values.astype(np.float32))
+        return torch.tensor(x.values.astype(np.float32)).to(device)
     elif isinstance(x, np.ndarray):
-        return torch.tensor(x.astype(np.float32))
+        return torch.tensor(x.astype(np.float32)).to(device)
     else:
         raise NotImplementedError
+
+
+def _to_tensor_gpu(x: pd.DataFrame | np.ndarray) -> torch.Tensor:
+    return _to_tensor(x, "cuda:0")
 
 
 def find_matching_target(on_concepts, off_concepts, target_concepts):
