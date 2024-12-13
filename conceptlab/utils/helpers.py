@@ -323,7 +323,6 @@ def stratified_adata_train_test_split(
         raise ValueError(f"{concept_key} not found in `adata.obsm`.")
     if not (0 < p_test < 1):
         raise ValueError(f"p_test = {p_test}, this is not in the interval (0,1)")
-
     # Create a unique identifier for each combination of concepts
     concept_matrix = np.asarray(adata.obsm[concept_key]).astype(int)
     concept_labels = np.array(["".join(map(str, row)) for row in concept_matrix])
@@ -348,7 +347,6 @@ def stratified_adata_train_test_split(
     # Add split labels for tracking
     adata_test.obs["split_label"] = concept_labels[test_idx]
     adata_train.obs["split_label"] = concept_labels[train_idx]
-
     return (
         adata_test,
         adata_train,
