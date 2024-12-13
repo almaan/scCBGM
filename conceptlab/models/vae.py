@@ -28,7 +28,6 @@ class VAE(BaseCBVAE):
             input_dim=self.input_dim,
             hidden_dim=self.hidden_dim,
             latent_dim=self.latent_dim,
-            n_layers=self.n_layers,
             dropout=self.dropout,
         )
 
@@ -36,7 +35,6 @@ class VAE(BaseCBVAE):
             input_dim=self.input_dim,
             n_unknown=self.latent_dim,
             hidden_dim=self.hidden_dim,
-            n_layers=self.n_layers,
             dropout=self.dropout,
         )
 
