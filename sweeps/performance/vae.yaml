@@ -30,3 +30,4 @@ command:
   - wandb.project=conceptlab
   - test_intervention=True
   - plotting.plot=False
+  - save_checkpoints=False

@@ -33,3 +33,4 @@ command:
   - wandb.entity=rb-aiml
   - wandb.project=conceptlab
   - test_intervention=True
+  - save_checkpoints=False
