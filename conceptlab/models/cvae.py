@@ -33,6 +33,7 @@ class CVAE(BaseCBVAE):
             n_concepts=self.n_concepts,
             hidden_dim=self.hidden_dim,
             latent_dim=self.latent_dim,
+            n_layers=self.n_layers,
             dropout=self.dropout,
         )
 
@@ -42,6 +43,7 @@ class CVAE(BaseCBVAE):
             n_concepts=self.n_concepts,
             n_unknown=self.latent_dim,
             hidden_dim=self.hidden_dim,
+            n_layers=self.n_layers,
             dropout=self.dropout,
         )
 

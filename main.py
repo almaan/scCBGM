@@ -243,14 +243,12 @@ def main(
             x = c_true.shape[0]
             # Repeat the (1, 8) tensor to match the shape of (x, 8)
             c_mean = np.tile(c_mean, (x, 1))
-            # print("random")
             c_mean = pd.DataFrame(
                 c_mean,
                 index=x_concepts.index,
                 columns=x_concepts.columns,
             )
 
-            print(c_mean)
 
             preds = model(helpers._to_tensor(x_true), helpers._to_tensor(c_mean))
 

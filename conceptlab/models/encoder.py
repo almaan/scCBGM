@@ -10,6 +10,7 @@ class DefaultEncoderBlock(nn.Module):
         input_dim: int,
         hidden_dim: int,
         latent_dim: int,
+        n_layers: int,
         dropout: float,
         n_concepts: int = 0,
         **kwargs,
@@ -18,27 +19,31 @@ class DefaultEncoderBlock(nn.Module):
         super().__init__()
 
         self.input_dim = input_dim
+        self.n_layers=n_layers
+
         self.hidden_dim = (
-            hidden_dim if isinstance(hidden_dim, (list, tuple)) else [hidden_dim]
+            hidden_dim if isinstance(hidden_dim, (list, tuple)) else [hidden_dim for i in range (self.n_layers)]
         )
         self.n_concepts = n_concepts
         self.latent_dim = latent_dim
         self.dropout = dropout
 
         layers = []
-        layers_dim = [self.input_dim] + self.hidden_dim
 
-        for k in range(0, len(layers_dim) - 1):
+        for k in range(0, self.n_layers - 1):
+            if k ==0:
+                in_dim=self.input_dim
+            else:
+                in_dim=self.hidden_dim[k-1]
 
             layer_k = [
-                nn.Linear(layers_dim[k], layers_dim[k + 1]),
+                nn.Linear(in_dim, self.hidden_dim[k]),
                 nn.ReLU(),
                 nn.Dropout(p=self.dropout),
             ]
             layers += layer_k
 
         self.encoder_layers = nn.Sequential(*layers)
-
         self.fc_mu = nn.Linear(self.hidden_dim[-1], self.latent_dim)
         self.fc_var = nn.Linear(self.hidden_dim[-1], self.latent_dim)
 
@@ -56,6 +61,7 @@ class ConditionalEncoderBlock(nn.Module):
         input_dim: int,
         hidden_dim: int,
         latent_dim: int,
+        n_layers: int,
         dropout: float,
         n_concepts: int = 0,
         **kwargs,
@@ -64,24 +70,31 @@ class ConditionalEncoderBlock(nn.Module):
         super().__init__()
 
         self.input_dim = input_dim + n_concepts
+        self.n_layers=n_layers
+
         self.hidden_dim = (
-            hidden_dim if isinstance(hidden_dim, (list, tuple)) else [hidden_dim]
+            hidden_dim if isinstance(hidden_dim, (list, tuple)) else [hidden_dim for i in range (self.n_layers)]
         )
         self.n_concepts = n_concepts
         self.latent_dim = latent_dim
         self.dropout = dropout
+        
 
         layers = []
-        layers_dim = [self.input_dim] + self.hidden_dim
 
-        for k in range(0, len(layers_dim) - 1):
+        for k in range(0, self.n_layers - 1):
+            if k ==0:
+                in_dim=self.input_dim
+            else:
+                in_dim=self.hidden_dim[k-1]
 
             layer_k = [
-                nn.Linear(layers_dim[k], layers_dim[k + 1]),
+                nn.Linear(in_dim, self.hidden_dim[k]),
                 nn.ReLU(),
                 nn.Dropout(p=self.dropout),
             ]
             layers += layer_k
+            
 
         self.encoder_layers = nn.Sequential(*layers)
 
