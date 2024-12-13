@@ -327,16 +327,13 @@ def stratified_adata_train_test_split(
     concept_matrix = np.asarray(adata.obsm[concept_key]).astype(int)
     concept_labels = np.array(["".join(map(str, row)) for row in concept_matrix])
 
-
     uni_concept_labels, cnt_concept_labels = np.unique(
         concept_labels, return_counts=True
     )
 
     drop_labels = np.isin(concept_labels, uni_concept_labels[cnt_concept_labels < 2])
 
-    concept_labels[drop_labels] = uni_concept_labels[
-        np.argmax(cnt_concept_labels)
-    ]
+    concept_labels[drop_labels] = uni_concept_labels[np.argmax(cnt_concept_labels)]
     # Perform a stratified split based on the unique concept labels
     indices = np.arange(adata.n_obs)
     train_idx, test_idx = train_test_split(

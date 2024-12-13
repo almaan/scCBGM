@@ -57,13 +57,7 @@ class ConditionalDecoderBlock(DefaultDecoderBlock):
 
 
 class SkipLayer(nn.Module):
-    def __init__(
-        self,
-        input_dim, 
-        hidden_dim,
-        dropout_p=0.0,
-        is_last_layer=False
-    ):
+    def __init__(self, input_dim, hidden_dim, dropout_p=0.0, is_last_layer=False):
         super(SkipLayer, self).__init__()
         self.fc = nn.Linear(input_dim, hidden_dim)
         self.dropout = nn.Dropout(p=dropout_p)
@@ -115,7 +109,7 @@ class SkipDecoderBlock(nn.Module):
 
         layers.append(
             SkipLayer(
-                self.hidden_dim[-1]+self.n_concepts,
+                self.hidden_dim[-1] + self.n_concepts,
                 self.input_dim,
                 is_last_layer=True,
             )

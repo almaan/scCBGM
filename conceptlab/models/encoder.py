@@ -69,7 +69,6 @@ class ConditionalEncoderBlock(nn.Module):
         self.n_concepts = n_concepts
         self.latent_dim = latent_dim
         self.dropout = dropout
-        
 
         layers = []
         layers_dim = [self.input_dim] + self.hidden_dim
@@ -82,7 +81,6 @@ class ConditionalEncoderBlock(nn.Module):
                 nn.Dropout(p=self.dropout),
             ]
             layers += layer_k
-            
 
         self.encoder_layers = nn.Sequential(*layers)
 
