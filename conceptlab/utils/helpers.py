@@ -330,9 +330,10 @@ def stratified_adata_train_test_split(
     uni_concept_labels, cnt_concept_labels = np.unique(
         concept_labels, return_counts=True
     )
-    concept_labels[cnt_concept_labels < 2] = uni_concept_labels[
-        np.argmax(cnt_concept_labels)
-    ]
+
+    drop_labels = np.isin(concept_labels, uni_concept_labels[cnt_concept_labels < 2])
+
+    concept_labels[drop_labels] = uni_concept_labels[np.argmax(cnt_concept_labels)]
 
     # Perform a stratified split based on the unique concept labels
     indices = np.arange(adata.n_obs)
