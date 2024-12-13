@@ -33,12 +33,6 @@ class EvaluationClass(ABCMeta):
         concept_uni_vars = (concept_coefs != 0).sum(axis=0)
         concept_neutral_vars = concept_coefs.columns[concept_uni_vars.values == 0]
 
-        direction_to_true = dict(
-            neu=0,
-            pos=1,
-            neg=1,
-        )
-
         results = dict()
         curves = dict()
 

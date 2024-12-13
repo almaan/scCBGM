@@ -1,13 +1,15 @@
 program: main.py
 method: grid
 metric:
-  goal: minimize
-  name: test_MSE_loss
+  goal: maximize
+  name: test_avg_concept_acc
 parameters:
   constants.seed:
     values: [13,42,1337,69]
   model:
-    value: vae
+    value: cb_vae
+  model.independent_training:
+    value: True
   modify:
     values: [default, add, noise, drop, duplicate]
   dataset.n_concepts:
@@ -20,6 +22,9 @@ parameters:
     value: False
   model.use_gaussian_mixture_KL:
     value: False
+  modify.params.n_mod:
+    values: [0.1, 0.5, 0.9]
+
 command:
   - ${env}
   - python
@@ -28,4 +33,3 @@ command:
   - wandb.entity=rb-aiml
   - wandb.project=conceptlab
   - test_intervention=True
-  - plotting.plot=False

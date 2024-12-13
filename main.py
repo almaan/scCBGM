@@ -234,17 +234,16 @@ def main(
             preds = model(torch.tensor(x_true), torch.tensor(c_true))
             c_mean = None
         else:
-            # c_mean = np.mean(
-            #     adata_train.obsm["concepts"].values.copy().astype(np.float32),
-            #     axis=0,
-            #     keepdims=True,
-            # )
-            # # Determine the number of times to repeat (x times)
-            # x = c_true.shape[0]
-            # # Repeat the (1, 8) tensor to match the shape of (x, 8)
-            # c_mean = np.tile(c_mean, (x, 1))
-            print("random")
-            c_mean = np.random.choice([0, 1], size=c_true.shape)
+            c_mean = np.mean(
+                adata_train.obsm["concepts"].values.copy().astype(np.float32),
+                axis=0,
+                keepdims=True,
+            )
+            # Determine the number of times to repeat (x times)
+            x = c_true.shape[0]
+            # Repeat the (1, 8) tensor to match the shape of (x, 8)
+            c_mean = np.tile(c_mean, (x, 1))
+            # print("random")
             c_mean = pd.DataFrame(
                 c_mean,
                 index=x_concepts.index,
