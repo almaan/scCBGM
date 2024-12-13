@@ -23,10 +23,10 @@ model:
   independent_training: True
   scale_concept: false
 
-modify:
-  mod: add
-  params: 
-    n_mod: 0.9
+# modify:
+#   mod: add
+#   params: 
+#     n_mod: 0.9
 
 
 dataset:

@@ -29,6 +29,10 @@ class DefaultDecoderBlock(nn.Module):
         self.dropout = dropout
 
         layers = []
+<<<<<<< HEAD
+=======
+        layers_dim = [self.n_concepts + self.n_unknown] + self.hidden_dim
+>>>>>>> 978fc16 (remove layernorm and stash fix)
 
         for k in range(0, self.n_layers - 1):
             if k ==0:
@@ -123,8 +127,13 @@ class SkipDecoderBlock(nn.Module):
 
             layers.append(
                 SkipLayer(
+<<<<<<< HEAD
                     in_dim +self.n_concepts,
                     self.hidden_dim[k],
+=======
+                    layers_dim[k],
+                    layers_dim[k + 1],
+>>>>>>> 978fc16 (remove layernorm and stash fix)
                     self.dropout,
                     is_last_layer=False,
                 )
