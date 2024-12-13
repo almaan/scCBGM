@@ -55,7 +55,7 @@ def eval_intervention(
     mask = np.zeros_like(x_concepts.values)
     mask[:, x_concepts.columns.get_loc(concept_name)] = 1
 
-    if (not cfg.model.type == "CVAE") or (cfg.given_gt):
+    if (not cfg.model.type == "CVAE") or (cfg.model.given_gt):
         x_concepts_intervene = x_concepts.copy()
 
         if intervention_type == "On":
@@ -83,7 +83,7 @@ def eval_intervention(
 
     if cfg.model.type == "CVAE":
 
-        if cfg.given_gt:
+        if cfg.model.given_gt:
 
             x_pred_withIntervention = model.intervene(
                 helpers._to_tensor(x_true, device),
