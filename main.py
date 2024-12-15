@@ -230,12 +230,12 @@ def main(
     x_concepts = adata_test.obsm[concept_key].copy()
 
     if cfg.model.type == "CVAE":
-        if cfg.given_gt:
+        if cfg.model.given_gt:
             preds = model(torch.tensor(x_true), torch.tensor(c_true))
             c_mean = None
         else:
             c_mean = np.mean(
-                adata_train.obsm["concepts"].values.copy().astype(np.float32),
+                adata.obsm["concepts"].values.copy().astype(np.float32),
                 axis=0,
                 keepdims=True,
             )
@@ -248,7 +248,6 @@ def main(
                 index=x_concepts.index,
                 columns=x_concepts.columns,
             )
-
 
             preds = model(helpers._to_tensor(x_true), helpers._to_tensor(c_mean))
 
