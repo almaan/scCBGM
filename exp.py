@@ -193,6 +193,7 @@ def main(
     wandb.log({"pred_MSE_loss": gen.mse_loss(x_pred, x_pred_pred)})
     wandb.log({"train_MSE_loss": gen.mse_loss(x_train, x_train_pred)})
 
+    pre_computed_mmd_train = None
     for label, schema in pred_schema.items():
 
         is_label = adata_pred.obs[cfg.analysis.split_col].values == label
@@ -230,15 +231,37 @@ def main(
         if is_target is not None:
             x_target = adata_test[is_target].to_df()
 
-            target_score = (
-                clab.evaluation.interventions.evaluate_intervention_with_target(
+            # R2 Evaluation
+            target_r2_score = (
+                clab.evaluation.interventions.evaluate_intervention_r2_with_target(
                     x_pred_label,
                     x_ivn,
                     x_target,
                 )
             )
 
-            for key, val in target_score.items():
+            for key, val in target_r2_score.items():
+                wandb.log(
+                    {f"{label}_On_{on_concepts_txt}_Off_{off_concepts_txt}_{key}": val}
+                )
+
+            # MMD Evaluation
+            labels_train = adata_train.obs[cfg.analysis.split_col]
+
+            target_mmd_score = (
+                clab.evaluation.interventions.evaluate_intervention_mmd_with_target(
+                    x_train,
+                    x_ivn,
+                    x_test,
+                    labels_train=labels_train,
+                    pre_computed_mmd_train=pre_computed_mmd_train,
+                )
+            )
+            pre_computed_mmd_train = target_mmd_score.pop(
+                "pre_computed_mmd_train", None
+            )
+
+            for key, val in target_mmd_score.items():
                 wandb.log(
                     {f"{label}_On_{on_concepts_txt}_Off_{off_concepts_txt}_{key}": val}
                 )

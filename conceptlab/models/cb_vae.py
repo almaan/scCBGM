@@ -252,8 +252,8 @@ class CB_VAE(BaseCBVAE):
 
 
 class SKIP_CB_VAE(CB_VAE):
-    def __init__(self, config):
-        super().__init__(config, _decoder=SkipDecoderBlock)
+    def __init__(self, config, **kwargs):
+        super().__init__(config, _decoder=SkipDecoderBlock, **kwargs)
 
     def decode(self, input_concept, unknown, **kwargs):
         return self._decoder(input_concept, unknown, **kwargs)

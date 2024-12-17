@@ -1,4 +1,5 @@
 from conceptlab.evaluation._base import EvaluationClass
+from conceptlab.evaluation import metrics as met
 from conceptlab.utils import helpers
 import pandas as pd
 import plotly.graph_objects as go
@@ -450,7 +451,36 @@ def intervene(
     return x_ivn
 
 
-def evaluate_intervention_with_target(
+def evaluate_intervention_mmd_with_target(
+    x_train,
+    x_ivn,
+    x_target,
+    labels_train,
+    pre_computed_mmd_train=None,
+) -> Dict[str, Any]:
+
+    if pre_computed_mmd_train is None:
+        source = np.unique(labels_train)
+        scores = np.zeros_like(source)
+
+        for k, s in enumerate(source):
+            x_source = x_train[labels_train == s]
+            scores[k] = met.mmd(x_target, x_source)
+
+        min_train_score = np.min(scores)
+    else:
+        min_train_score = pre_computed_mmd_train
+
+    ivn_score = met.mmd(x_target, x_ivn)
+
+    mmd_ratio = ivn_score / (min_train_score + 1e-8)
+
+    score = dict(mmd_ratio=mmd_ratio, pre_computed_mmd_train=min_train_score)
+
+    return score
+
+
+def evaluate_intervention_r2_with_target(
     x_og,
     x_new,
     x_target,
