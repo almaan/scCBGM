@@ -130,6 +130,7 @@ def main(
             split_col=train_test_col,
             test_labels=test_labels,
         )
+
     else:
         adata_test, adata, n_test, idx = helpers.stratified_adata_train_test_split(
             adata,
@@ -137,7 +138,6 @@ def main(
         )
 
     logger.info("Anndata Information")
-    print(adata)
 
     n_obs, n_vars = adata.shape
     n_concepts = adata.obsm[concept_key].shape[1]
@@ -227,14 +227,35 @@ def main(
         x_true[sub_idx],
         obs=adata_test.obs.iloc[sub_idx],
     )
+    x_concepts = adata_test.obsm[concept_key].copy()
 
     if cfg.model.type == "CVAE":
-        preds = model(torch.tensor(x_true), torch.tensor(c_true))
+        if cfg.model.given_gt:
+            preds = model(torch.tensor(x_true), torch.tensor(c_true))
+            c_mean = None
+        else:
+            c_mean = np.mean(
+                adata.obsm["concepts"].values.copy().astype(np.float32),
+                axis=0,
+                keepdims=True,
+            )
+            # Determine the number of times to repeat (x times)
+            x = c_true.shape[0]
+            # Repeat the (1, 8) tensor to match the shape of (x, 8)
+            c_mean = np.tile(c_mean, (x, 1))
+            c_mean = pd.DataFrame(
+                c_mean,
+                index=x_concepts.index,
+                columns=x_concepts.columns,
+            )
+
+            preds = model(helpers._to_tensor(x_true), helpers._to_tensor(c_mean))
+
     else:
+        c_mean = None
         preds = model(torch.tensor(x_true))
 
     x_pred = preds["x_pred"].detach().numpy()
-    x_concepts = adata_test.obsm[concept_key].copy()
 
     if cfg.model.has_cbm:
         pred_concept = preds["pred_concept"].detach().numpy()
@@ -398,6 +419,7 @@ def main(
                     concept_vars,
                     model,
                     cfg,
+                    c_mean,
                 )
 
                 if cfg.plotting.plot:
@@ -417,8 +439,8 @@ def main(
 
         joint_score = clab.evaluation.interventions.score_intervention(
             metrics=[
-                "auroc",
-                "auprc",
+                # "auroc",
+                # "auprc",
                 "acc",
             ],
             scores=intervention_scores,

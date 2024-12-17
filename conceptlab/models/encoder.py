@@ -38,7 +38,6 @@ class DefaultEncoderBlock(nn.Module):
             layers += layer_k
 
         self.encoder_layers = nn.Sequential(*layers)
-
         self.fc_mu = nn.Linear(self.hidden_dim[-1], self.latent_dim)
         self.fc_var = nn.Linear(self.hidden_dim[-1], self.latent_dim)
 

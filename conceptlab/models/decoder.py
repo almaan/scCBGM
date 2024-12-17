@@ -57,19 +57,15 @@ class ConditionalDecoderBlock(DefaultDecoderBlock):
 
 
 class SkipLayer(nn.Module):
-    def __init__(
-        self, input_dim, hidden_dim, layer_norm_dim, dropout_p=0.0, is_last_layer=False
-    ):
+    def __init__(self, input_dim, hidden_dim, dropout_p=0.0, is_last_layer=False):
         super(SkipLayer, self).__init__()
-        self.layer_norm = nn.LayerNorm(layer_norm_dim)
-        self.fc = nn.Linear(layer_norm_dim, hidden_dim)
+        self.fc = nn.Linear(input_dim, hidden_dim)
         self.dropout = nn.Dropout(p=dropout_p)
         self.is_last_layer = is_last_layer
 
     def forward(self, inputs):
         h, c = inputs
         x = t.cat((h, c), dim=-1)
-        x = self.layer_norm(x)
         x = self.fc(x)
         if not self.is_last_layer:
             x = F.relu(x)
@@ -96,17 +92,16 @@ class SkipDecoderBlock(nn.Module):
         self.n_concepts = n_concepts
         self.n_unknown = n_unknown
         self.dropout = dropout
-        cbm_dim = self.n_unknown + self.n_unknown
 
-        layers_dim = [cbm_dim] + self.hidden_dim
         layers = []
+        layers_dim = [self.n_concepts + self.n_unknown] + self.hidden_dim
 
         for k in range(0, len(layers_dim) - 1):
+
             layers.append(
                 SkipLayer(
                     layers_dim[k],
                     layers_dim[k + 1],
-                    layers_dim[k],
                     self.dropout,
                     is_last_layer=False,
                 )
@@ -116,7 +111,6 @@ class SkipDecoderBlock(nn.Module):
             SkipLayer(
                 self.hidden_dim[-1] + self.n_concepts,
                 self.input_dim,
-                self.hidden_dim[-1] + self.n_concepts,
                 is_last_layer=True,
             )
         )

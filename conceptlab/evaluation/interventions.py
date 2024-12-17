@@ -49,37 +49,66 @@ def eval_intervention(
     concept_vars,
     model,
     cfg,
+    x_mean_concepts=None,
 ):
+
     mask = np.zeros_like(x_concepts.values)
     mask[:, x_concepts.columns.get_loc(concept_name)] = 1
 
-    x_concepts_intervene = x_concepts.copy()
+    if (not cfg.model.type == "CVAE") or (cfg.model.given_gt):
+        x_concepts_intervene = x_concepts.copy()
 
-    if intervention_type == "On":
-        x_concepts_intervene.loc[:, concept_name] = 1
-        indices = np.where(x_concepts.loc[:, concept_name] == 0)[0]
+        if intervention_type == "On":
+            x_concepts_intervene.loc[:, concept_name] = 1
+            indices = np.where(x_concepts.loc[:, concept_name] == 0)[0]
+
+        else:
+            x_concepts_intervene.loc[:, concept_name] = 0
+            indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
 
     else:
-        x_concepts_intervene.loc[:, concept_name] = 0
-        indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
 
-    # print("eval_intervention",x_concepts_intervene.shape,mask.shape,x_concepts.shape)
+        x_concepts_intervene = x_mean_concepts.copy()
 
-    # if cfg.model.type=="CVAE":
-    #     x_pred_withIntervention = model.intervene(
-    #         helpers._to_tensor(x_true),
-    #         helpers._to_tensor(original_test_concepts),
-    #         helpers._to_tensor(x_concepts_intervene),
-    #         helpers._to_tensor(mask),
-    #     )["x_pred"]
-    # else:
-    x_pred_withIntervention = model.intervene(
-        helpers._to_tensor(x_true),
-        helpers._to_tensor(x_concepts_intervene),
-        helpers._to_tensor(mask),
-    )["x_pred"]
+        if intervention_type == "On":
+            x_concepts_intervene.loc[:, concept_name] = 1
+            indices = np.arange(x_concepts_intervene.shape[0])
 
-    x_pred_withIntervention = x_pred_withIntervention.detach().numpy()
+        else:
+            x_concepts_intervene.loc[:, concept_name] = 0
+            indices = np.arange(x_concepts_intervene.shape[0])
+
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+
+    if cfg.model.type == "CVAE":
+
+        if cfg.model.given_gt:
+
+            x_pred_withIntervention = model.intervene(
+                helpers._to_tensor(x_true, device),
+                helpers._to_tensor(x_concepts, device),
+                helpers._to_tensor(x_concepts_intervene, device),
+                helpers._to_tensor(mask, device),
+            )["x_pred"]
+        else:
+
+            x_pred_withIntervention = model.intervene(
+                helpers._to_tensor(x_true, device),
+                helpers._to_tensor(x_mean_concepts, device),
+                helpers._to_tensor(x_concepts_intervene, device),
+                helpers._to_tensor(mask, device),
+            )["x_pred"]
+
+    else:
+
+        x_pred_withIntervention = model.intervene(
+            helpers._to_tensor(x_true, device),
+            helpers._to_tensor(x_concepts_intervene, device),
+            helpers._to_tensor(mask, device),
+        )["x_pred"]
+
+    x_pred_withIntervention = x_pred_withIntervention.detach().cpu().numpy()
 
     genetrated_data_after_intervention = pd.DataFrame(
         x_pred_withIntervention, columns=coefs.columns
@@ -128,6 +157,7 @@ def eval_intervention(
         concepts_new=subset_concepts,
         concept_coefs=coefs,
         use_neutral=False,
+        concept_names=concept_name,
     )
 
     return results, scores, genetrated_data_after_intervention

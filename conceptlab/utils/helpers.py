@@ -4,6 +4,7 @@ from conceptlab.utils.constants import DimNames, DataVars
 from conceptlab.utils.types import NonNegativeFloat
 from typing import Tuple, List
 from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -270,47 +271,89 @@ def simple_adata_train_test_split(
     return adata_test, adata_train, n_test, idx
 
 
+# def stratified_adata_train_test_split(
+#     adata: ad.AnnData,
+#     p_test: NonNegativeFloat = 0.5,
+#     concept_key: str = "concepts",
+# ) -> Tuple[ad.AnnData, ad.AnnData]:
+
+#     if concept_key not in adata.obsm:
+#         return simple_adata_train_test_split(
+#             adata,
+#             p_test,
+#         )
+
+#     if (p_test >= 1) or (p_test <= 0):
+#         raise ValueError(
+#             "p_test = {}, this is not in the interval (0,1)".format(p_test)
+#         )
+
+#     concept_vec = np.array(
+#         ["".join(map(str, row.astype(int))) for row in adata.obsm["concepts"].values]
+#     )
+
+#     uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)
+#     while uni_cnt.min() < 2:
+
+#         min_lab = np.argmin(uni_cnt)
+#         uni_cnt[min_lab] = uni_cnt.max()
+#         smin_lab = np.argmin(uni_cnt)
+#         concept_vec[concept_vec == uni_lab[min_lab]] = uni_lab[smin_lab]
+#         uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)
+
+#     sss = StratifiedShuffleSplit(n_splits=1, test_size=p_test, random_state=69)
+#     idx = np.arange(len(adata))
+#     train_idx, test_idx = next(sss.split(idx, concept_vec))
+
+#     adata_test, adata_train = adata[test_idx].copy(), adata[train_idx].copy()
+#     n_test = len(adata_test)
+
+#     adata_test.obs["split_label"] = concept_vec[test_idx]
+#     adata_train.obs["split_label"] = concept_vec[train_idx]
+
+#     return adata_test, adata_train, n_test, np.concatenate((test_idx, train_idx))
+
+
 def stratified_adata_train_test_split(
     adata: ad.AnnData,
     p_test: NonNegativeFloat = 0.5,
     concept_key: str = "concepts",
 ) -> Tuple[ad.AnnData, ad.AnnData]:
-
     if concept_key not in adata.obsm:
-        return simple_adata_train_test_split(
-            adata,
-            p_test,
-        )
+        raise ValueError(f"{concept_key} not found in `adata.obsm`.")
+    if not (0 < p_test < 1):
+        raise ValueError(f"p_test = {p_test}, this is not in the interval (0,1)")
+    # Create a unique identifier for each combination of concepts
+    concept_matrix = np.asarray(adata.obsm[concept_key]).astype(int)
+    concept_labels = np.array(["".join(map(str, row)) for row in concept_matrix])
 
-    if (p_test >= 1) or (p_test <= 0):
-        raise ValueError(
-            "p_test = {}, this is not in the interval (0,1)".format(p_test)
-        )
-
-    concept_vec = np.array(
-        ["".join(map(str, row.astype(int))) for row in adata.obsm["concepts"].values]
+    uni_concept_labels, cnt_concept_labels = np.unique(
+        concept_labels, return_counts=True
     )
 
-    uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)
-    while uni_cnt.min() < 2:
+    drop_labels = np.isin(concept_labels, uni_concept_labels[cnt_concept_labels < 2])
 
-        min_lab = np.argmin(uni_cnt)
-        uni_cnt[min_lab] = uni_cnt.max()
-        smin_lab = np.argmin(uni_cnt)
-        concept_vec[concept_vec == uni_lab[min_lab]] = uni_lab[smin_lab]
-        uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)
+    concept_labels[drop_labels] = uni_concept_labels[np.argmax(cnt_concept_labels)]
 
-    sss = StratifiedShuffleSplit(n_splits=1, test_size=p_test, random_state=69)
-    idx = np.arange(len(adata))
-    train_idx, test_idx = next(sss.split(idx, concept_vec))
+    # Perform a stratified split based on the unique concept labels
+    indices = np.arange(adata.n_obs)
+    train_idx, test_idx = train_test_split(
+        indices, test_size=p_test, stratify=concept_labels, random_state=42
+    )
 
-    adata_test, adata_train = adata[test_idx].copy(), adata[train_idx].copy()
-    n_test = len(adata_test)
+    # Split the AnnData object
+    adata_test = adata[test_idx].copy()
+    adata_train = adata[train_idx].copy()
 
-    adata_test.obs["split_label"] = concept_vec[test_idx]
-    adata_train.obs["split_label"] = concept_vec[train_idx]
-
-    return adata_test, adata_train, n_test, np.concatenate((test_idx, train_idx))
+    # Add split labels for tracking
+    adata_test.obs["split_label"] = concept_labels[test_idx]
+    adata_train.obs["split_label"] = concept_labels[train_idx]
+    return (
+        adata_test,
+        adata_train,
+        len(adata_test),
+        np.concatenate((test_idx, train_idx)),
+    )
 
 
 def generate_random_string(length=15):
@@ -514,13 +557,17 @@ def custom_adata_train_test_split(
     return adata_train, adata_test, adata_pred
 
 
-def _to_tensor(x: pd.DataFrame | np.ndarray) -> torch.Tensor:
+def _to_tensor(x: pd.DataFrame | np.ndarray, device: str = "cpu") -> torch.Tensor:
     if isinstance(x, pd.DataFrame):
-        return torch.tensor(x.values.astype(np.float32))
+        return torch.tensor(x.values.astype(np.float32)).to(device)
     elif isinstance(x, np.ndarray):
-        return torch.tensor(x.astype(np.float32))
+        return torch.tensor(x.astype(np.float32)).to(device)
     else:
         raise NotImplementedError
+
+
+def _to_tensor_gpu(x: pd.DataFrame | np.ndarray) -> torch.Tensor:
+    return _to_tensor(x, "cuda:0")
 
 
 def find_matching_target(on_concepts, off_concepts, target_concepts):
