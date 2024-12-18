@@ -5,13 +5,13 @@ metric:
   name: test_avg_concept_acc
 parameters:
   constants.seed:
-    values: [13,42]
+    value: 13
   model:
     value: cvae
   modify:
     value: default
   model.beta:
-    values: [1e-5, 1e-3, 1e-2]
+     value: 1e-5
   model.lr:
     values: [1e-3, 5e-4, 1e-5]
   model.latent_dim:
