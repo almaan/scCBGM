@@ -3,203 +3,223 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch as t
+from torch.optim.lr_scheduler import CosineAnnealingLR
+import torch.nn.utils.parametrizations as param
+from wandb import Histogram
+import wandb
+
+from .base import BaseCBVAE
+from .utils import sigmoid
+from .encoder import DefaultEncoderBlock
+from .decoder import DefaultDecoderBlock, SkipDecoderBlock, SkipDecoderBlock2
 
 
-# Define the VAE model
-class CEM_VAE(pl.LightningModule):
-    def __init__(self, config):
-        super(CEM_VAE, self).__init__()
-        self.input_dim = config.input_dim
-        self.hidden_dim = config.hidden_dim
-        self.latent_dim = config.latent_dim
-        self.n_concepts = config.n_concepts
-        self.learning_rate = config.lr
-        self.independent_training = config.independent_training
-        self.emb_size = config.emb_size
-        self.concept_bins = config.concept_bins
+class CEM_VAE(BaseCBVAE):
+    def __init__(
+        self,
+        config,
+        _encoder: nn.Module = DefaultEncoderBlock,
+        _decoder: nn.Module = DefaultDecoderBlock,
+        **kwargs,
+    ):
 
-        # Encoder
-        self.fc1 = nn.Linear(self.input_dim, self.hidden_dim)
-        self.fc21 = nn.Linear(self.hidden_dim, self.latent_dim)  # Mean
-        self.fc22 = nn.Linear(self.hidden_dim, self.latent_dim)  # Log variance
-
-        # CBM
-        self.sigmoid = torch.nn.Sigmoid()
-        self.concept_prob_generators = torch.nn.ModuleList()
-        self.concept_context_generators = torch.nn.ModuleList()
-
-        for c in range(self.n_concepts):
-
-            self.concept_context_generators.append(
-                torch.nn.Sequential(
-                    *[
-                        torch.nn.Linear(
-                            self.latent_dim, self.concept_bins[c] * self.emb_size
-                        ),
-                        nn.BatchNorm1d(self.concept_bins[c] * self.emb_size),
-                    ]
-                )
-            )
-
-            self.concept_prob_generators.append(
-                torch.nn.Sequential(
-                    *[
-                        torch.nn.Linear(
-                            self.concept_bins[c] * self.emb_size, self.concept_bins[c]
-                        )
-                    ]
-                )
-            )
-
-        self.concept_context_generators.append(
-            torch.nn.Sequential(
-                *[
-                    torch.nn.Linear(self.latent_dim, self.emb_size),
-                    nn.BatchNorm1d(self.emb_size),
-                ]
-            )
+        super().__init__(
+            config,
+            **kwargs,
         )
 
-        self.g_latent = self.emb_size * (self.n_concepts + 1)
-        # self.g_latent+=sum(self.concept_bins)
+        self.dropout = config.get("dropout", 0.0)
 
-        # self.fcCB1 = nn.Linear(self.latent_dim,  self.n_concepts)
-        # self.fcCB2 = nn.Linear(self.latent_dim,  self.n_concepts)
-        # Decoder
-        self.fc3 = nn.Linear(self.g_latent, self.hidden_dim)
-        self.fc4 = nn.Linear(self.hidden_dim, self.input_dim)
+        # Encoder
+
+        self._encoder = _encoder(
+            input_dim=self.input_dim,
+            hidden_dim=self.hidden_dim,
+            latent_dim=self.latent_dim,
+            dropout=self.dropout,
+        )
+
+        if "n_unknown" in config:
+            n_unknown = config["n_unknown"]
+        elif "min_bottleneck_size" in config:
+            n_unknown = max(config.min_bottleneck_size, self.n_concepts)
+        else:
+            n_unknown = 32
+
+        if self.n_concepts > n_unknown:
+            # Case 1: If n_concepts is larger than n_unknown
+            n_unknown = self.n_concepts
+            self.emb_size = 1
+        else:
+            # Case 2: Make n_concept * emb_size = n_unknown
+            # Since we can't modify n_concepts, we'll adjust emb_size
+            self.emb_size = n_unknown // self.n_concepts
+            # Adjust n_unknown to be exactly divisible by n_concepts
+            n_unknown = self.n_concepts * self.emb_size
+
+        # Create separate context generators for each concept
+        self.concept_context_generators = nn.ModuleList(
+            [
+                nn.Sequential(nn.Linear(self.latent_dim, 2 * self.emb_size), nn.ReLU())
+                for _ in range(self.n_concepts)
+            ]
+        )
+
+        # Separate probability generator for each concept
+        self.concept_prob_generators = nn.ModuleList(
+            [
+                nn.Sequential(nn.Linear(2 * self.emb_size, 1), nn.Sigmoid())
+                for _ in range(self.n_concepts)
+            ]
+        )
+
+        if "cb_layers" in config:
+            cb_layers = config["cb_layers"]
+        else:
+            cb_layers = 1
+
+        cb_unk_layers = []
+
+        for k in range(0, cb_layers - 1):
+
+            layer_k = [
+                nn.Linear(self.latent_dim, self.latent_dim),
+                nn.ReLU(),
+                nn.Dropout(p=self.dropout),
+            ]
+
+            cb_unk_layers += layer_k
+
+        cb_unk_layers.append(nn.Linear(self.latent_dim, n_unknown))
+        cb_unk_layers.append(nn.ReLU())
+
+        self.cb_unk_layers = nn.Sequential(*cb_unk_layers)
+
+        self._decoder = _decoder(
+            input_dim=self.input_dim,
+            n_concepts=n_unknown,
+            n_unknown=n_unknown,
+            hidden_dim=self.hidden_dim,
+            dropout=self.dropout,
+        )
+
+        self.dropout = nn.Dropout(p=self.dropout)
+
         self.beta = config.beta
         self.concepts_hp = config.concepts_hp
         self.orthogonality_hp = config.orthogonality_hp
 
+        self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
+        self.use_concept_loss = config.get("use_concept_loss", True)
+
+        self.use_concept_loss = config.get("use_concept_loss", True)
+
         self.save_hyperparameters()
 
-    def encode(self, x):
-        h1 = F.relu(self.fc1(x))
-        mu, logvar = self.fc21(h1), self.fc22(h1)
-        logvar = t.clip(logvar, -1e5, 1e5)
-        return mu, logvar
+    @property
+    def has_concepts(
+        self,
+    ):
+        return True
 
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
+    def _extra_loss(self, loss_dict, *args, **kwargs):
+        return loss_dict
 
-    def cbm(self, h, concepts=None, mask=None, intervene=False):
+    def encode(self, x, **kwargs):
+        return self._encoder(x, **kwargs)
 
-        non_concept_latent = None
-        all_concept_latent = None
-        all_concepts = None
-        all_logits = None
+    def decode(self, h, **kwargs):
+        return self._decoder(h, **kwargs)
 
-        for c in range(self.n_concepts + 1):
-            ### 1 generate context
-            context = self.concept_context_generators[c](h)
+    def concept_loss(self, pred_concept, concepts, **kwargs):
+        overall_concept_loss = self.n_concepts * F.binary_cross_entropy(
+            pred_concept, concepts, reduction="mean"
+        )
+        return overall_concept_loss
 
-            if c < self.n_concepts:
-                ### 2 get prob given concept
-                if concepts == None:
-                    logits = self.concept_prob_generators[c](context)
-                    prob_gumbel = self.sigmoid(logits)
-                else:
-                    if intervene:
-                        logits = self.concept_prob_generators[c](context)
-                        prob_gumbel = self.sigmoid(logits)
-                        mask_c = mask[:, c].unsqueeze(-1)
-                        concepts_c = concepts[:, c].unsqueeze(-1)
+    def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
 
-                        prob_gumbel = prob_gumbel * (1 - mask_c) + concepts_c * mask_c
+        unknown = self.cb_unk_layers(z)
 
-                    else:
-                        logits = concepts[:, c].unsqueeze(-1)
-                        prob_gumbel = concepts[:, c].unsqueeze(-1)
-                for i in range(self.concept_bins[c]):
-                    temp_concept_latent = context[
-                        :, (i * self.emb_size) : ((i + 1) * self.emb_size)
-                    ] * prob_gumbel[:, i].unsqueeze(-1)
-                    if i == 0:
-                        concept_latent = temp_concept_latent
-                    else:
-                        concept_latent = concept_latent + temp_concept_latent
+        # Lists to store results
+        contexts = []
+        probs = []
 
-                if all_concept_latent == None:
-                    all_concept_latent = concept_latent
-                else:
-                    all_concept_latent = torch.cat(
-                        (all_concept_latent, concept_latent), 1
-                    )
+        # Generate context and probability for each concept
+        for i in range(self.n_concepts):
+            # Generate context
+            context = self.concept_context_generators[i](
+                z
+            )  # shape: [..., 2 * emb_size]
+            contexts.append(context)
 
-                if all_concepts == None:
-                    all_concepts = prob_gumbel
-                    all_logits = logits
-                else:
-                    all_concepts = torch.cat((all_concepts, prob_gumbel), 1)
-                    all_logits = torch.cat((all_logits, logits), 1)
+            # Generate probability from this concept's context
+            prob = self.concept_prob_generators[i](context)  # shape: [..., 1]
+            probs.append(prob)
 
+        # Stack results
+        contexts = torch.stack(
+            contexts, dim=-2
+        )  # shape: [..., n_concepts, 2 * emb_size]
+        known_concepts = torch.stack(
+            probs, dim=-2
+        ).squeeze()  # shape: [..., n_concepts, 1]
+
+        pos_context = context[..., : self.emb_size]  # shape: [..., emb_size]
+        neg_context = context[..., self.emb_size :]  # shape: [..., emb_size]
+
+        # Expand contexts to match number of concepts
+        pos_context = pos_context.unsqueeze(-2).expand(
+            *pos_context.shape[:-1], self.n_concepts, self.emb_size
+        )
+        neg_context = neg_context.unsqueeze(-2).expand(
+            *neg_context.shape[:-1], self.n_concepts, self.emb_size
+        )
+
+        if intervene:
+            input_concept = known_concepts * (1 - mask) + concepts * mask
+        else:
+            if concepts == None:
+                input_concept = known_concepts
             else:
-                for c in range(self.n_concepts):
-                    if c == 0:
-                        non_concept_latent = context
-                    else:
-                        non_concept_latent = torch.cat((non_concept_latent, context), 1)
+                input_concept = concepts
 
-        z = torch.cat((all_concept_latent, context), 1)
-        return all_concept_latent, non_concept_latent, all_concepts, z
+        input_concept = input_concept.unsqueeze(-1).expand(
+            *input_concept.shape, self.emb_size
+        )
+        # Weight contexts with probabilities
+        weighted_pos = pos_context * input_concept
+        weighted_neg = neg_context * (1 - input_concept)
 
-    def decode(self, z):
-        h3 = F.relu(self.fc3(z))
-        return self.fc4(h3)
+        # Combine weighted contexts
+        combined = weighted_pos + weighted_neg  # shape: [..., n_concepts, emb_size]
+        # Reshape to have size emb_size * n_concepts
+        final_shape = list(combined.shape[:-2]) + [self.emb_size * self.n_concepts]
 
-    def forward(self, x, concepts=None):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
-        known_concepts, unknown, pred_concept, z = self.cbm(z, concepts)
-        x_pred = self.decode(z)
-        return {
-            "x_pred": x_pred,
-            "z": z,
-            "mu": mu,
-            "logvar": logvar,
-            "pred_concept": pred_concept,
-            "known_concepts": known_concepts,
-            "unknown": unknown,
-        }
+        emd_concept = combined.reshape(*final_shape)
+        h = torch.cat((emd_concept, unknown), 1)
 
-    def intervene(self, x, concepts, mask):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
-        known_concepts, unknown, pred_concept, z = self.cbm(z, concepts, mask, True)
-        x_pred = self.decode(z)
-        return {"x_pred": x_pred}
+        return dict(
+            pred_concept=known_concepts,
+            emd_concept=emd_concept,
+            unknown=unknown,
+            h=h,
+        )
 
-    def orthogonality_loss(self, concept_emb, unk_emb):
+    def intervene(self, x, concepts, mask, **kwargs):
+        enc = self.encode(x)
+        z = self.reparametrize(**enc)
+        cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
+        dec = self.decode(**cbm)
+        return dec
+
+    def orthogonality_loss(self, c, u):
         cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
-        output = torch.abs(cos(concept_emb, unk_emb))
+        output = torch.abs(cos(c, u))
         return output.mean()
 
-    def binary_accuracy(self, preds, labels, threshold=0.5):
-        """
-        Calculate the binary accuracy of a batch.
-
-        Args:
-        preds (torch.Tensor): The predicted probabilities or logits.
-        labels (torch.Tensor): The true labels.
-        threshold (float): The threshold to convert probabilities to binary predictions.
-
-        Returns:
-        float: The binary accuracy.
-        """
-
-        # Convert probabilities to binary predictions
-        binary_preds = (preds >= threshold).float()
-
-        # Calculate the number of correct predictions
-        correct = (binary_preds == labels).float().sum()
-
-        # Calculate the accuracy
-        accuracy = correct / labels.numel()
-
-        return accuracy.item()
+    def rec_loss(self, x_pred, x):
+        return F.mse_loss(x_pred, x, reduction="mean")
 
     def loss_function(
         self,
@@ -209,55 +229,63 @@ class CEM_VAE(pl.LightningModule):
         mu,
         logvar,
         pred_concept,
-        known_concepts,
+        emd_concept,
         unknown,
         **kwargs,
     ):
         loss_dict = {}
-        MSE = F.mse_loss(x_pred, x, reduction="mean")
 
-        overall_concept_loss = self.n_concepts * F.mse_loss(
-            pred_concept, concepts, reduction="mean"
-        )
-
-        for c in range(self.n_concepts):
-            accuracy = self.binary_accuracy(pred_concept[:, c], concepts[:, c])
-            loss_dict[str(c) + "_acc"] = accuracy
-
-        orth_loss = self.orthogonality_loss(known_concepts, unknown)
-        loss_dict["concept_loss"] = overall_concept_loss
-        loss_dict["orth_loss"] = orth_loss
+        MSE = self.rec_loss(x_pred, x)
         KLD = self.KL_loss(mu, logvar)
+
         loss_dict["rec_loss"] = MSE
         loss_dict["KL_loss"] = KLD
-        loss_dict["Total_loss"] = (
-            MSE
-            + self.beta * KLD
-            + self.concepts_hp * overall_concept_loss
-            + self.orthogonality_hp * orth_loss
+
+        loss_dict["Total_loss"] = MSE + self.beta * KLD
+
+        pred_concept_clipped = t.clip(pred_concept, 0, 1)
+
+        if self.use_concept_loss:
+            overall_concept_loss = self.concept_loss(pred_concept_clipped, concepts)
+            loss_dict["concept_loss"] = overall_concept_loss
+            loss_dict["Total_loss"] += self.concepts_hp * overall_concept_loss
+
+        if self.use_orthogonality_loss:
+            orth_loss = self.orthogonality_loss(emd_concept, unknown)
+            loss_dict["orth_loss"] = orth_loss
+            loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
+
+        loss_dict = self._extra_loss(
+            loss_dict,
+            x=x,
+            concepts=concepts,
+            x_pred=x_pred,
+            mu=mu,
+            logvar=logvar,
+            pred_concept=pred_concept,
+            unknown=unknown,
+            **kwargs,
         )
 
         return loss_dict
 
-    def _step(self, batch, batch_idx, prefix="train"):
-        x, concepts = batch
-        if prefix == "train" and self.independent_training:
-            out = self(x, concepts)
+    def configure_optimizers(
+        self,
+    ):
 
-        else:
-            out = self(x)
+        optimizer = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate
+        )
+        # Define the CosineAnnealingLR scheduler
+        scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
 
-        loss_dict = self.loss_function(x, concepts, **out)
-
-        for key, value in loss_dict.items():
-            self.log(f"{prefix}_{key}", value)
-        return loss_dict["Total_loss"]
-
-    def training_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, "train")
-
-    def validation_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, "val")
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        # Return a dictionary with the optimizer and the scheduler
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,  # The LR scheduler instance
+                "interval": "epoch",  # The interval to step the scheduler ('epoch' or 'step')
+                "frequency": 1,  # How often to update the scheduler
+                "monitor": "val_loss",  # Optional: if you use reduce-on-plateau schedulers
+            },
+        }
