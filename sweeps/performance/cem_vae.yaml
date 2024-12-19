@@ -5,27 +5,15 @@ metric:
   name: test_avg_concept_acc
 parameters:
   constants.seed:
-    value: 13
+    values: [13,42,1337,69]
   model:
-    value: cb_vae
+    value: cem_vae
+  model.independent_training:
+    value: True
   modify:
-    value: default
-  model.beta:
-    value: 1e-5
-  model.lr:
-    values: [1e-3, 5e-4, 1e-5]
-  model.orthogonality_hp:
-    values: [0.2,0.5,1]
-  model.concepts_hp:
-    values: [0.005,0.05,0.1]
-  model.latent_dim:
-    values: [32,64,128]
-  model.min_bottleneck_size:
-    values: [32, 64, 128]
-  model.hidden_dim:
-    values: [256, 128]
+    values: [default, add, noise, drop, duplicate]
   dataset.n_concepts:
-    values: [25,50,75]
+    values: [8,25,50,75]
   dataset.use_concept_dependency:
     value: False
   model.n_decoder_layers:
@@ -34,6 +22,9 @@ parameters:
     value: False
   model.use_gaussian_mixture_KL:
     value: False
+  modify.params.n_mod:
+    values: [0.1, 0.5, 0.9]
+
 command:
   - ${env}
   - python
@@ -42,3 +33,4 @@ command:
   - wandb.entity=rb-aiml
   - wandb.project=conceptlab
   - test_intervention=True
+  - save_checkpoints=False

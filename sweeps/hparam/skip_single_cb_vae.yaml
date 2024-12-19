@@ -7,7 +7,7 @@ parameters:
   constants.seed:
     value: 13
   model:
-    value: cb_vae
+    value: skip_single_cb_vae
   modify:
     value: default
   model.beta:
@@ -19,7 +19,7 @@ parameters:
   model.concepts_hp:
     values: [0.005,0.05,0.1]
   model.latent_dim:
-    values: [32,64,128]
+    values: [64,128]
   model.min_bottleneck_size:
     values: [32, 64, 128]
   model.hidden_dim:

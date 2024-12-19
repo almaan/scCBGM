@@ -11,7 +11,7 @@ import wandb
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import DefaultEncoderBlock
-from .decoder import DefaultDecoderBlock, SkipDecoderBlock
+from .decoder import DefaultDecoderBlock, SkipDecoderBlock, SkipDecoderBlock2
 
 EPS = 1e-6
 
@@ -48,8 +48,33 @@ class CB_VAE(BaseCBVAE):
         else:
             n_unknown = 32
 
-        self.fcCB1 = nn.Linear(self.latent_dim, self.n_concepts)
-        self.fcCB2 = nn.Linear(self.latent_dim, n_unknown)
+        if "cb_layers" in config:
+            cb_layers = config["cb_layers"]
+        else:
+            cb_layers = 1
+
+        cb_concepts_layers = []
+        cb_unk_layers = []
+
+        for k in range(0, cb_layers - 1):
+
+            layer_k = [
+                nn.Linear(self.latent_dim, self.latent_dim),
+                nn.ReLU(),
+                nn.Dropout(p=self.dropout),
+            ]
+
+            cb_concepts_layers += layer_k
+            cb_unk_layers += layer_k
+
+        cb_concepts_layers.append(nn.Linear(self.latent_dim, self.n_concepts))
+        cb_concepts_layers.append(nn.Sigmoid())
+
+        cb_unk_layers.append(nn.Linear(self.latent_dim, n_unknown))
+        cb_unk_layers.append(nn.ReLU())
+
+        self.cb_concepts_layers = nn.Sequential(*cb_concepts_layers)
+        self.cb_unk_layers = nn.Sequential(*cb_unk_layers)
 
         self._decoder = _decoder(
             input_dim=self.input_dim,
@@ -94,9 +119,8 @@ class CB_VAE(BaseCBVAE):
         return self._decoder(h, **kwargs)
 
     def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
-
-        known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
-        unknown = F.relu(self.fcCB2(z))
+        known_concepts = self.cb_concepts_layers(z)
+        unknown = self.cb_unk_layers(z)
 
         if intervene:
             input_concept = known_concepts * (1 - mask) + concepts * mask
@@ -233,6 +257,40 @@ class SKIP_CB_VAE(CB_VAE):
 
     def decode(self, input_concept, unknown, **kwargs):
         return self._decoder(input_concept, unknown, **kwargs)
+
+
+class SKIP_SINGLE_CB_VAE(CB_VAE):
+    def __init__(self, config):
+        super().__init__(config, _decoder=SkipDecoderBlock2)
+
+    def decode(self, input_concept, unknown, **kwargs):
+        return self._decoder(input_concept, unknown, **kwargs)
+
+
+class BACKPACK_CB_VAE(CB_VAE):
+    def __init__(self, config):
+        super().__init__(config, _decoder=SkipDecoderBlockBackpack)
+
+    def forward(self, x, concepts=None, **kwargs):
+        enc = self.encode(x, concepts=concepts, **kwargs)
+        z = self.reparametrize(**enc)
+        cbm = self.cbm(**z, concepts=concepts, **enc)
+        dec = self.decode(x, **enc, **z, **cbm, concepts=concepts)
+
+        out = dict()
+        for d in [enc, z, cbm, dec]:
+            out.update(d)
+        return out
+
+    def decode(self, x, input_concept, unknown, **kwargs):
+        return self._decoder(x, input_concept, unknown, **kwargs)
+
+    def intervene(self, x, concepts, mask, **kwargs):
+        enc = self.encode(x)
+        z = self.reparametrize(**enc)
+        cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
+        dec = self.decode(x, **cbm)
+        return dec
 
 
 class ALEA_CB_VAE(CB_VAE):
