@@ -8,6 +8,7 @@ import pandas as pd
 # import omics
 # from conceptlab.datagen.omics import OmicsDataGenerator
 import xarray as xr
+import scanpy as sc
 
 
 class GeneExpressionDataset(Dataset):

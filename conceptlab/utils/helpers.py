@@ -271,53 +271,11 @@ def simple_adata_train_test_split(
     return adata_test, adata_train, n_test, idx
 
 
-# def stratified_adata_train_test_split(
-#     adata: ad.AnnData,
-#     p_test: NonNegativeFloat = 0.5,
-#     concept_key: str = "concepts",
-# ) -> Tuple[ad.AnnData, ad.AnnData]:
-
-#     if concept_key not in adata.obsm:
-#         return simple_adata_train_test_split(
-#             adata,
-#             p_test,
-#         )
-
-#     if (p_test >= 1) or (p_test <= 0):
-#         raise ValueError(
-#             "p_test = {}, this is not in the interval (0,1)".format(p_test)
-#         )
-
-#     concept_vec = np.array(
-#         ["".join(map(str, row.astype(int))) for row in adata.obsm["concepts"].values]
-#     )
-
-#     uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)
-#     while uni_cnt.min() < 2:
-
-#         min_lab = np.argmin(uni_cnt)
-#         uni_cnt[min_lab] = uni_cnt.max()
-#         smin_lab = np.argmin(uni_cnt)
-#         concept_vec[concept_vec == uni_lab[min_lab]] = uni_lab[smin_lab]
-#         uni_lab, uni_cnt = np.unique(concept_vec, return_counts=True)
-
-#     sss = StratifiedShuffleSplit(n_splits=1, test_size=p_test, random_state=69)
-#     idx = np.arange(len(adata))
-#     train_idx, test_idx = next(sss.split(idx, concept_vec))
-
-#     adata_test, adata_train = adata[test_idx].copy(), adata[train_idx].copy()
-#     n_test = len(adata_test)
-
-#     adata_test.obs["split_label"] = concept_vec[test_idx]
-#     adata_train.obs["split_label"] = concept_vec[train_idx]
-
-#     return adata_test, adata_train, n_test, np.concatenate((test_idx, train_idx))
-
-
 def stratified_adata_train_test_split(
     adata: ad.AnnData,
     p_test: NonNegativeFloat = 0.5,
     concept_key: str = "concepts",
+    return_index_only: bool = False,
 ) -> Tuple[ad.AnnData, ad.AnnData]:
     if concept_key not in adata.obsm:
         raise ValueError(f"{concept_key} not found in `adata.obsm`.")
@@ -340,6 +298,9 @@ def stratified_adata_train_test_split(
     train_idx, test_idx = train_test_split(
         indices, test_size=p_test, stratify=concept_labels, random_state=42
     )
+
+    if return_index_only:
+        return dict(train=train_idx, test=test_idx)
 
     # Split the AnnData object
     adata_test = adata[test_idx].copy()
