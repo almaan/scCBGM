@@ -139,8 +139,3 @@ class BaseCBVAE(pl.LightningModule, ABC):
         accuracy = correct / labels.numel()
 
         return accuracy.item()
-
-    def get_trainer_function(
-        self,
-    ):
-        return pl.Trainer
