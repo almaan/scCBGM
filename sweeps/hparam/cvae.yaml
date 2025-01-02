@@ -5,7 +5,7 @@ metric:
   name: test_avg_concept_acc
 parameters:
   constants.seed:
-    value: 13
+    values: [13,42]
   model:
     value: cvae
   modify:
@@ -13,11 +13,11 @@ parameters:
   model.beta:
      value: 1e-5
   model.lr:
-    values: [1e-3, 5e-4, 1e-5]
+    values: [5e-4, 1e-5]
   model.latent_dim:
     values: [16,32,64,128]
   model.hidden_dim:
-    values: [512, 256, 128]
+    values: [256, 128]
   dataset.n_concepts:
     values: [25,50,75]
   dataset.use_concept_dependency:

@@ -132,6 +132,7 @@ class CEM_VAE(BaseCBVAE):
         return self._decoder(h, **kwargs)
 
     def concept_loss(self, pred_concept, concepts, **kwargs):
+
         overall_concept_loss = self.n_concepts * F.binary_cross_entropy(
             pred_concept, concepts, reduction="mean"
         )
@@ -161,9 +162,16 @@ class CEM_VAE(BaseCBVAE):
         contexts = torch.stack(
             contexts, dim=-2
         )  # shape: [..., n_concepts, 2 * emb_size]
-        known_concepts = torch.stack(
-            probs, dim=-2
-        ).squeeze()  # shape: [..., n_concepts, 1]
+        contexts = contexts.unsqueeze(-2) if contexts.ndimension() == 2 else contexts
+
+        known_concepts = torch.stack(probs, dim=-2).squeeze(
+            -1
+        )  # Ensure shape [..., n_concepts]
+        known_concepts = (
+            known_concepts.unsqueeze(-1)
+            if known_concepts.ndimension() == 1
+            else known_concepts
+        )
 
         pos_context = context[..., : self.emb_size]  # shape: [..., emb_size]
         neg_context = context[..., self.emb_size :]  # shape: [..., emb_size]
@@ -194,6 +202,7 @@ class CEM_VAE(BaseCBVAE):
         # Combine weighted contexts
         combined = weighted_pos + weighted_neg  # shape: [..., n_concepts, emb_size]
         # Reshape to have size emb_size * n_concepts
+
         final_shape = list(combined.shape[:-2]) + [self.emb_size * self.n_concepts]
 
         emd_concept = combined.reshape(*final_shape)

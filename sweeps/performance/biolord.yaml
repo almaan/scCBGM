@@ -1,0 +1,28 @@
+program: biolord_baseline.py
+method: grid
+metric:
+  goal: maximize
+  name: test_avg_concept_acc
+parameters:
+  model:
+    value: biolord
+  constants.seed:
+    values: [13,42,1337,69]
+  modify:
+    values: [default, add, noise, drop, duplicate]
+  dataset.n_concepts:
+    values: [8,25,50,75]
+  dataset.use_concept_dependency:
+    value: False
+  modify.params.n_mod:
+    values: [0.1, 0.5, 0.9]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.entity=rb-aiml
+  - wandb.project=conceptlab
+  - test_intervention=True
+  - save_checkpoints=False
