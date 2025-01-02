@@ -5,15 +5,15 @@ metric:
   name: test_avg_concept_acc
 parameters:
   constants.seed:
-    values: 13
+    values: [13,42]
   model:
     value: cem_vae
   modify:
     value: default
   model.beta:
-    value: 1e-5
+    values: [1e-4,1e-5]
   model.lr:
-    values: [1e-3, 5e-4, 1e-5]
+    values: [5e-4, 1e-5]
   model.orthogonality_hp:
     values: [0.2,0.5,1]
   model.concepts_hp:
@@ -21,7 +21,7 @@ parameters:
   model.latent_dim:
     values: [32,64,128]
   model.min_bottleneck_size:
-    value: 32
+    values: [64,128]
   model.hidden_dim:
     values: [256, 128]
   dataset.n_concepts:

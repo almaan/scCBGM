@@ -2,9 +2,9 @@ type: CVAE
 has_condition: True
 has_cbm: False
 lr: 0.0005
-beta: 1e-5
+beta: 0.000010
 hidden_dim: 256
-latent_dim: 64
+latent_dim: 32
 input_dim: 5000
 n_concepts: 8
 n_decoder_layers: 2
