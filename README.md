@@ -5,11 +5,16 @@ This is a toy setup for OMICS data to test different architecture
 
 # Getting started
 
-Install the environment
+Setup the environment
 
 ```
-mamba env create -f env.yml
-conda activate conceptlab
+micromamba env create -f env.yaml
+micromamba activate conceptlab
+```
+
+Install the package
+```
+poetry install
 ```
 
 ## Running code:
@@ -17,7 +22,7 @@ conda activate conceptlab
 Running experiments using hydra configs
 
 ```
-python main.py experiment=vae.yaml
+python main.py experiment=demo.yaml
 ```
 
 ## Making Sweeps
@@ -44,14 +49,14 @@ When you create a sweep agent, a message that looks something like below, will b
 
 $ wandb: Creating sweep from: sweeps/sweep_demo.yaml
 $ wandb: Creating sweep with ID: wuw4xyb0
-$ wandb: View sweep at: https://genentech.wandb.io/andera29/conceptlab/s
-$ wandb: Run sweep agent with: wandb agent andera29/conceptlab/wuw4xyb0
+$ wandb: View sweep at: https://xxx.wandb.io/user/conceptlab
+$ wandb: Run sweep agent with: wandb agent user/conceptlab/wuw4xyb0
 
 ```
 
 ### 3. Launch the sweep
 
-To launch the sweep you can simply do `wandb agent andera29/conceptlab/wuw4xyb0`
+To launch the sweep you can simply do `wandb agent user/conceptlab/wuw4xyb0`
 as the statement above suggests. This needs to be done on a GPU session.
 
 If you have a large sweep with multiple configurations, it might be smarter to
@@ -98,6 +103,6 @@ One example of how you could run this is:
 
 ```sh
 # in root
-python jobs/sweeper.py --n_jobs 50 --sweep_id andera29/conceptlab/2wfnbcy8 lsf --sla gRED_braid_gpu --job_name sweep
+python jobs/sweeper.py --n_jobs 20 --sweep_id andera29/conceptlab/2wfnbcy8 lsf --sla gRED_braid_gpu --job_name sweep
 
 ```
