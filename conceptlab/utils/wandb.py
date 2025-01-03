@@ -50,10 +50,11 @@ def download_wandb_project(project: str, entity: str | None = None):
     return df
 
 
-def collapse_columns(results_df: pd.DataFrame, collapse_columns: List[str]):
+def collapse_columns(
+    results_df: pd.DataFrame, collapse_columns: List[str], agg: str = "mean"
+):
     group_columns = [x for x in results_df.columns if x not in collapse_columns]
-    print(group_columns)
-    df_grouped = results_df.groupby(group_columns, as_index=False).agg("mean")
+    df_grouped = results_df.groupby(group_columns, as_index=False).agg(agg)
     return df_grouped
 
 
