@@ -1,0 +1,8 @@
+split_col: 'cell_stim'
+test_labels: ['Dendritic cells_stim']
+pred_schema:
+  Dendritic cells_ctrl:
+    1: ['stim']
+    target: 'Dendritic cells_stim'
+split_pred: True
+split_pred_p: 0.2

@@ -1,0 +1,8 @@
+split_col: 'cell_stim'
+test_labels: ['Megakaryocytes_stim']
+pred_schema:
+  Megakaryocytes_ctrl:
+    1: ['stim']
+    target: 'Megakaryocytes_stim'
+split_pred: True
+split_pred_p: 0.2

@@ -200,6 +200,26 @@ def main(
     concept_names = original_concepts.columns
     coefs = adata.varm[concept_coef_key].T
 
+    # compute MSE
+
+    source_idx = adata.obs["split_col"].values == "test"
+    adata_source = adata[source_idx]
+
+    adata_preds, _ = model.predict(
+        adata_source,
+    )
+
+    mse_loss = gen.mse_loss(
+        adata_source.to_df().values,
+        adata_preds.to_df().values,
+        normalize_true=(not normalize),
+        normalize_pred=(not normalize),
+    )
+
+    del adata_source, adata_preds
+
+    wandb.log({"test_MSE_loss": mse_loss})
+
     scores = dict(On={}, Off={})
 
     for concept_name in concept_names:

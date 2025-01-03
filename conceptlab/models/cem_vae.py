@@ -11,7 +11,7 @@ import wandb
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import DefaultEncoderBlock
-from .decoder import DefaultDecoderBlock, SkipDecoderBlock, SkipDecoderBlock2
+from .decoder import DefaultDecoderBlock, SkipDecoderBlock
 
 
 class CEM_VAE(BaseCBVAE):
