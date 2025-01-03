@@ -1,4 +1,4 @@
-type: SKIP_CB_VAE
+type: scCBGM
 has_cbm: True
 lr: 5e-4
 beta: 1e-05

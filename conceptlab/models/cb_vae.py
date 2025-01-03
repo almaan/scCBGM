@@ -251,7 +251,7 @@ class CB_VAE(BaseCBVAE):
         }
 
 
-class SKIP_CB_VAE(CB_VAE):
+class scCBGM(CB_VAE):
     def __init__(self, config, **kwargs):
         super().__init__(config, _decoder=SkipDecoderBlock, **kwargs)
 

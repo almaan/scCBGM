@@ -7,7 +7,7 @@ parameters:
   constants.seed:
     values: [13,42,1337,69]
   model:
-    value: skip_single_cb_vae
+    value: scCBGM
   model.independent_training:
     value: True
   modify:
