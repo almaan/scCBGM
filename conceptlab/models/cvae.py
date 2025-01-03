@@ -27,7 +27,6 @@ class CVAE(BaseCBVAE):
         self.dropout = config.get("dropout", 0.0)
 
         # Encoder
-
         self._encoder = _encoder(
             input_dim=self.input_dim,
             n_concepts=self.n_concepts,
