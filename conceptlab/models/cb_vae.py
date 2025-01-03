@@ -11,7 +11,7 @@ import wandb
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import DefaultEncoderBlock
-from .decoder import DefaultDecoderBlock, SkipDecoderBlock, SkipDecoderBlock2
+from .decoder import DefaultDecoderBlock, SkipDecoderBlock
 
 EPS = 1e-6
 
@@ -257,97 +257,3 @@ class SKIP_CB_VAE(CB_VAE):
 
     def decode(self, input_concept, unknown, **kwargs):
         return self._decoder(input_concept, unknown, **kwargs)
-
-
-class SKIP_SINGLE_CB_VAE(CB_VAE):
-    def __init__(self, config):
-        super().__init__(config, _decoder=SkipDecoderBlock2)
-
-    def decode(self, input_concept, unknown, **kwargs):
-        return self._decoder(input_concept, unknown, **kwargs)
-
-
-class BACKPACK_CB_VAE(CB_VAE):
-    def __init__(self, config):
-        super().__init__(config, _decoder=SkipDecoderBlockBackpack)
-
-    def forward(self, x, concepts=None, **kwargs):
-        enc = self.encode(x, concepts=concepts, **kwargs)
-        z = self.reparametrize(**enc)
-        cbm = self.cbm(**z, concepts=concepts, **enc)
-        dec = self.decode(x, **enc, **z, **cbm, concepts=concepts)
-
-        out = dict()
-        for d in [enc, z, cbm, dec]:
-            out.update(d)
-        return out
-
-    def decode(self, x, input_concept, unknown, **kwargs):
-        return self._decoder(x, input_concept, unknown, **kwargs)
-
-    def intervene(self, x, concepts, mask, **kwargs):
-        enc = self.encode(x)
-        z = self.reparametrize(**enc)
-        cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
-        dec = self.decode(x, **cbm)
-        return dec
-
-
-class ALEA_CB_VAE(CB_VAE):
-    def __init__(self, config, _decoder=DefaultDecoderBlock):
-        super().__init__(config, _decoder=_decoder)
-
-        self.a = nn.Parameter(6 * t.ones(self.n_concepts), requires_grad=True)
-        self.cos = nn.CosineSimilarity(dim=0)
-
-    def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
-
-        w = sigmoid(self.a, self.sigmoid_temp)
-        self.w = t.clip(w, 1e-3, 1)
-
-        known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
-
-        known_concepts_proj = self.fcCBproj(known_concepts)
-        unknown = F.relu(self.fcCB2(z))
-
-        if intervene:
-            concepts_ = known_concepts * (1 - mask) + concepts * mask
-            h = torch.cat((w * concepts_, unknown), 1)
-        else:
-            if concepts == None:
-                h = torch.cat((w * known_concepts, unknown), 1)
-            else:
-                h = torch.cat((w * concepts, unknown), 1)
-
-        return dict(
-            pred_concept=known_concepts,
-            concept_proj=known_concepts_proj,
-            unknown=unknown,
-            h=h,
-        )
-
-    def concept_loss(self, pred_concept, concepts):
-        overall_concept_loss = self.n_concepts * F.binary_cross_entropy(
-            pred_concept, concepts, weight=self.w.detach(), reduction="mean"
-        )
-        return overall_concept_loss
-
-    def _extra_loss(self, loss_dict, pred_concept, **kwargs):
-
-        log_B = t.log(t.tensor(pred_concept.size(0)))
-
-        s = pred_concept / t.sum(pred_concept, dim=0)
-        e = -t.sum(t.log(s + 1e-8) * s, dim=0)
-        e = (log_B - e) / log_B
-
-        alea_loss = 1 - self.cos(self.w, e)
-
-        loss_dict["Alea_loss"] = alea_loss
-        loss_dict["Total_loss"] += alea_loss
-
-        return loss_dict
-
-
-class SKIP_ALEA_CB_VAE(ALEA_CB_VAE):
-    def __init__(self, config):
-        super().__init__(config, _decoder=SkipDecoderBlock)

@@ -1,0 +1,8 @@
+split_col: 'cell_stim'
+test_labels: ['FCGR3A+ Monocytes_stim']
+pred_schema:
+  FCGR3A+ Monocytes_ctrl:
+    1: ['stim']
+    target: 'FCGR3A+ Monocytes_stim'
+split_pred: True
+split_pred_p: 0.2

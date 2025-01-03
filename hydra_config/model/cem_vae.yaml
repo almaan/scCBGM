@@ -1,12 +1,12 @@
-type: CB_VAE
+type: CEM_VAE
 has_cbm: True
-lr: 0.0005
-beta: 0.00001
+lr: 0.000500
+beta: 0.000100
 input_dim: 5000
 hidden_dim: 256
-latent_dim: 64
+latent_dim: 128
 n_concepts: 8
-min_bottleneck_size: 64
+min_bottleneck_size: 128
 concepts_hp: 0.005
 normalize: True
 orthogonality_hp: 0.2

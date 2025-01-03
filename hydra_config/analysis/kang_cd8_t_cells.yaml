@@ -1,0 +1,8 @@
+split_col: 'cell_stim'
+test_labels: ['CD8 T cells_stim']
+pred_schema:
+  CD8 T cells_ctrl:
+    1: ['stim']
+    target: 'CD8 T cells_stim'
+split_pred: True
+split_pred_p: 0.2

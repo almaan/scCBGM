@@ -1,0 +1,31 @@
+program: exp.py
+method: grid
+metric:
+  goal: maximize
+  name: AVG_ACC
+parameters:
+  constants.seed:
+    values: [13,42,1337]
+  dataset:
+    value: kang
+  model:
+    value: skip_cb_vae
+  analysis:
+    values:
+      - 'kang_b_cells'
+      - 'kang_cd14_monocytes'
+      - 'kang_cd4_t_cells'
+      - 'kang_cd8_t_cells'
+      - 'kang_dendritic_cells'
+      - 'kang_fcgr3a_monocytes'
+      - 'kang_megakarocytes'
+      - 'kang_nk_cells'
+  model.independent_training:
+    value: True
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - save_checkpoints=False

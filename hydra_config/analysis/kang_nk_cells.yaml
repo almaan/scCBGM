@@ -1,0 +1,8 @@
+split_col: 'cell_stim'
+test_labels: ['NK cells_stim']
+pred_schema:
+  NK cells_ctrl:
+    1: ['stim']
+    target: 'NK cells_stim'
+split_pred: True
+split_pred_p: 0.2

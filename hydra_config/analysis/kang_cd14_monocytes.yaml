@@ -1,0 +1,8 @@
+split_col: 'cell_stim'
+test_labels: ['CD14+ Monocytes_stim']
+pred_schema:
+  CD14+ Monocytes_ctrl:
+    1: ['stim']
+    target: 'CD14+ Monocytes_stim'
+split_pred: True
+split_pred_p: 0.2

@@ -1,0 +1,13 @@
+type: CEM_VAE
+has_cbm: True
+lr: 1e-3
+beta: 0.002
+input_dim: 5000
+hidden_dim: 128
+latent_dim: 64
+n_concepts: 8
+independent_training: False
+concepts_hp: 0.01
+orthogonality_hp: 0.1
+emb_size: 2
+concept_bins: [1,1,1,1,1,1,1,1]
