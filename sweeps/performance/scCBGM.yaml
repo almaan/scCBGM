@@ -1,18 +1,26 @@
-program: biolord.py
+program: main.py
 method: grid
 metric:
   goal: maximize
   name: test_avg_concept_acc
 parameters:
-  model:
-    value: biolord
   constants.seed:
     values: [13,42,1337,69]
+  model:
+    value: scCBGM
+  model.independent_training:
+    value: True
   modify:
     values: [default, add, noise, drop, duplicate]
   dataset.n_concepts:
     values: [8,25,50,75]
   dataset.use_concept_dependency:
+    value: False
+  model.n_decoder_layers:
+    value: 2
+  model.scale_concept:
+    value: False
+  model.use_gaussian_mixture_KL:
     value: False
   modify.params.n_mod:
     values: [0.1, 0.5, 0.9]

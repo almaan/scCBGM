@@ -20,21 +20,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.learning_rate = config.lr
         self.independent_training = config.get("independent_training", False)
         self.beta = config.beta
-        # self.n_decoder_layers = config.n_decoder_layers
         self.sigmoid_temp = config.get("sigmoid_temp", 1)
-        self.scale_concept = config.get("scale_concept", False)
-        self.use_gaussian_mixture_KL = config.get("use_gaussian_mixture_KL", False)
-
-        # -- if scaling concepts --
-
-        if self.scale_concept:
-            initial_std_dev = 0.01
-            self.learned_concept_scale_gamma = nn.Parameter(
-                torch.randn(self.n_concepts) * initial_std_dev
-            )
-            self.learned_concept_scale_beta = nn.Parameter(
-                torch.randn(self.n_concepts) * initial_std_dev
-            )
 
     @property
     @abstractmethod
@@ -83,6 +69,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
     def _step(self, batch, batch_idx, prefix="train"):
 
         x, concepts = batch
+
         if prefix == "train" and self.independent_training:
             out = self(x, concepts)
         else:
@@ -102,19 +89,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         return self._step(batch, batch_idx, "val")
 
     def KL_loss(self, mu, logvar):
-        # TODO: the Z_log_var definition does not seem correct
-        if self.use_gaussian_mixture_KL:
-            # KL loss for individual elements (to penalize individual variances too close to zero)
-            kl_loss_ind = -0.1 * (1 + logvar - logvar.exp())
-            kl_loss_ind = torch.mean(torch.sum(kl_loss_ind, dim=1))
-
-            # Population Gaussian P(Z)
-            Z_mean = torch.mean(mu, dim=0)
-            Z_log_var = torch.log(torch.var(mu, dim=0, unbiased=False))
-            KLD = -0.5 * torch.sum((1 + Z_log_var - Z_mean.pow(2) - Z_log_var.exp()))
-
-        else:
-            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+        KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
 
         return KLD
 

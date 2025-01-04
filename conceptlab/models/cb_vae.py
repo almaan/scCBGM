@@ -16,6 +16,24 @@ from .decoder import DefaultDecoderBlock, SkipDecoderBlock
 EPS = 1e-6
 
 
+import pytorch_lightning as pl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch as t
+from torch.optim.lr_scheduler import CosineAnnealingLR
+import torch.nn.utils.parametrizations as param
+from wandb import Histogram
+import wandb
+
+from .base import BaseCBVAE
+from .utils import sigmoid
+from .encoder import DefaultEncoderBlock
+from .decoder import DefaultDecoderBlock, SkipDecoderBlock
+
+EPS = 1e-6
+
+
 class CB_VAE(BaseCBVAE):
     def __init__(
         self,
@@ -251,7 +269,7 @@ class CB_VAE(BaseCBVAE):
         }
 
 
-class SKIP_CB_VAE(CB_VAE):
+class scCBGM(CB_VAE):
     def __init__(self, config, **kwargs):
         super().__init__(config, _decoder=SkipDecoderBlock, **kwargs)
 

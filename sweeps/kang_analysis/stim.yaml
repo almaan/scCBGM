@@ -9,7 +9,7 @@ parameters:
   dataset:
     value: kang
   model:
-    value: skip_cb_vae
+    value: scCBGM
   analysis:
     values:
       - 'kang_b_cells'

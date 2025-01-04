@@ -1,15 +1,20 @@
 # ConceptLab
 
-This is a toy setup for OMICS data to test different architecture
+Code for accompanying the paper ''Single Cell Concept Bottleneck Generative Model'' submitted to ICML 2025.
 
 
 # Getting started
 
-Install the environment
+Setup the environment
 
 ```
-mamba env create -f env.yml
-conda activate conceptlab
+micromamba env create -f env.yaml
+micromamba activate conceptlab
+```
+
+Install the package
+```
+poetry install
 ```
 
 ## Running code:
@@ -17,8 +22,23 @@ conda activate conceptlab
 Running experiments using hydra configs
 
 ```
-python main.py experiment=vae.yaml
+python main.py experiment=demo.yaml
 ```
+
+## Reproducing Results
+We've aimed to make our analysis as reproducible as possible. Hence:
+
+* All results from our wandb sweeps can be found in: `results/sweeps/`
+* We provide notebooks to generate all display items and analysis `notebooks/analysis/`. These are as follows:
+  * `hbca_immune_continous_state_shift_analysis.ipynb` - reproduces Figure 2
+  * `hbca_immune_pathway_scoring.ipynb` - preprocess and assigns pathway scores to the HBCA-I dataset.
+  * `kang_rmmd_analysis_processing.ipynb` - reproduces Table 3
+  * `kang_zero_shot_CD4T_cell_example.ipynb` - reproduces Figure 1
+  * `optimal_hyperparameter_selection.ipynb` - outlines the choice of each set of hyper parameters for each model.
+  * `synthetic_data_result_processing.ipynb` - reproduces Table 1 and Table 2.
+* Sweep configs to re-run all of the sweeps can be found in `sweeps/`, we also include instructions on how to use these below.
+* The weights for the specific models used in the examples shown in Figure 1 and 2 are found in `results/model_params/`.
+
 
 ## Making Sweeps
 
@@ -44,14 +64,14 @@ When you create a sweep agent, a message that looks something like below, will b
 
 $ wandb: Creating sweep from: sweeps/sweep_demo.yaml
 $ wandb: Creating sweep with ID: wuw4xyb0
-$ wandb: View sweep at: https://genentech.wandb.io/andera29/conceptlab/s
-$ wandb: Run sweep agent with: wandb agent andera29/conceptlab/wuw4xyb0
+$ wandb: View sweep at: https://xxx.wandb.io/user/conceptlab
+$ wandb: Run sweep agent with: wandb agent user/conceptlab/wuw4xyb0
 
 ```
 
 ### 3. Launch the sweep
 
-To launch the sweep you can simply do `wandb agent andera29/conceptlab/wuw4xyb0`
+To launch the sweep you can simply do `wandb agent user/conceptlab/wuw4xyb0`
 as the statement above suggests. This needs to be done on a GPU session.
 
 If you have a large sweep with multiple configurations, it might be smarter to
@@ -98,6 +118,6 @@ One example of how you could run this is:
 
 ```sh
 # in root
-python jobs/sweeper.py --n_jobs 50 --sweep_id andera29/conceptlab/2wfnbcy8 lsf --sla gRED_braid_gpu --job_name sweep
+python jobs/sweeper.py --n_jobs 20 --sweep_id user/conceptlab/wuw4xyb0 lsf --sla gpu_gold --job_name sweep
 
 ```

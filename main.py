@@ -41,7 +41,7 @@ MODS = {
 }
 
 
-@hydra.main(config_path="./dev_hydra_config/", config_name="config.yaml")
+@hydra.main(config_path="./synth_hydra_config/", config_name="config.yaml")
 def main(
     cfg: DictConfig,
 ) -> None:

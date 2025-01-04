@@ -1,0 +1,14 @@
+type: CVAE
+
+input_dim: null
+n_concepts: null
+
+has_condition: True
+has_cbm: False
+
+lr: 0.0005
+beta: 0.000010
+hidden_dim: 256
+latent_dim: 32
+min_bottleneck_size: 32
+given_gt: True
