@@ -1,6 +1,6 @@
 # ConceptLab
 
-This is a toy setup for OMICS data to test different architecture
+Code for accompanying the paper ''Single Cell Concept Bottleneck Generative Model'' submitted to ICML 2025.
 
 
 # Getting started
@@ -24,6 +24,23 @@ Running experiments using hydra configs
 ```
 python main.py experiment=demo.yaml
 ```
+
+## Reproducing Results
+We've aimed to make our analysis as reproducible as possible. Hence:
+
+* All results from our wandb sweeps can be found in: `results/sweeps/`
+* We provide notebooks to generate all display items and analysis `notebooks/analysis/`. These are as follows:
+  * 'hbca_immune_continous_state_shift_analysis.ipynb' - reproduces Figure 2
+  * 'hbca_immune_pathway_scoring.ipynb' - preprocess and assigns pathway scores to the HBCA-I dataset.
+  * 'kang_rmmd_analysis_processing.ipynb' - reproduces Table 3
+  * 'kang_zero_shot_CD4T_cell_example.ipynb' - reproduces Figure 1
+  * 'optimal_hyperparameter_selection.ipynb' - outlines the choice of each set of hyper parameters for each model.
+  * 'synthetic_data_result_processing.ipynb' - reproduces Table 1 and Table 2.
+
+If you wish to re-run any of the sweeps we provide the sweep configurations in
+'sweeps/', we also include instructions on how to use these below.
+
+
 
 ## Making Sweeps
 
