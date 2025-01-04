@@ -36,11 +36,8 @@ We've aimed to make our analysis as reproducible as possible. Hence:
   * `kang_zero_shot_CD4T_cell_example.ipynb` - reproduces Figure 1
   * `optimal_hyperparameter_selection.ipynb` - outlines the choice of each set of hyper parameters for each model.
   * `synthetic_data_result_processing.ipynb` - reproduces Table 1 and Table 2.
-
-If you wish to re-run any of the sweeps we provide the sweep configurations in
-`sweeps/`, we also include instructions on how to use these below.
-
-We also include the trained models for the specific models used in the examples shown in Figure 1 and 2, these are found in `results/model_params/`.
+* Sweep configs to re-run all of the sweeps can be found in `sweeps/`, we also include instructions on how to use these below.
+* The weights for the specific models used in the examples shown in Figure 1 and 2 are found in `results/model_params/`.
 
 
 ## Making Sweeps
