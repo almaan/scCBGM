@@ -1,13 +1,14 @@
 type: CVAE
+
+input_dim: null
+n_concepts: null
+
 has_condition: True
 has_cbm: False
+
 lr: 0.0005
 beta: 0.000010
 hidden_dim: 256
 latent_dim: 32
-input_dim: 5000
-n_concepts: 8
-n_decoder_layers: 2
 min_bottleneck_size: 32
-scale_concept: False
 given_gt: True
