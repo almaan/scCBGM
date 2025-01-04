@@ -20,7 +20,6 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.learning_rate = config.lr
         self.independent_training = config.get("independent_training", False)
         self.beta = config.beta
-        # self.n_decoder_layers = config.n_decoder_layers
         self.sigmoid_temp = config.get("sigmoid_temp", 1)
 
     @property
@@ -70,6 +69,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
     def _step(self, batch, batch_idx, prefix="train"):
 
         x, concepts = batch
+
         if prefix == "train" and self.independent_training:
             out = self(x, concepts)
         else:

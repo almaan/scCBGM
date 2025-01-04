@@ -103,6 +103,6 @@ One example of how you could run this is:
 
 ```sh
 # in root
-python jobs/sweeper.py --n_jobs 20 --sweep_id andera29/conceptlab/2wfnbcy8 lsf --sla gRED_braid_gpu --job_name sweep
+python jobs/sweeper.py --n_jobs 20 --sweep_id user/conceptlab/wuw4xyb0 lsf --sla gpu_gold --job_name sweep
 
 ```

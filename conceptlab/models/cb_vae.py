@@ -16,6 +16,24 @@ from .decoder import DefaultDecoderBlock, SkipDecoderBlock
 EPS = 1e-6
 
 
+import pytorch_lightning as pl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch as t
+from torch.optim.lr_scheduler import CosineAnnealingLR
+import torch.nn.utils.parametrizations as param
+from wandb import Histogram
+import wandb
+
+from .base import BaseCBVAE
+from .utils import sigmoid
+from .encoder import DefaultEncoderBlock
+from .decoder import DefaultDecoderBlock, SkipDecoderBlock
+
+EPS = 1e-6
+
+
 class CB_VAE(BaseCBVAE):
     def __init__(
         self,
@@ -41,7 +59,6 @@ class CB_VAE(BaseCBVAE):
             dropout=self.dropout,
         )
 
-        # CB layer
         if "n_unknown" in config:
             n_unknown = config["n_unknown"]
         elif "min_bottleneck_size" in config:
@@ -49,12 +66,33 @@ class CB_VAE(BaseCBVAE):
         else:
             n_unknown = 32
 
-        # setup concept bottleneck
+        if "cb_layers" in config:
+            cb_layers = config["cb_layers"]
+        else:
+            cb_layers = 1
 
-        self.fcCB1 = nn.Linear(self.latent_dim, self.n_concepts)
-        self.fcCB2 = nn.Linear(self.latent_dim, n_unknown)
+        cb_concepts_layers = []
+        cb_unk_layers = []
 
-        # Decoder
+        for k in range(0, cb_layers - 1):
+
+            layer_k = [
+                nn.Linear(self.latent_dim, self.latent_dim),
+                nn.ReLU(),
+                nn.Dropout(p=self.dropout),
+            ]
+
+            cb_concepts_layers += layer_k
+            cb_unk_layers += layer_k
+
+        cb_concepts_layers.append(nn.Linear(self.latent_dim, self.n_concepts))
+        cb_concepts_layers.append(nn.Sigmoid())
+
+        cb_unk_layers.append(nn.Linear(self.latent_dim, n_unknown))
+        cb_unk_layers.append(nn.ReLU())
+
+        self.cb_concepts_layers = nn.Sequential(*cb_concepts_layers)
+        self.cb_unk_layers = nn.Sequential(*cb_unk_layers)
 
         self._decoder = _decoder(
             input_dim=self.input_dim,
@@ -63,8 +101,6 @@ class CB_VAE(BaseCBVAE):
             hidden_dim=self.hidden_dim,
             dropout=self.dropout,
         )
-
-        # configure parameters
 
         self.dropout = nn.Dropout(p=self.dropout)
 
@@ -101,20 +137,21 @@ class CB_VAE(BaseCBVAE):
         return self._decoder(h, **kwargs)
 
     def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
-
-        known_concepts = sigmoid(self.fcCB1(z), self.sigmoid_temp)
-        unknown = F.relu(self.fcCB2(z))
+        known_concepts = self.cb_concepts_layers(z)
+        unknown = self.cb_unk_layers(z)
 
         if intervene:
-            concepts_ = known_concepts * (1 - mask) + concepts * mask
-            h = torch.cat((concepts_, unknown), 1)
+            input_concept = known_concepts * (1 - mask) + concepts * mask
         else:
             if concepts == None:
-                h = torch.cat((known_concepts, unknown), 1)
+                input_concept = known_concepts
             else:
-                h = torch.cat((concepts, unknown), 1)
+                input_concept = concepts
+
+        h = torch.cat((input_concept, unknown), 1)
 
         return dict(
+            input_concept=input_concept,
             pred_concept=known_concepts,
             unknown=unknown,
             h=h,
