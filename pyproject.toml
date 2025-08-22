@@ -1,17 +1,56 @@
-[tool.poetry]
+[project]
 name = "conceptlab"
 version = "0.1.0"
 description = ""
-authors = ["Alma Andersson", "Aya Ismail"]
+authors = [
+    {name = "Alma Andersson"},
+    {name = "Aya Ismail"}
+]
 readme = "README.md"
-packages = [
-    { include = "conceptlab" }
-    ]
+requires-python = ">=3.10"
+dependencies = [
+    "lightning",
+    "torch",
+    "torchvision",
+    "torchdata",
+    "pandas",
+    "wandb",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "timm",
+    "xarray",
+    "anndata",
+    "scanpy",
+    "umap-learn",
+    "hydra-core",
+    "pyyaml",
+    "networkx",
+    "python-louvain",
+    "rapids-singlecell[rapids12]; sys_platform == 'linux'",
+    "cupy-cuda12x; sys_platform == 'linux'",
+    "paretoset>=1.2.5",
+    "plotly>=6.3.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "autoflake",
+    "black",
+    "isort",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
+[tool.uv.sources]
+torch = [{index = "pytorch-cu129"}]
+torchvision = [{index = "pytorch-cu129"}]
+
