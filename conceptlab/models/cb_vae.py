@@ -139,7 +139,7 @@ class CB_VAE(BaseCBVAE):
     def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
         known_concepts = self.cb_concepts_layers(z)
         unknown = self.cb_unk_layers(z)
-
+        
         if intervene:
             input_concept = known_concepts * (1 - mask) + concepts * mask
         else:

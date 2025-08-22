@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+from typing import Optional
 
 class FourierEmbedding(nn.Module):
     """
@@ -65,11 +66,8 @@ class MLPBlock(nn.Module):
         Returns:
             torch.Tensor: The output tensor of the block.
         """
-        # The main path with a residual connection
-        # We add the concept and time embeddings before the linear layer
-
-        
         residual = x
+        # Add concept and time embeddings to the main data path before the linear layer
         x = self.linear(x + c_emb + t_emb)
         x = self.norm(x)
         x = self.activation(x)
@@ -80,14 +78,15 @@ class MLPBlock(nn.Module):
 class MLP(nn.Module):
     """
     A fully-connected neural network with skip connections, designed for
-    flow matching. It takes cell data, concepts, and time as input.
+    flow matching. It takes cell data, time, and an optional concept vector as input.
     """
-    def __init__(self, x_dim: int, c_dim: int, emb_dim: int, n_layers: int, dropout: float = 0.1):
+    def __init__(self, x_dim: int, c_dim: Optional[int], emb_dim: int, n_layers: int, dropout: float = 0.1):
         """
         Initializes the MLP model.
         Args:
-            x_dim (int): The dimensionality of the input cell data (x_t).
-            c_dim (int): The dimensionality of the concept vector (c_masked).
+            x_dim (int): The dimensionality of the input data (x_t).
+            c_dim (Optional[int]): The dimensionality of the concept vector (c). If None or 0,
+                                   the model is unconditional.
             emb_dim (int): The core embedding dimension used throughout the network.
             n_layers (int): The number of MLPBlock layers.
             dropout (float): The dropout rate.
@@ -98,16 +97,15 @@ class MLP(nn.Module):
         self.emb_dim = emb_dim
 
         # --- Initial Embedding Layers ---
-        # Embed the input data x_t to the main embedding dimension
         self.x_embedder = nn.Linear(x_dim, emb_dim)
         
-        # Embed the concept vector c_masked to the main embedding dimension
-        self.c_embedder = nn.Linear(c_dim, emb_dim)
+        # Only create a concept embedder if c_dim is provided and greater than 0
+        if self.c_dim is not None and self.c_dim > 0:
+            self.c_embedder = nn.Linear(self.c_dim, emb_dim)
+        else:
+            self.c_embedder = None
         
-        # Fourier feature embedding for the time scalar t
         self.t_embedder = FourierEmbedding(emb_dim)
-        
-        # An additional embedding layer for time to allow for more complex transformations
         self.t_mapper = nn.Sequential(
             nn.Linear(emb_dim, emb_dim),
             nn.ReLU(),
@@ -115,33 +113,37 @@ class MLP(nn.Module):
         )
 
         # --- Core Network ---
-        # A stack of MLP blocks that form the main body of the network
         self.layers = nn.ModuleList(
             [MLPBlock(emb_dim, dropout) for _ in range(n_layers)]
         )
 
         # --- Output Layer ---
-        # A final layer to project the output back to the original data dimension
         self.output_layer = nn.Sequential(
             nn.LayerNorm(emb_dim),
             nn.Linear(emb_dim, self.x_dim)
         )
 
-    def forward(self, x_t: torch.Tensor, c_masked: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+    def forward(self, x_t: torch.Tensor, t: torch.Tensor, c: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         The forward pass for the entire model.
         Args:
-            x_t (torch.Tensor): The noisy cell data, shape (batch_size, x_dim).
-            c_masked (torch.Tensor): The masked concept vector, shape (batch_size, c_dim).
+            x_t (torch.Tensor): The noisy data, shape (batch_size, x_dim).
             t (torch.Tensor): The time values, shape (batch_size,).
+            c (Optional[torch.Tensor]): The concept vector, shape (batch_size, c_dim).
+                                           Defaults to None.
         Returns:
             torch.Tensor: The predicted vector field, shape (batch_size, x_dim).
         """
         # 1. Embed all inputs
         x_emb = self.x_embedder(x_t)
-        c_emb = self.c_embedder(c_masked)
         
-        # Ensure t is in the correct format (batch_size, 1) for the embedder
+        # Embed concepts if the embedder exists and concepts are provided
+        if self.c_embedder is not None and c is not None:
+            c_emb = self.c_embedder(c)
+        else:
+            # Use a zero tensor if model is unconditional or no concepts are passed
+            c_emb = torch.zeros(x_t.shape[0], self.emb_dim, device=x_t.device)
+        
         if t.dim() == 1:
             t = t.unsqueeze(-1)
         t_fourier_emb = self.t_embedder(t)
@@ -155,4 +157,3 @@ class MLP(nn.Module):
         # 3. Project to output dimension
         output = self.output_layer(h)
         return output
-
