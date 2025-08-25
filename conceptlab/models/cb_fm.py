@@ -190,7 +190,7 @@ class CB_FM:
              c_neg = torch.cat(c_neg_parts, dim=1)
         
         xt = torch.randn(num_samples, self.x_dim, device=self.device)
-        print(f"Generating {num_samples} samples with w_pos={w_pos}" + (f" and w_neg={w_neg}" if c_neg is not None else ""))
+        print(f"Generating {num_samples} samples with CFG, w_pos={w_pos}" + (f" and w_neg={w_neg}" if c_neg is not None else ""))
 
         dt = 1.0 / timesteps
         for t_step in tqdm(range(timesteps), desc="Sampling", ncols=88):
@@ -203,8 +203,153 @@ class CB_FM:
             
             if c_neg is not None:
                 v_neg = self.model(xt, t, c_neg)
-                v_guided += w_neg * (v_cond - v_neg)
-            
+                v_guided +=  (1 - w_neg) * v_neg
+
             xt = xt + v_guided * dt
+            
+        return xt
+    
+    def _prepare_edit_tensors(self,
+                             x_orig: torch.Tensor,
+                             orig_concepts_known: Optional[torch.Tensor],
+                             orig_concepts_unknown: Optional[torch.Tensor],
+                             cf_concepts_known: Optional[torch.Tensor],
+                             cf_concepts_unknown: Optional[torch.Tensor]
+                             ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]:
+        """
+        Handles dimension validation, broadcasting, and combination of tensors for the edit function.
+        """
+        xt = x_orig.to(self.device)
+
+        # --- Dimension Handling and Validation ---
+        if xt.dim() == 1:
+            cf_batch_sizes = {c.shape[0] for c in [cf_concepts_known, cf_concepts_unknown] if c is not None and c.dim() == 2}
+            if len(cf_batch_sizes) > 1:
+                raise ValueError(f"Inconsistent batch sizes in counterfactual concepts: {cf_batch_sizes}")
+            
+            num_samples = cf_batch_sizes.pop() if cf_batch_sizes else 1
+            xt = xt.unsqueeze(0).repeat(num_samples, 1)
+
+        elif xt.dim() == 2:
+            num_samples = xt.shape[0]
+        else:
+            raise ValueError(f"x_orig must be a 1D or 2D tensor, but got {xt.dim()} dimensions.")
+
+        all_concepts = [orig_concepts_known, orig_concepts_unknown, cf_concepts_known, cf_concepts_unknown]
+        processed_concepts = []
+        for concept in all_concepts:
+            if concept is None:
+                processed_concepts.append(None)
+                continue
+            
+            concept = concept.to(self.device)
+            if concept.dim() == 1:
+                processed_concepts.append(concept.unsqueeze(0).repeat(num_samples, 1))
+            elif concept.dim() == 2:
+                assert concept.shape[0] == num_samples, \
+                    f"A concept tensor has batch size {concept.shape[0]}, but expected {num_samples} to match x_orig."
+                processed_concepts.append(concept)
+            else:
+                raise ValueError(f"Concept tensors must be 1D or 2D, but got {concept.dim()} dimensions.")
+        
+        orig_concepts_known, orig_concepts_unknown, cf_concepts_known, cf_concepts_unknown = processed_concepts
+
+        # --- Combine Concepts into Single Tensors ---
+        orig_concept_parts = [c for c in [orig_concepts_known, orig_concepts_unknown] if c is not None]
+        c_orig = torch.cat(orig_concept_parts, dim=1) if orig_concept_parts else torch.zeros(num_samples, 0, device=self.device)
+
+        cf_concept_parts = [c for c in [cf_concepts_known, cf_concepts_unknown] if c is not None]
+        c_cf = torch.cat(cf_concept_parts, dim=1) if cf_concept_parts else torch.zeros(num_samples, 0, device=self.device)
+
+        return xt, c_orig, c_cf, num_samples
+
+    @torch.no_grad()
+    def edit(self,
+             x_orig: torch.Tensor,
+             timesteps: int,
+             t_edit: float,
+             w_cfg: float = 1.0,
+             noise_scale: float = 0.5,
+             orig_concepts_known: Optional[torch.Tensor] = None,
+             orig_concepts_unknown: Optional[torch.Tensor] = None,
+             cf_concepts_known: Optional[torch.Tensor] = None,
+             cf_concepts_unknown: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Generates a counterfactual for a given data point 'x_orig' (at t=1) by changing its conditions.
+        It performs partial REVERSE integration (adds noise) with the original concepts, then FORWARD
+        integration (denoises) with the counterfactual concepts, with optional Classifier-Free Guidance.
+
+        Args:
+            x_orig (torch.Tensor): The original data point(s) to edit (at t=1). Shape (batch_size, x_dim) or (x_dim,).
+            timesteps (int): The total number of integration steps for a full solve (t=0 to t=1).
+            t_edit (float): A value between 0 and 1 controlling edit strength.
+                            A higher value means integrating further back towards noise, resulting in a stronger edit.
+            w_cfg (float): Guidance scale for CFG. w_cfg=1.0 means no guidance.
+            orig_concepts_known (Optional[torch.Tensor]): Original "known" conditions for x_orig.
+            orig_concepts_unknown (Optional[torch.Tensor]): Original "unknown" conditions for x_orig.
+            cf_concepts_known (Optional[torch.Tensor]): Counterfactual "known" conditions.
+            cf_concepts_unknown (Optional[torch.Tensor]): Counterfactual "unknown" conditions.
+
+        Returns:
+            torch.Tensor: The edited, counterfactual data point(s).
+        """
+        self.model.eval()
+        if not (0 <= t_edit < 1):
+            raise ValueError("t_edit must be between 0 and 1.")
+
+        # --- Calculate distinct inputs for print statement ---
+        num_distinct_x = 1 if x_orig.dim() == 1 else x_orig.shape[0]
+        cf_batch_sizes = {c.shape[0] for c in [cf_concepts_known, cf_concepts_unknown] if c is not None and c.dim() == 2}
+        num_distinct_cf = cf_batch_sizes.pop() if cf_batch_sizes else 1
+
+        xt, c_orig, c_cf, num_samples = self._prepare_edit_tensors(
+            x_orig, orig_concepts_known, orig_concepts_unknown, 
+            cf_concepts_known, cf_concepts_unknown
+        )
+        
+        print(f"Generating {num_samples} counterfactual sample(s) from {num_distinct_x} original data point(s) with {num_distinct_cf} counterfactual condition(s).")
+        if w_cfg != 1.0:
+            print(f"Applying Classifier-Free Guidance with w_cfg={w_cfg}.")
+
+        # --- Integration Process ---
+        dt = 1.0 / timesteps
+        
+        # Snap t_edit to the nearest discrete timestep
+        t_edit_step = int(round(t_edit * timesteps))
+        t_edit_snapped = t_edit_step / timesteps
+        if abs(t_edit - t_edit_snapped) > 1e-6:
+            print(f"Warning: t_edit snapped from {t_edit:.4f} to {t_edit_snapped:.4f} to align with discrete timesteps.")
+
+        c_uncond = torch.zeros_like(c_orig)
+
+        # 1. Reverse integration (Encoding / Adding Noise) from t=1 down to t=t_edit
+        print(f"Encoding: Integrating backward to t={t_edit_snapped:.2f}...")
+        # Loop from t=1 down to t=t_edit+dt
+        for t_step in tqdm(range(timesteps, t_edit_step, -1), desc="Encoding (Backward)", ncols=88):
+            t_val = t_step / timesteps
+            t = torch.full((num_samples,), t_val, device=self.device)
+            
+            v_cond = self.model(xt, t, c_orig)
+            v_uncond = self.model(xt, t, c_uncond)
+            v = v_uncond + w_cfg * (v_cond - v_uncond) # CFG
+            
+            xt = xt - v * dt # Step from t to t-dt
+
+        # add some noise to xt
+
+        xt = xt + torch.randn_like(xt) * noise_scale
+
+        # 2. Forward integration (Decoding / Denoising) from t=t_edit up to t=1
+        print(f"Decoding: Integrating forward to t=1.0 with new condition and noise {noise_scale}...")
+        # Loop from t=t_edit up to t=1-dt
+        for t_step in tqdm(range(t_edit_step, timesteps), desc="Decoding (Forward)", ncols=88):
+            t_val = t_step / timesteps
+            t = torch.full((num_samples,), t_val, device=self.device)
+
+            v_cond = self.model(xt, t, c_cf)
+            v_uncond = self.model(xt, t, c_uncond)
+            v = v_uncond + w_cfg * (v_cond - v_uncond) # CFG
+
+            xt = xt + v * dt # Step from t to t+dt
             
         return xt
