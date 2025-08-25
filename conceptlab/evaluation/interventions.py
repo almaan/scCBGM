@@ -452,10 +452,10 @@ def intervene(
 
 
 def evaluate_intervention_mmd_with_target(
-    x_train,
-    x_ivn,
-    x_target,
-    labels_train,
+    x_train, #All unstimulated data + and everything stim except your stimulation of interest.
+    x_ivn, # Taking the unstimulated data and changing the stimulation concept to 1 and see what it predicts.
+    x_target, # Stimulated data with stimulation of interest.
+    labels_train, # Cell type + stimulation
     pre_computed_mmd_train=None,
 ) -> Dict[str, Any]:
 

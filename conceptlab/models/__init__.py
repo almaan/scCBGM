@@ -5,3 +5,4 @@ from .cb_vae import (
 )
 from .cem_vae import CEM_VAE
 from .cvae import CVAE
+from .cb_fm import CB_FM

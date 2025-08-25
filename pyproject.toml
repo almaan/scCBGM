@@ -31,6 +31,9 @@ dependencies = [
     "cupy-cuda12x; sys_platform == 'linux'",
     "paretoset>=1.2.5",
     "plotly>=6.3.0",
+    "biolord>=0.0.3",
+    "pertpy>=0.10.0",
+    "pot>=0.9.5",
 ]
 
 [project.optional-dependencies]

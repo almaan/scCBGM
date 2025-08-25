@@ -28,11 +28,12 @@ from conceptlab.utils import logging
 import os.path as osp
 
 import os
-import biolord
-
 
 import hydra
 from omegaconf import DictConfig
+
+import pertpy as pt
+import scanpy as sc
 
 MODS = {
     "drop": modify.drop_concepts,
@@ -44,7 +45,7 @@ MODS = {
 }
 
 
-@hydra.main(config_path="./dev_hydra_config/", config_name="config.yaml")
+@hydra.main(config_path="./synth_hydra_config/", config_name="config.yaml")
 def main(
     cfg: DictConfig,
 ) -> None:
@@ -144,83 +145,17 @@ def main(
     observed_concept_names = adata.obsm[concept_key].columns.tolist()
 
     logger.info("Anndata Information")
-
-    biolord.Biolord.setup_anndata(
-        adata,
-        ordered_attributes_keys=None,
-        categorical_attributes_keys=observed_concept_names,
-    )
-
-    # module_params = {
-    #     "decoder_width": cfg.model.decoder_width,
-    #     "decoder_depth": cfg.model.decoder_depth,
-    #     "attribute_nn_width": cfg.model.attribute_nn_width,
-    #     "attribute_nn_depth": cfg.model.attribute_nn_depth,
-    #     "n_latent_attribute_categorical": cfg.model.n_latent_attribute_categorical,
-    #     "gene_likelihood": cfg.model.gene_likelihood,
-    #     "reconstruction_penalty": cfg.model.reconstruction_penalty,
-    #     "unknown_attribute_penalty": cfg.model.unknown_attribute_penalty,
-    #     "unknown_attribute_noise_param": cfg.model.unknown_attribute_noise_param,
-    #     "attribute_dropout_rate": cfg.model.attribute_dropout_rate,
-    #     "use_batch_norm": cfg.model.use_batch_norm,
-    #     "use_layer_norm": cfg.model.use_layer_norm,
-    #     "seed": cfg.constants.seed,
-    # }
-    module_params = {k: v for k, v in cfg.model.module_params.items()}
-    module_params["seed"] = cfg.constants.seed
-
-    model = biolord.Biolord(
-        adata=adata,
-        n_latent=cfg.model.model.n_latent,
-        module_params=module_params,
-        train_classifiers=False,
-        split_key="split_col",
-        train_split="train",
-        valid_split="val",
-        test_split="test",
-    )
-
-    trainer_params = {k: v for k, v in cfg.model.trainer.items()}
-    batch_size = trainer_params.pop("batch_size")
-
-    model.train(
-        max_epochs=cfg.trainer.max_epochs,
-        batch_size=batch_size,
-        plan_kwargs=trainer_params,
-        early_stopping=True,
-        early_stopping_patience=20,
-        check_val_every_n_epoch=10,
-        num_workers=1,
-        enable_checkpointing=False,
-    )
-
+    
     indicator = adata.uns["concept_indicator"]
     ix_og_concepts = indicator.values == C.Mods.none
     original_concepts = adata.obsm[concept_key].iloc[:, ix_og_concepts].copy()
     concept_names = original_concepts.columns
     coefs = adata.varm[concept_coef_key].T
 
-    # compute MSE
-
-    source_idx = adata.obs["split_col"].values == "test"
-    adata_source = adata[source_idx]
-
-    adata_preds, _ = model.predict(
-        adata_source,
-    )
-
-    mse_loss = gen.mse_loss(
-        adata_source.to_df().values,
-        adata_preds.to_df().values,
-        normalize_true=(not normalize),
-        normalize_pred=(not normalize),
-    )
-
-    del adata_source, adata_preds
-
-    wandb.log({"test_MSE_loss": mse_loss})
-
     scores = dict(On={}, Off={})
+
+    cot = pt.tl.Cinemaot()
+    sc.pp.pca(adata)
 
     for concept_name in concept_names:
 
@@ -233,21 +168,40 @@ def main(
 
         for ivn_value, intervention_type in enumerate(["Off", "On"]):
 
-            source_idx = (adata.obs["split_col"].values == "test") & (
+            # selecting values in the "test" or "val" cfg.model.eval_split
+            source_test_idx = (adata.obs["split_col"].values == cfg.model.eval_split) & (
                 adata.obs[concept_name].values == ivn_value
             )
-            adata_source = adata[source_idx]
+            train_idx = (adata.obs["split_col"].values == "train")
+            
+            adata_source = adata[source_test_idx + train_idx]
 
-            adata_preds = model.compute_prediction_adata(
-                adata, adata_source, target_attributes=[concept_name]
-            )
+            #Fitting COT on the concept_name (perturbation key)
+            de = cot.causaleffect(
+                adata_source,
+                pert_key=concept_name,
+                control=ivn_value,
+                return_matching=True,
+                thres=cfg.model.thresh,
+                smoothness=1e-5,
+                eps=cfg.model.eps,
+                solver="Sinkhorn",
+                )
+            
+            ot_map = de.obsm["ot"] # treatment vs controls
+            adata_control = adata_source[adata_source.obs[concept_name].values == ivn_value]
+            adata_treated = adata_source[adata_source.obs[concept_name].values == 1 - ivn_value]
+            test_controls_idx = (adata_control.obs["split_col"].values == cfg.model.eval_split) & (adata_control.obs[concept_name].values == ivn_value)
+            ot_map_test = ot_map[:,test_controls_idx].T
+            ot_map_test /= ot_map_test.sum(1).mean()
 
-            x_old = adata_source[
-                adata_source.obs[concept_name].values == ivn_value
-            ].to_df()
-            x_new = adata_preds[
-                adata_preds.obs[concept_name].values == 1 - ivn_value
-            ].to_df()
+            adata_test_control = adata_control[test_controls_idx] # control units to predict
+
+            adata_test_predicted = adata_control[test_controls_idx].copy()
+            adata_test_predicted.X = ot_map_test @ adata_treated.X # predicted treated units
+
+            x_new = adata_test_predicted.to_df()
+            x_old = adata_test_control.to_df()
 
             c_old = ivn_value * np.ones(x_old.shape[0])
             c_new = 1 - c_old
@@ -273,26 +227,9 @@ def main(
             ],
             scores=scores,
         )
-
+    
     for key, val in joint_score.items():
         wandb.log({key.upper(): val})
-
-    if cfg.plotting.plot:
-
-        logger.info("Plot reconstruction UMAP")
-        helpers.create_composite_image(
-            plotting_folder_path + cfg.wandb.experiment,
-            plotting_folder_path + cfg.wandb.experiment + "_intervention_results.png",
-        )
-        wandb.log(
-            {
-                "intervention_plot": wandb.Image(
-                    plotting_folder_path
-                    + cfg.wandb.experiment
-                    + "_intervention_results.png"
-                )
-            }
-        )
 
     wandb.finish()
 
