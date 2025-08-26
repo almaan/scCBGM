@@ -7,7 +7,6 @@ def sigmoid(x, alpha=1):
     return F.sigmoid(alpha * x)
 
 
-
 def optimal_transport_coupling(x0, x1):
     """
     Computes the optimal transport coupling between two batches of tensors.

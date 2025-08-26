@@ -1,0 +1,12 @@
+defaults:
+  - _self_
+  - data: kang
+  - model: cbm
+
+
+wandb:
+  experiment: conceptlab
+  project: conceptlab
+  entity: null
+
+seed: 42

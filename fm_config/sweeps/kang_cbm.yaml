@@ -1,0 +1,24 @@
+program: benchmark_scdata.py
+method: grid
+parameters:
+  model:
+    value: cbm
+  seed:
+    values: [13,42,1337,69]
+  data/intervention_labels:
+    values: 
+      - cd4
+      - nk
+      - bcells
+      - cd8_tcells
+      - cd14_monocytes
+      - dendritic_cells
+      - fcgr3a_monocytes
+      - megakaryocytes
+command:
+  - uv
+  - run
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.project=conceptlab

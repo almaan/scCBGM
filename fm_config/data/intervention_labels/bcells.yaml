@@ -1,0 +1,3 @@
+# @package intervention_labels
+hold_out_label: 'B cells_stim'
+mod_label: 'B cells_ctrl'

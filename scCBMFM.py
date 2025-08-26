@@ -33,7 +33,7 @@ import hydra
 from omegaconf import DictConfig
 
 # Run the stuff
-# uv run python scCBMFM.py modify=default dataset.use_concept_dependency=False model.use_gaussian_mixture_KL=False modify.params.n_mod=0.1 trainer.max_epochs=2 model=scCBGMFM model.fm_max_epochs=2
+# uv run python scCBMFM.py modify=default dataset.use_concept_dependency=False model.use_gaussian_mixture_KL=False modify.params.n_mod=0.1 trainer.max_epochs=1000 model=scCBGMFM model.fm_max_epochs=2
 
 MODS = {
     "drop": modify.drop_concepts,

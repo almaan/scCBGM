@@ -4,7 +4,11 @@ import torch.optim.lr_scheduler
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 from typing import List, Optional, Tuple
-
+from omegaconf import OmegaConf
+import conceptlab as clab
+import pytorch_lightning as pl
+import numpy as np
+import anndata as ad
 
 # Assuming the MLP model is defined in mlp.py as specified previously
 from .mlp import MLP
@@ -352,3 +356,144 @@ class CB_FM:
             xt = xt + v * dt # Step from t to t+dt
             
         return xt
+
+
+class CBMFM_MetaTrainer:
+    def __init__(self, cbm_mod,
+                 emb_dim = 1024,
+                 n_layers = 6,
+                 num_epochs = 1000,
+                 batch_size = 128,
+                 lr = 3e-4,
+                 p_drop = 0.1,
+                 pc = False,
+                 raw = False,
+                 concept_key= "concepts"):
+        self.scCBGM_model = cbm_mod
+        self.emb_dim = emb_dim
+        self.n_layers = n_layers
+        self.num_epochs = num_epochs
+        self.batch_size = batch_size
+        self.lr = lr
+        self.p_drop = p_drop
+        self.pc = pc
+        self.concept_key = concept_key
+        self.raw = raw
+
+    def get_learned_concepts(self, adata_full):
+        """Uses a trained scCBGM to generate learned concepts for all data."""
+        print("Generating learned concepts from scCBGM...")
+        if self.scCBGM_model.model is None:
+            raise ValueError("scCBGM model is not trained. Call fit_cbm_model first")
+        with torch.no_grad():
+            all_x = torch.tensor(adata_full.X.toarray(), dtype=torch.float32)
+            enc = self.scCBGM_model.encode(all_x)
+            adata_full.obsm['scCBGM_concepts_known'] = self.scCBGM_model.cb_concepts_layers(enc['mu']).cpu().numpy()
+            adata_full.obsm['scCBGM_concepts_unknown'] = self.scCBGM_model.cb_unk_layers(enc['mu']).cpu().numpy()
+        return adata_full
+    
+    def fit_cbm_model(self, adata):
+        self.scCBGM_model.train(adata)
+
+    def get_learned_concepts(self,adata_full):
+        """Uses a trained scCBGM to generate learned concepts for all data."""
+        print("Generating learned concepts from scCBGM...")
+        with torch.no_grad():
+            all_x = torch.tensor(adata_full.X.toarray(), dtype=torch.float32)
+            enc = self.scCBGM_model.model.encode(all_x)
+            adata_full.obsm['scCBGM_concepts_known'] = self.scCBGM_model.model.cb_concepts_layers(enc['mu']).cpu().numpy()
+            adata_full.obsm['scCBGM_concepts_unknown'] = self.scCBGM_model.model.cb_unk_layers(enc['mu']).cpu().numpy()
+        return adata_full
+
+    def train(self, adata_train):
+        """Trains and returns the CB-FM model using learned concepts."""
+        print("Training CB-FM model with learned concepts...")
+
+        if not self.raw:
+            self.fit_cbm_model(adata_train)
+            adata_train = self.get_learned_concepts(adata_train.copy()) 
+        
+        if(self.pc):
+            data_matrix = adata_train.uns['pca_transform'].transform(adata_train.X.toarray())
+        else:
+            data_matrix = adata_train.X.toarray()
+
+        if self.raw:
+            fm_model = clab.models.cb_fm.CB_FM(
+            x_dim=data_matrix.shape[1],
+            c_known_dim=adata_train.obsm[self.concept_key].shape[1],
+            emb_dim=self.emb_dim, n_layers=self.n_layers
+        )
+            fm_model.train(
+            data=torch.from_numpy(data_matrix.astype(np.float32)),
+            concepts_known=torch.from_numpy(adata_train.obsm[self.concept_key].to_numpy().astype(np.float32)),
+            num_epochs=self.num_epochs, batch_size=self.batch_size, lr = self.lr, p_drop=self.p_drop
+        )
+        else:
+            fm_model = clab.models.cb_fm.CB_FM(
+                x_dim=data_matrix.shape[1],
+                c_known_dim=adata_train.obsm['scCBGM_concepts_known'].shape[1],
+                c_unknown_dim=adata_train.obsm['scCBGM_concepts_unknown'].shape[1],
+                emb_dim=self.emb_dim, n_layers=self.n_layers
+            )
+        
+            fm_model.train(
+                data=torch.from_numpy(data_matrix.astype(np.float32)),
+                concepts_known=torch.from_numpy(adata_train.obsm['scCBGM_concepts_known'].astype(np.float32)),
+                concepts_unknown=torch.from_numpy(adata_train.obsm['scCBGM_concepts_unknown'].astype(np.float32)),
+                num_epochs=self.num_epochs, batch_size=self.batch_size, lr=self.lr, p_drop=self.p_drop
+            )
+        self.model = fm_model
+        return self.model
+
+    def predict_intervention(self, adata_inter, hold_out_label):
+        """Performs intervention using a trained learned-concept CB-FM model."""
+        print("Performing intervention with CB-FM (learned)...")
+        if not self.raw:
+            adata_inter = self.get_learned_concepts(adata_inter.copy())
+
+            c_known_inter = torch.from_numpy(adata_inter.obsm['scCBGM_concepts_known'].astype(np.float32))
+            c_unknown_inter = torch.from_numpy(adata_inter.obsm['scCBGM_concepts_unknown'].astype(np.float32))
+        
+            inter_concepts_known = c_known_inter.clone()
+            inter_concepts_known[:, -1] = 1 - inter_concepts_known[:, -1] # Set stim concept to the opposite of the observed value.
+
+        else:
+            c_intervene_on = torch.from_numpy(adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32))
+            inter_concepts = c_intervene_on.clone()
+            inter_concepts[:, -1] = 1- inter_concepts[:,-1] # Set stim concept to 1 
+
+        if(self.pc):
+            x_inter = adata_inter.uns['pca_transform'].transform(adata_inter.X.toarray())
+        else:
+            x_inter = adata_inter.X.toarray()
+
+        if self.raw:
+            inter_preds = self.model.sample(
+            concepts_known=inter_concepts,
+            num_samples=inter_concepts.shape[0],
+            timesteps=1000, w_pos=1, w_neg=0.0
+            )
+            x_inter_preds = inter_preds.detach().cpu().numpy()
+
+        else:
+            inter_preds = self.model.edit(
+                x_orig =torch.from_numpy(x_inter.astype(np.float32)),
+                timesteps = 1000,
+                t_edit = 0.1,
+                w_cfg = 1.2,
+                noise_scale = 0.3,
+                orig_concepts_known = c_known_inter,
+                orig_concepts_unknown = c_unknown_inter,
+                cf_concepts_known = inter_concepts_known,
+                cf_concepts_unknown = c_unknown_inter
+            )
+            x_inter_preds = inter_preds.detach().cpu().numpy()
+
+        if(self.pc == True):
+            x_inter_preds = adata_inter.uns['pca_transform'].inverse_transform(x_inter_preds)
+
+        pred_adata = ad.AnnData(x_inter_preds, var=adata_inter.var)
+        pred_adata.obs['ident'] = 'intervened on'
+        pred_adata.obs['cell_stim'] = hold_out_label + '*'
+        return pred_adata

@@ -1,0 +1,8 @@
+defaults:
+  - intervention_labels: cd4
+
+_target_: conceptlab.data.dataset.InterventionDataset
+data_path: /braid/havivd/scgen/kang.h5ad
+concept_key: concepts
+label_variable: cell_stim
+intervention_labels: ${intervention_labels}

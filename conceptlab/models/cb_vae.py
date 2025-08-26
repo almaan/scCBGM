@@ -31,6 +31,12 @@ from .utils import sigmoid
 from .encoder import DefaultEncoderBlock
 from .decoder import DefaultDecoderBlock, SkipDecoderBlock
 
+import conceptlab as clab
+import pytorch_lightning as pl
+import numpy as np
+import anndata as ad
+from omegaconf import OmegaConf
+
 EPS = 1e-6
 
 
@@ -275,3 +281,70 @@ class scCBGM(CB_VAE):
 
     def decode(self, input_concept, unknown, **kwargs):
         return self._decoder(input_concept, unknown, **kwargs)
+
+
+class CBM_MetaTrainer:
+
+    def __init__(self,
+                 cbm_config,
+                 max_epochs,
+                 log_every_n_steps,
+                concept_key):
+        self.cbm_config = cbm_config
+        self.max_epochs = max_epochs
+        self.log_every_n_steps = log_every_n_steps
+        self.concept_key = concept_key
+
+        self.model = None
+    
+    def train(self, adata_train):
+
+        """Trains and returns the scCBGM model."""
+        print("Training scCBGM model...")
+
+        config = OmegaConf.create(dict(
+            input_dim=adata_train.shape[1], 
+            n_concepts=adata_train.obsm[self.concept_key].shape[1],
+        ))
+        merged_config = OmegaConf.merge(config, self.cbm_config)
+        
+        model = clab.models.scCBGM(merged_config)
+
+        data_module = clab.data.dataloader.GeneExpressionDataModule(
+            adata_train, add_concepts=True, concept_key=self.concept_key, batch_size=512, normalize=False
+        )
+
+        trainer = pl.Trainer(max_epochs=self.max_epochs, log_every_n_steps = self.log_every_n_steps, accelerator='auto')
+        trainer.fit(model, data_module)
+
+        self.model = model.to("cpu").eval()
+
+        return self.model
+
+    def predict_intervention(self, adata_inter, hold_out_label):
+        """Performs intervention using a trained scCBGM model.
+        Returns an anndata with predicted values."""
+        print("Performing intervention with scCBGM...")
+
+        if self.model is None:
+            raise ValueError("Model has not been trained yet. Call train() before predict_intervention().")
+        
+        x_intervene_on = torch.tensor(adata_inter.X.toarray(), dtype=torch.float32)
+        c_intervene_on = adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)
+
+        # Define the intervention by creating a mask and new concept values
+        mask = torch.zeros(c_intervene_on.shape, dtype=torch.float32)
+        mask[:, -1] = 1  # Intervene on the last concept (stim)
+        
+        inter_concepts = torch.tensor(c_intervene_on, dtype=torch.float32)
+        inter_concepts[:, -1] = 1 - inter_concepts[:, -1] # Set stim concept to the opposite of the observed value.
+
+        with torch.no_grad():
+            inter_preds = self.model.intervene(x_intervene_on, mask=mask, concepts=inter_concepts)
+        
+        x_inter_preds = inter_preds['x_pred'].cpu().numpy()
+
+        pred_adata = ad.AnnData(x_inter_preds, var=adata_inter.var)
+        pred_adata.obs['ident'] = 'intervened on'
+        pred_adata.obs['cell_stim'] = hold_out_label + '*'
+        return pred_adata
