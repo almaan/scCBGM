@@ -321,7 +321,7 @@ class CBM_MetaTrainer:
 
         return self.model
 
-    def predict_intervention(self, adata_inter, hold_out_label):
+    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
         """Performs intervention using a trained scCBGM model.
         Returns an anndata with predicted values."""
         print("Performing intervention with scCBGM...")
@@ -332,12 +332,16 @@ class CBM_MetaTrainer:
         x_intervene_on = torch.tensor(adata_inter.X.toarray(), dtype=torch.float32)
         c_intervene_on = adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)
 
+
+        # what indices should we flip in the concepts
+        concept_to_intervene_idx = [idx for idx,c in enumerate(adata_inter.obsm[self.concept_key].columns) if c in concepts_to_flip]
+
         # Define the intervention by creating a mask and new concept values
         mask = torch.zeros(c_intervene_on.shape, dtype=torch.float32)
-        mask[:, -1] = 1  # Intervene on the last concept (stim)
-        
+        mask[:, concept_to_intervene_idx] = 1  # Intervene on the last concept (stim)
+
         inter_concepts = torch.tensor(c_intervene_on, dtype=torch.float32)
-        inter_concepts[:, -1] = 1 - inter_concepts[:, -1] # Set stim concept to the opposite of the observed value.
+        inter_concepts[:, concept_to_intervene_idx] = 1 - inter_concepts[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
 
         with torch.no_grad():
             inter_preds = self.model.intervene(x_intervene_on, mask=mask, concepts=inter_concepts)

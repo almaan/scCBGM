@@ -1,3 +1,4 @@
 # @package intervention_labels
 hold_out_label: 'CD14+ Monocytes_stim'
 mod_label: 'CD14+ Monocytes_ctrl'
+concepts_to_flip: ["stim"]

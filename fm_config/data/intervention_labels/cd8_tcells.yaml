@@ -1,3 +1,4 @@
 # @package intervention_labels
 hold_out_label: 'CD8 T cells_stim'
 mod_label: 'CD8 T cells_ctrl'
+concepts_to_flip: ["stim"]

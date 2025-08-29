@@ -1,0 +1,9 @@
+defaults:
+  - intervention_labels: cui_IL4_bcells
+
+_target_: conceptlab.data.dataset.InterventionDataset
+data_path: /braid/havivd/immune_dictionary/lig_seurat_with_concepts.h5ad
+concept_key: concepts
+label_variable: ["celltype","sample"]
+intervention_labels: ${intervention_labels}
+single_cell_preproc: false

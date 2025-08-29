@@ -4,6 +4,7 @@ import conceptlab as clab
 import wandb
 import omegaconf
 from conceptlab.utils import helpers
+import numpy as np
 
 @hydra.main(config_path="../fm_config/", config_name="general.yaml")
 def main(cfg: DictConfig):
@@ -23,14 +24,22 @@ def main(cfg: DictConfig):
     adata, adata_train, adata_test, adata_inter =  dataset.get_anndatas()
     
     model.train(adata_train.copy())
-    adata_preds = model.predict_intervention(adata_inter.copy(), hold_out_label = dataset.hold_out_label)
+    adata_preds = model.predict_intervention(adata_inter.copy(), hold_out_label = dataset.hold_out_label, concepts_to_flip = dataset.concepts_to_flip)
+
+    if isinstance(adata_train.X,np.ndarray):
+        x_baseline = adata_train.X
+        x_target = adata_test.X
+    else:
+        x_baseline = adata_train.X.toarray()
+        x_target = adata_test.X.toarray()
 
     score = clab.evaluation.interventions.evaluate_intervention_mmd_with_target(
-        x_train = adata_train.X.toarray(),
+        x_train = x_baseline,
         x_ivn = adata_preds.X,
-        x_target = adata_test.X.toarray(),
-        labels_train = adata_train.obs['cell_stim'].values
+        x_target = x_target,
+        labels_train = adata_train.obs[dataset.label_variable].values
         )
+    
 
     print(score)
     for k, v in score.items():

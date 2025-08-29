@@ -2,9 +2,14 @@ import scanpy as sc
 from conceptlab.data.data_utils import split_data_for_counterfactuals
 import anndata as ad
 import numpy as np
+from typing import List, Union 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 class InterventionDataset:
-    def __init__(self, data_path, intervention_labels, concept_key, label_variable):
+    def __init__(self, data_path, intervention_labels, concept_key, label_variable: Union[List,str], single_cell_preproc = True):
         """
         Loads and preprocesses single cell data
         Inputs:
@@ -12,16 +17,24 @@ class InterventionDataset:
         - intervention_labels:
             - hold_out_label: label for the hold-out group (the ground truth to compare agaisnt)
             - mod_label: label for the group that we will modulate / intervene on.
-        - label_variable: name of the column in the anndata where the mod_label and hold_out_label are defined.
+        - label_variable: name of the column in the anndata where the mod_label and hold_out_label are defined. If label_variable is a list, then we merge the columns 
+            to create a new label variable where each unique combination of the columns is a new label. Example if label_variable = ['treatment', 'cell_type'], we'll create a new column 'treatment_cell_type' where each element will be joined with '_'.
+        - single_cell_preproc: whether to preprocess the cells using scanpy.
         """
         print("Loading and preprocessing data...")
         
         print(intervention_labels)
         adata = ad.read_h5ad(data_path)
-        sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
-        sc.pp.log1p(adata)
-        sc.pp.highly_variable_genes(adata, n_top_genes=2048, subset=True)
 
+        if single_cell_preproc:
+            sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
+            sc.pp.log1p(adata)
+            sc.pp.highly_variable_genes(adata, n_top_genes=2048, subset=True)
+
+        if not isinstance(label_variable,str): # it's a list then
+            log.info("Creating a joint label variable")
+            adata.obs["_".join(label_variable)] = adata.obs[label_variable].agg("_".join, axis=1)
+            label_variable = "_".join(label_variable)
 
         hold_out_label = intervention_labels.hold_out_label
         mod_label = intervention_labels.mod_label
@@ -37,6 +50,9 @@ class InterventionDataset:
 
         self.concept_key = concept_key
         self.hold_out_label = hold_out_label
+        self.concepts_to_flip = intervention_labels.concepts_to_flip
+
+        self.label_variable = label_variable
 
     def get_anndatas(self):
         return self.adata, self.adata_train, self.adata_test, self.adata_inter

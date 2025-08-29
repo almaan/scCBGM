@@ -446,9 +446,14 @@ class CBMFM_MetaTrainer:
         self.model = fm_model
         return self.model
 
-    def predict_intervention(self, adata_inter, hold_out_label):
-        """Performs intervention using a trained learned-concept CB-FM model."""
+    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
+        """Performs intervention using a trained learned-concept CB-FM model.
+        Concepts_to_flip: List of binary concepts to flip during intervention."""
+
         print("Performing intervention with CB-FM (learned)...")
+
+        concept_to_intervene_idx = [idx for idx,c in enumerate(adata_inter.obsm[self.concept_key].columns) if c in concepts_to_flip]
+
         if not self.raw:
             adata_inter = self.get_learned_concepts(adata_inter.copy())
 
@@ -456,12 +461,14 @@ class CBMFM_MetaTrainer:
             c_unknown_inter = torch.from_numpy(adata_inter.obsm['scCBGM_concepts_unknown'].astype(np.float32))
         
             inter_concepts_known = c_known_inter.clone()
-            inter_concepts_known[:, -1] = 1 - inter_concepts_known[:, -1] # Set stim concept to the opposite of the observed value.
-
+            
+            inter_concepts_known[:, concept_to_intervene_idx] = 1 - torch.Tensor(adata_inter.obsm[self.concept_key].values)[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
+        
         else:
             c_intervene_on = torch.from_numpy(adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32))
             inter_concepts = c_intervene_on.clone()
-            inter_concepts[:, -1] = 1- inter_concepts[:,-1] # Set stim concept to 1 
+            
+            inter_concepts[:, concept_to_intervene_idx] = 1 - inter_concepts[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
 
         if(self.pc):
             x_inter = adata_inter.uns['pca_transform'].transform(adata_inter.X.toarray())

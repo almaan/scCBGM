@@ -1,3 +1,4 @@
 # @package intervention_labels
 hold_out_label: 'Dendritic cells_stim'
 mod_label: 'Dendritic cells_ctrl'
+concepts_to_flip: ["stim"]

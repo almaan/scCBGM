@@ -1,0 +1,4 @@
+# @package intervention_labels
+hold_out_label: 'B_cell_IL4'
+mod_label: 'B_cell_PBS'
+concepts_to_flip: ["PBS","IL4"] #concepts that should be flipped in the intervention prediction

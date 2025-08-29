@@ -1,3 +1,4 @@
 # @package intervention_labels
 hold_out_label: 'Megakaryocytes_stim'
 mod_label: 'Megakaryocytes_ctrl'
+concepts_to_flip: ["stim"]

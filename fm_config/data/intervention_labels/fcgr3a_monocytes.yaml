@@ -1,3 +1,4 @@
 # @package intervention_labels
 hold_out_label: 'FCGR3A+ Monocytes_stim'
 mod_label: 'FCGR3A+ Monocytes_ctrl'
+concepts_to_flip: ["stim"]
