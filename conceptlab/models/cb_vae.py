@@ -289,11 +289,13 @@ class CBM_MetaTrainer:
                  cbm_config,
                  max_epochs,
                  log_every_n_steps,
-                concept_key):
+                concept_key,
+                num_workers):
         self.cbm_config = cbm_config
         self.max_epochs = max_epochs
         self.log_every_n_steps = log_every_n_steps
         self.concept_key = concept_key
+        self.num_workers = num_workers
 
         self.model = None
     
@@ -311,7 +313,7 @@ class CBM_MetaTrainer:
         model = clab.models.scCBGM(merged_config)
 
         data_module = clab.data.dataloader.GeneExpressionDataModule(
-            adata_train, add_concepts=True, concept_key=self.concept_key, batch_size=512, normalize=False
+            adata_train, add_concepts=True, concept_key=self.concept_key, batch_size=512, normalize=False, num_workers=self.num_workers
         )
 
         trainer = pl.Trainer(max_epochs=self.max_epochs, log_every_n_steps = self.log_every_n_steps, accelerator='auto')
@@ -329,7 +331,10 @@ class CBM_MetaTrainer:
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call train() before predict_intervention().")
         
-        x_intervene_on = torch.tensor(adata_inter.X.toarray(), dtype=torch.float32)
+        if isinstance(adata_inter.X, np.ndarray):
+            x_intervene_on = torch.tensor(adata_inter.X, dtype=torch.float32)
+        else:
+            x_intervene_on = torch.tensor(adata_inter.X.toarray(), dtype=torch.float32)
         c_intervene_on = adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)
 
 

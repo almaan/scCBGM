@@ -60,11 +60,13 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         concept_key: str = "concepts",
         normalize: bool = True,
         split_by: str | None = "split_label",
+        num_workers: int = 0,
     ):
         super().__init__()
 
         self.add_concepts = add_concepts
         self.split_by = split_by
+        self.num_workers = num_workers
 
         if isinstance(data, xr.Dataset):
             self.data = data.data.to_dataframe().unstack()
@@ -104,7 +106,7 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         )
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size)

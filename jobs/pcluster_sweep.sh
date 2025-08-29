@@ -20,4 +20,4 @@ conda deactivate
 
 cd /homefs/home/debroue1/projects/conceptlab/scripts
 
-wandb agent debroue1/conceptlab/s4en36ga
+wandb agent debroue1/conceptlab/9mrqvoby

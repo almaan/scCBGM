@@ -21,7 +21,7 @@ class CB_FM:
     This class handles training and sampling with optional "known" and "unknown" concepts.
     """
 
-    def __init__(self, x_dim: int, c_known_dim: int = 0, c_unknown_dim: int = 0, emb_dim: int = 256, n_layers: int = 4, dropout: float = 0.1):
+    def __init__(self, x_dim: int, c_known_dim: int = 0, c_unknown_dim: int = 0, emb_dim: int = 256, n_layers: int = 4, dropout: float = 0.1, num_workers = 0):
         """
         Initializes the FlowMatchingModel.
         Args:
@@ -37,6 +37,7 @@ class CB_FM:
         self.c_unknown_dim = c_unknown_dim
         self.c_dim = c_known_dim + c_unknown_dim
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.num_workers = num_workers
         
         if self.c_dim == 0:
             print("Warning: All concept dimensions are 0. Model will be purely unconditional.")
@@ -89,22 +90,30 @@ class CB_FM:
 
         # Create placeholders for missing concepts to keep DataLoader structure consistent
         num_data_points = data.shape[0]
-        if concepts_known is None:
-            concepts_known = torch.zeros(num_data_points, self.c_known_dim, device=self.device)
-        if concepts_unknown is None:
-            concepts_unknown = torch.zeros(num_data_points, self.c_unknown_dim, device=self.device)
+        data_tensors = (data,)
+        if concepts_known is not None:
+            #concepts_known = torch.zeros(num_data_points, self.c_known_dim, device=self.device)
+            data_tensors = data_tensors + (concepts_known,)
+        if concepts_unknown is not None:
+            data_tensors = data_tensors + (concepts_unknown,)
+            #concepts_unknown = torch.zeros(num_data_points, self.c_unknown_dim, device=self.device)
 
-        dataset = TensorDataset(data, concepts_known, concepts_unknown)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataset = TensorDataset(*data_tensors)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers = self.num_workers)
         
         pbar = tqdm(range(num_epochs), ncols=88)
         self.losses = []
 
+        def unpack_batch(batch):
+            x1_batch = batch[0].to(self.device)
+            c_known_batch = batch[1].to(self.device) if concepts_known is not None else None
+            c_unknown_batch = batch[-1].to(self.device) if concepts_unknown is not None else None
+            return x1_batch, c_known_batch, c_unknown_batch
+
         for epoch in pbar:
             epoch_loss, epoch_ot_improv = 0.0, 0.0
-            for x1_batch, c_known_batch, c_unknown_batch in dataloader:
-                x1_batch, c_known_batch, c_unknown_batch = \
-                    x1_batch.to(self.device), c_known_batch.to(self.device), c_unknown_batch.to(self.device)
+            for batch in dataloader:
+                x1_batch, c_known_batch, c_unknown_batch = unpack_batch(batch)
 
                 optimizer.zero_grad()
                 t, xt, ut, ot_improv = self._get_train_step_data(x1_batch, ot=ot)
@@ -368,7 +377,8 @@ class CBMFM_MetaTrainer:
                  p_drop = 0.1,
                  pc = False,
                  raw = False,
-                 concept_key= "concepts"):
+                 concept_key= "concepts",
+                 num_workers = 0):
         self.scCBGM_model = cbm_mod
         self.emb_dim = emb_dim
         self.n_layers = n_layers
@@ -379,6 +389,7 @@ class CBMFM_MetaTrainer:
         self.pc = pc
         self.concept_key = concept_key
         self.raw = raw
+        self.num_workers = num_workers
 
     def get_learned_concepts(self, adata_full):
         """Uses a trained scCBGM to generate learned concepts for all data."""
@@ -399,7 +410,10 @@ class CBMFM_MetaTrainer:
         """Uses a trained scCBGM to generate learned concepts for all data."""
         print("Generating learned concepts from scCBGM...")
         with torch.no_grad():
-            all_x = torch.tensor(adata_full.X.toarray(), dtype=torch.float32)
+            if isinstance(adata_full.X,np.ndarray):
+                all_x = torch.tensor(adata_full.X, dtype=torch.float32)
+            else:
+                all_x = torch.tensor(adata_full.X.toarray(), dtype=torch.float32)
             enc = self.scCBGM_model.model.encode(all_x)
             adata_full.obsm['scCBGM_concepts_known'] = self.scCBGM_model.model.cb_concepts_layers(enc['mu']).cpu().numpy()
             adata_full.obsm['scCBGM_concepts_unknown'] = self.scCBGM_model.model.cb_unk_layers(enc['mu']).cpu().numpy()
@@ -416,13 +430,17 @@ class CBMFM_MetaTrainer:
         if(self.pc):
             data_matrix = adata_train.uns['pca_transform'].transform(adata_train.X.toarray())
         else:
-            data_matrix = adata_train.X.toarray()
+            if isinstance(adata_train.X,np.ndarray):
+                data_matrix = adata_train.X
+            else:
+                data_matrix = adata_train.X.toarray()
 
         if self.raw:
             fm_model = clab.models.cb_fm.CB_FM(
             x_dim=data_matrix.shape[1],
             c_known_dim=adata_train.obsm[self.concept_key].shape[1],
-            emb_dim=self.emb_dim, n_layers=self.n_layers
+            emb_dim=self.emb_dim, n_layers=self.n_layers,
+            num_workers = self.num_workers
         )
             fm_model.train(
             data=torch.from_numpy(data_matrix.astype(np.float32)),
@@ -434,7 +452,8 @@ class CBMFM_MetaTrainer:
                 x_dim=data_matrix.shape[1],
                 c_known_dim=adata_train.obsm['scCBGM_concepts_known'].shape[1],
                 c_unknown_dim=adata_train.obsm['scCBGM_concepts_unknown'].shape[1],
-                emb_dim=self.emb_dim, n_layers=self.n_layers
+                emb_dim=self.emb_dim, n_layers=self.n_layers,
+                num_workers=self.num_workers
             )
         
             fm_model.train(
@@ -470,10 +489,16 @@ class CBMFM_MetaTrainer:
             
             inter_concepts[:, concept_to_intervene_idx] = 1 - inter_concepts[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
 
-        if(self.pc):
-            x_inter = adata_inter.uns['pca_transform'].transform(adata_inter.X.toarray())
+        if isinstance(adata_inter.X,np.ndarray):
+            if(self.pc):
+                x_inter = adata_inter.uns['pca_transform'].transform(adata_inter.X)
+            else:
+                x_inter = adata_inter.X
         else:
-            x_inter = adata_inter.X.toarray()
+            if(self.pc):
+                x_inter = adata_inter.uns['pca_transform'].transform(adata_inter.X.toarray())
+            else:
+                x_inter = adata_inter.X.toarray()
 
         if self.raw:
             inter_preds = self.model.sample(
