@@ -5,7 +5,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import Literal, List, Dict, Any
 from torch.nn import Module
+import scanpy as sc
+import anndata as ad
 import numpy as np
+import pandas as pd
 from sklearn.metrics import (
     precision_recall_curve,
     auc,
@@ -499,5 +502,71 @@ def evaluate_intervention_r2_with_target(
         pre_ivn_r2_score=old_score,
         post_ivn_r2_score=new_score,
     )
+
+    return score
+
+def evaluate_intervention_DE_with_target(
+        x_train,
+        x_ivn,
+        x_target,
+        genes_list,
+) -> Dict[str, Any]:
+    """
+    Computes the recall for significantly up and down-regulated genes as obtained with the true treated population and the predicted one.
+
+    1. We first compute DE genes between x_train and x_target
+    2. We compute DE genes between x_train and x_ivn
+    3. We compare the list of DE genes for each direction (upregulated and downregulated)
+
+    Inputs:
+        x_train: array of control data - this should already be normalized
+        x_ivn: array of predicted intervention data - should be normalized
+        x_target: array of target intervention data - should be normalized
+        list_of_genes: the list of gene_names for the DE analysis (can be just a list of strings with same lenghts as number of columns in x_train)
+    Outputs:
+        recall_pos: recall for upregulated genes (# correctly predicted upregulated DE genes / # true upregulated DE genes)
+        recall_negs: recall for downregulated genes (# correctly predicted downregulated DE genes / # true downregulated DE genes)
+    """
+
+
+    adata_train = ad.AnnData(X=x_train, var=pd.DataFrame(index=genes_list), obs = pd.DataFrame({"treated": ["FALSE"] * len(x_train)}))
+    adata_ivn = ad.AnnData(X=x_ivn, var=pd.DataFrame(index=genes_list), obs = pd.DataFrame({"treated": ["TRUE"] * len(x_ivn)}))
+    adata_target = ad.AnnData(X=x_target, var=pd.DataFrame(index=genes_list), obs = pd.DataFrame({"treated": ["TRUE"] * len(x_target)}))
+
+    adata_train.obs_names = [f"train_{x}" for x in adata_train.obs_names]
+    adata_target.obs_names = [f"target_{x}" for x in adata_target.obs_names]
+    adata_ivn.obs_names = [f"ivn_{x}" for x in adata_ivn.obs_names]
+    
+    adata_true = ad.concat([adata_train,adata_target])
+    adata_pred = ad.concat([adata_train, adata_ivn])
+    
+    adata_true.obs["treated"] = adata_true.obs["treated"].astype("category")
+    adata_pred.obs["treated"] = adata_pred.obs["treated"].astype("category")
+
+    # Run DE: A vs B (two-sided Wilcoxon)
+    sc.tl.rank_genes_groups(adata_true, groupby="treated", method="wilcoxon", use_raw=False)
+    sc.tl.rank_genes_groups(adata_pred, groupby="treated", method="wilcoxon", use_raw=False)
+
+
+    # Export tidy table for group Treated vs Untreated
+    def scanpy_de_to_df(adata, group="B"):
+        keys = ["names","scores","pvals","pvals_adj","logfoldchanges"]
+        cols = {k: adata.uns["rank_genes_groups"][k][group] for k in keys}
+        return pd.DataFrame(cols)
+
+    res_true = scanpy_de_to_df(adata_true, group="TRUE")
+    res_pred = scanpy_de_to_df(adata_pred, group="TRUE")
+
+    true_pos = res_true.loc[(res_true["pvals_adj"] < 0.001) & (res_true["logfoldchanges"]>0), "names"].values
+    true_negs = res_true.loc[(res_true["pvals_adj"] < 0.001) & (res_true["logfoldchanges"]<0), "names"].values
+
+    pred_pos = res_pred.loc[(res_pred["pvals_adj"] < 0.001) & (res_pred["logfoldchanges"]>0), "names"].values
+    pred_negs = res_pred.loc[(res_pred["pvals_adj"] < 0.001) & (res_pred["logfoldchanges"]<0), "names"].values
+
+    #recall pos and negative genes
+    recall_pos = len(set(true_pos) & set(pred_pos)) / (len(true_pos) + 1e-8)
+    recall_negs = len(set(true_negs) & set(pred_negs)) / (len(true_negs) + 1e-8)
+
+    score = dict(recall_pos=recall_pos, recall_negs=recall_negs)
 
     return score

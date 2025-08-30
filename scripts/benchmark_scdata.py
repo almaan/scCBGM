@@ -33,16 +33,25 @@ def main(cfg: DictConfig):
         x_baseline = adata_train.X.toarray()
         x_target = adata_test.X.toarray()
 
-    score = clab.evaluation.interventions.evaluate_intervention_mmd_with_target(
+    mmd_score = clab.evaluation.interventions.evaluate_intervention_mmd_with_target(
         x_train = x_baseline,
         x_ivn = adata_preds.X,
         x_target = x_target,
         labels_train = adata_train.obs[dataset.label_variable].values
         )
     
-
-    print(score)
-    for k, v in score.items():
+    de_score = clab.evaluation.interventions.evaluate_intervention_DE_with_target(
+        x_train = x_baseline,
+        x_ivn = adata_preds.X,
+        x_target = x_target,
+        genes_list = adata_train.var.index
+    ) 
+    
+    print(mmd_score)
+    print(de_score)
+    for k, v in mmd_score.items():
+        wandb.log({k: v})
+    for k, v in de_score.items():
         wandb.log({k: v})
     wandb.finish()
 
