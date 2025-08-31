@@ -560,8 +560,8 @@ def evaluate_intervention_DE_with_target(
     true_pos = res_true.loc[(res_true["pvals_adj"] < 0.001) & (res_true["logfoldchanges"]>0), "names"].values
     true_negs = res_true.loc[(res_true["pvals_adj"] < 0.001) & (res_true["logfoldchanges"]<0), "names"].values
 
-    pred_pos = res_pred.loc[(res_pred["pvals_adj"] < 0.001) & (res_pred["logfoldchanges"]>0), "names"].values
-    pred_negs = res_pred.loc[(res_pred["pvals_adj"] < 0.001) & (res_pred["logfoldchanges"]<0), "names"].values
+    pred_pos = res_pred.loc[(res_pred["pvals_adj"] < 0.05) & (res_pred["logfoldchanges"]>0), "names"].values
+    pred_negs = res_pred.loc[(res_pred["pvals_adj"] < 0.05) & (res_pred["logfoldchanges"]<0), "names"].values
 
     #recall pos and negative genes
     recall_pos = len(set(true_pos) & set(pred_pos)) / (len(true_pos) + 1e-8)
