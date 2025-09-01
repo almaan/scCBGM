@@ -4,12 +4,13 @@ import anndata as ad
 import numpy as np
 from typing import List, Union 
 import logging
+from sklearn.decomposition import PCA
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 class InterventionDataset:
-    def __init__(self, data_path, intervention_labels, concept_key, label_variable: Union[List,str], single_cell_preproc = True):
+    def __init__(self, data_path, intervention_labels, concept_key, label_variable: Union[List,str], single_cell_preproc = True, log1p = True):
         """
         Loads and preprocesses single cell data
         Inputs:
@@ -30,6 +31,8 @@ class InterventionDataset:
             sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
             sc.pp.log1p(adata)
             sc.pp.highly_variable_genes(adata, n_top_genes=2048, subset=True)
+        
+        adata.X = adata.X.toarray()
 
         if not isinstance(label_variable,str): # it's a list then
             log.info("Creating a joint label variable")
@@ -42,6 +45,12 @@ class InterventionDataset:
         adata, adata_train, adata_test, adata_inter = split_data_for_counterfactuals(
             adata, hold_out_label, mod_label, label_variable
         )
+        
+        adata.uns['pc_transform'] = PCA(n_components=80).fit(adata_train.X)
+
+        for x_data in [adata, adata_train, adata_test, adata_inter]:
+            x_data.uns['pc_transform'] = adata.uns['pc_transform']
+            x_data.obsm['X_pca'] = x_data.uns['pc_transform'].transform(x_data.X)
 
         self.adata = adata
         self.adata_train = adata_train

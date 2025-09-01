@@ -3,10 +3,12 @@ concept_key: ${data.concept_key}
 max_epochs: 200
 log_every_n_steps: 10
 num_workers: 4
+pca: False
 cbm_config:
   has_cbm: True
-  lr: 5e-4
-  hidden_dim: 256
+  lr: 3e-4
+  n_layers: 4
+  hidden_dim: 1024
   beta: 1e-5
   latent_dim: 128
   min_bottleneck_size: 128

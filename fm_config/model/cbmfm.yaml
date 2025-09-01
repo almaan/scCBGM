@@ -1,6 +1,4 @@
 _target_: conceptlab.models.cb_fm.CBMFM_MetaTrainer
-emb_dim: 1024
-n_layers: 6
 num_epochs: 1000
 batch_size: 128
 lr: 3e-4
@@ -8,6 +6,12 @@ p_drop: 0.1
 raw: False
 concept_key: ${data.concept_key}
 num_workers: 4
+fm_mod_cfg:
+  hidden_dim: 1024
+  latent_dim: 128
+  n_layers: 4
+  dropout: 0.1
+  p_uncond: 0.1
 cbm_mod:
   _target_: conceptlab.models.cb_vae.CBM_MetaTrainer
   concept_key: ${data.concept_key}
@@ -16,8 +20,9 @@ cbm_mod:
   num_workers: 4
   cbm_config:
     has_cbm: True
-    lr: 5e-4
-    hidden_dim: 256
+    lr: 3e-4
+    n_layers: 4
+    hidden_dim: 1024
     beta: 1e-5
     latent_dim: 128
     min_bottleneck_size: 128
@@ -25,3 +30,4 @@ cbm_mod:
     concepts_hp: 0.005
     orthogonality_hp: 0.2
     use_soft_concepts: False
+

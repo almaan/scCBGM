@@ -7,6 +7,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from torch.optim.lr_scheduler import CosineAnnealingLR, ExponentialLR
 import torch.nn.utils.parametrizations as param
 from wandb import Histogram
+from scipy.sparse import csr_array, issparse
 
 from tqdm import tqdm
 
@@ -161,9 +162,12 @@ class CB_VAE(BaseCBVAE):
         return out
     
     def intervene(self, x, concepts, mask, **kwargs):
-        enc = self.encode(x)
+        
+        device = self._encoder.x_embedder.weight.device
+        
+        enc = self.encode(x.to(device))
         z = self.reparametrize(**enc)
-        cbm = self.cbm(**z, **enc, concepts=concepts, mask=mask, intervene=True)
+        cbm = self.cbm(**z, **enc, concepts=concepts.to(device), mask=mask.to(device), intervene=True)
         dec = self.decode(**cbm)
         return dec
 
@@ -255,8 +259,8 @@ class CB_VAE(BaseCBVAE):
                concepts: torch.Tensor,
                num_epochs: int,
                batch_size: int,
-               lr: float = 3e-4,
-               lr_gamma: float = 0.997):
+               lr_gamma: float = 0.997,
+               num_workers:int = 0):
         """
         Defines the training loop for the scCBGM model.
         """
@@ -267,8 +271,9 @@ class CB_VAE(BaseCBVAE):
         self.to(device)
 
         dataset = TensorDataset(data, concepts)
-        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers = num_workers)
 
+        lr = self.learning_rate
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=lr_gamma)
 
@@ -378,6 +383,11 @@ class CBM_MetaTrainer:
             if self.z_score:
                 data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization       
 
+        if issparse(data_matrix):
+            data_matrix = data_matrix.toarray()
+        
+        torch.set_flush_denormal(True)
+
         config = OmegaConf.create(dict(
             input_dim=adata_train.shape[1], 
             n_concepts=adata_train.obsm[self.concept_key].shape[1],
@@ -386,14 +396,23 @@ class CBM_MetaTrainer:
         
         model = clab.models.scCBGM(merged_config)
 
-        data_module = clab.data.dataloader.GeneExpressionDataModule(
-            adata_train, add_concepts=True, concept_key=self.concept_key, batch_size=512, normalize=False, num_workers=self.num_workers
-        )
+        model.train_loop(
+            data=torch.from_numpy(data_matrix.astype(np.float32)),
+            concepts=torch.from_numpy(adata_train.obsm[self.concept_key].to_numpy().astype(np.float32)),
+            num_epochs=self.max_epochs, batch_size=128,
+            num_workers = self.num_workers
+            )
+        
+        self.model = model
 
-        trainer = pl.Trainer(max_epochs=self.max_epochs, log_every_n_steps = self.log_every_n_steps, accelerator='auto')
-        trainer.fit(model, data_module)
+        #data_module = clab.data.dataloader.GeneExpressionDataModule(
+        #    adata_train, add_concepts=True, concept_key=self.concept_key, batch_size=512, normalize=False, num_workers=self.num_workers
+        #)
 
-        self.model = model.to("cpu").eval()
+        #trainer = pl.Trainer(max_epochs=self.max_epochs, log_every_n_steps = self.log_every_n_steps, accelerator='auto')
+        #trainer.fit(model, data_module)
+
+        #self.model = model.to("cpu").eval()
 
         return self.model
 
@@ -405,12 +424,14 @@ class CBM_MetaTrainer:
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call train() before predict_intervention().")
         
-        if isinstance(adata_inter.X, np.ndarray):
-            x_intervene_on = torch.tensor(adata_inter.X, dtype=torch.float32)
+        if self.pca:
+            x_intervene_on =  torch.tensor(adata_inter.obsm['X_pca'], dtype=torch.float32)
         else:
-            x_intervene_on = torch.tensor(adata_inter.X.toarray(), dtype=torch.float32)
+            if isinstance(adata_inter.X, np.ndarray):
+                x_intervene_on = torch.tensor(adata_inter.X, dtype=torch.float32)
+            else:
+                x_intervene_on = torch.tensor(adata_inter.X.toarray(), dtype=torch.float32)
         c_intervene_on = adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)
-
 
         # what indices should we flip in the concepts
         concept_to_intervene_idx = [idx for idx,c in enumerate(adata_inter.obsm[self.concept_key].columns) if c in concepts_to_flip]
@@ -425,9 +446,18 @@ class CBM_MetaTrainer:
         with torch.no_grad():
             inter_preds = self.model.intervene(x_intervene_on, mask=mask, concepts=inter_concepts)
         
-        x_inter_preds = inter_preds['x_pred'].cpu().numpy()
+        inter_preds = inter_preds['x_pred'].cpu().numpy() 
+
+        if(self.pca):
+            x_inter_preds = adata_inter.uns['pc_transform'].inverse_transform(inter_preds)
+        else:
+            x_inter_preds = inter_preds
 
         pred_adata = ad.AnnData(x_inter_preds, var=adata_inter.var)
         pred_adata.obs['ident'] = 'intervened on'
         pred_adata.obs['cell_stim'] = hold_out_label + '*'
+
+        if(self.pca):
+            pred_adata.obsm['X_pca'] = inter_preds
+
         return pred_adata

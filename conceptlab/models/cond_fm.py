@@ -187,7 +187,8 @@ class Cond_FM(nn.Module, ABC):
               num_epochs: int,
               batch_size: int,
               lr: float = 2e-4,
-              lr_gamma: float = 0.997):
+              lr_gamma: float = 0.997,
+              num_workers: int = 0):
         """
         Defines the training loop for the Concept_FM model.
 
@@ -202,7 +203,7 @@ class Cond_FM(nn.Module, ABC):
 
         # Create DataLoader
         dataset = TensorDataset(data, concepts)
-        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers = num_workers)
 
         # Setup Optimizer and Scheduler
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
