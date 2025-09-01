@@ -6,15 +6,15 @@ from tqdm import tqdm
 from typing import List, Optional, Tuple
 
 
-# Assuming the MLP model is defined in mlp.py as specified previously
-from .mlp import MLP
+# Assuming the FlowDecoder model is defined in FlowDecoder.py as specified previously
+from .mlp import FlowDecoder
 from .utils import optimal_transport_coupling
 
 
 
 class CB_FM:
     """
-    Implements a conditional flow matching model using a base MLP.
+    Implements a conditional flow matching model using a base FlowDecoder.
     This class handles training and sampling with optional "known" and "unknown" concepts.
     """
 
@@ -25,9 +25,9 @@ class CB_FM:
             x_dim (int): The dimensionality of the input data (e.g., cell features).
             c_known_dim (int): The dimensionality of the "known" conditioning vector.
             c_unknown_dim (int): The dimensionality of the "unknown" conditioning vector.
-            emb_dim (int): The embedding dimension for the MLP.
-            n_layers (int): The number of layers in the MLP.
-            dropout (float): The dropout rate for the MLP.
+            emb_dim (int): The embedding dimension for the FlowDecoder.
+            n_layers (int): The number of layers in the FlowDecoder.
+            dropout (float): The dropout rate for the FlowDecoder.
         """
         self.x_dim = x_dim
         self.c_known_dim = c_known_dim
@@ -38,7 +38,7 @@ class CB_FM:
         if self.c_dim == 0:
             print("Warning: All concept dimensions are 0. Model will be purely unconditional.")
 
-        self.model = MLP(
+        self.model = FlowDecoder(
             x_dim=x_dim,
             c_dim=self.c_dim,
             emb_dim=emb_dim,

@@ -3,6 +3,34 @@ import torch.nn as nn
 import math
 from typing import Optional
 
+class ConditionEmbedding(nn.Module):
+    """
+    A learnable embedding layer for the condition vector 'c'.
+    This layer projects the condition vector into a higher-dimensional space.
+    """
+    def __init__(self, c_dim: int, emb_dim: int):
+        """
+        Initializes the condition embedding layer.
+        Args:
+            c_dim (int): The dimensionality of the condition vector.
+            emb_dim (int): The dimensionality of the embedding space.
+        """
+        super().__init__()
+        self.linear = nn.Linear(c_dim, emb_dim)
+
+    def forward(self, c: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the condition embedding layer.
+        Args:
+            c (torch.Tensor): The condition vector, shape (batch_size, c_dim).
+        Returns:
+            torch.Tensor: The embedded condition vector, shape (batch_size, emb_dim).
+        """
+        c_emb = self.linear(c)
+        c_emb = c_emb / c_emb.norm(dim=-1, keepdim=True)  # normalize to be on hypersphere
+        return c_emb
+
+
 class FourierEmbedding(nn.Module):
     """
     Projects a scalar time value 't' into a higher-dimensional Fourier feature space.
@@ -75,7 +103,7 @@ class MLPBlock(nn.Module):
         return x + residual
 
 
-class MLP(nn.Module):
+class FlowDecoder(nn.Module):
     """
     A fully-connected neural network with skip connections, designed for
     flow matching. It takes cell data, time, and an optional concept vector as input.
@@ -199,7 +227,7 @@ class FeedForwardBlock(nn.Module):
         return x + residual
 
 
-class Encoder(nn.Module):
+class DenseEncoder(nn.Module):
     def __init__(
         self,
         input_dim: int,

@@ -9,12 +9,10 @@ import torch.nn.utils.parametrizations as param
 from wandb import Histogram
 import wandb
 
-from tqdm import tqdm
-from .mlp import MLP
 
 from .utils import sigmoid
 
-from .mlp import MLP, Encoder
+from .mlp import FlowDecoder, DenseEncoder, ConditionEmbedding
 from tqdm import tqdm
 
 from abc import ABC, abstractmethod
@@ -23,8 +21,8 @@ class Concept_FM(nn.Module, ABC):
     def __init__(
         self,
         config,
-        _encoder: nn.Module = Encoder,
-        _decoder: nn.Module = MLP,
+        _encoder: nn.Module = DenseEncoder,
+        _decoder: nn.Module = FlowDecoder,
         **kwargs,
     ):
 
@@ -39,10 +37,17 @@ class Concept_FM(nn.Module, ABC):
         self.dropout = config.get("dropout", 0.1)
         self.p_uncond = config.get("p_uncond", 0.1)
 
+        if(self.p_uncond > 0):
+            self.condition_embedder = ConditionEmbedding(c_dim=self.n_concepts + self.n_unknown, emb_dim=self.hidden_dim)
+            self.concept_emb_dim = self.hidden_dim
+        else:
+            self.condition_embedder = nn.Identity()
+            self.concept_emb_dim = self.n_concepts + self.n_unknown
+
         # Encoder
         self._encoder = _encoder(
             input_dim=self.input_dim,
-            hidden_dim=self.hidden_dim,
+            hidden_dim=self.concept_emb_dim,
             latent_dim=self.latent_dim,
             n_layers =self.n_layers,
             dropout=self.dropout,
@@ -83,7 +88,7 @@ class Concept_FM(nn.Module, ABC):
 
         self._decoder = _decoder(
             x_dim=self.input_dim,
-            c_dim=self.n_concepts + self.n_unknown,
+            c_dim=self.concept_emb_dim,
             emb_dim=self.hidden_dim,
             n_layers = self.n_layers,
             dropout=self.dropout,
@@ -168,13 +173,14 @@ class Concept_FM(nn.Module, ABC):
 
         print(f"Decoding with {n_steps} steps and cfg_strength {cfg_strength}")
 
+        h_emb = self.condition_embedder(h)
         # Iteratively solve the ODE using the Euler method
         for t_step in tqdm(range(n_steps), desc="Forward Process", ncols=88, leave=False):
             t_current = t_step * dt
             t_vec = torch.full((batch_size,), t_current, device=device)
 
-            v_cond = self._decoder(x_t=x_t, t=t_vec, c=h)
-            v_uncond = self._decoder(x_t=x_t, t=t_vec, c=torch.zeros_like(h))
+            v_cond = self._decoder(x_t=x_t, t=t_vec, c=h_emb)
+            v_uncond = self._decoder(x_t=x_t, t=t_vec, c=torch.zeros_like(h_emb))
             v_guided = v_uncond + cfg_strength * (v_cond - v_uncond)
 
             x_t = x_t + v_guided * dt
@@ -301,8 +307,10 @@ class Concept_FM(nn.Module, ABC):
                 std = torch.exp(0.5 * logvar)
 
                 # 3. Classifier-Free Guidance Training
+
+                h_emb = self.condition_embedder(h)
                 is_unconditional = torch.rand(x_batch.shape[0], device=device) < self.p_uncond
-                h_guided = torch.where(is_unconditional.unsqueeze(-1), 0.0, h)
+                h_guided = torch.where(is_unconditional.unsqueeze(-1), 0.0, h_emb)
 
                 # Sample x_0 from the learned distribution N(mu, sigma^2)
                 x_0 = mu + std * torch.randn_like(mu)

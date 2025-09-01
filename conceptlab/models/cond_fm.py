@@ -9,12 +9,9 @@ import torch.nn.utils.parametrizations as param
 from wandb import Histogram
 import wandb
 
-from tqdm import tqdm
-from .mlp import MLP
-
 from .utils import sigmoid
 
-from .mlp import MLP, Encoder
+from .mlp import FlowDecoder, ConditionEmbedding
 from tqdm import tqdm
 
 from abc import ABC, abstractmethod
@@ -23,8 +20,7 @@ class Cond_FM(nn.Module, ABC):
     def __init__(
         self,
         config,
-        _encoder: nn.Module = Encoder,
-        _decoder: nn.Module = MLP,
+        _decoder: nn.Module = FlowDecoder,
         **kwargs,
     ):
 
@@ -38,9 +34,16 @@ class Cond_FM(nn.Module, ABC):
         self.dropout = config.get("dropout", 0.1)
         self.p_uncond = config.get("p_uncond", 0.0)
 
+        if(self.p_uncond > 0):
+            self.condition_embedder = ConditionEmbedding(c_dim=self.n_concepts, emb_dim=self.hidden_dim)
+            self.concept_emb_dim = self.hidden_dim
+        else:
+            self.condition_embedder = nn.Identity()
+            self.concept_emb_dim = self.n_concepts
+        
         self._decoder = _decoder(
             x_dim=self.input_dim,
-            c_dim=self.n_concepts,
+            c_dim=self.concept_emb_dim,
             emb_dim=self.hidden_dim,
             n_layers = self.n_layers,
             dropout=self.dropout,
@@ -68,6 +71,8 @@ class Cond_FM(nn.Module, ABC):
         x_t = torch.randn(batch_size, self.input_dim, device=device)
         dt = 1.0 / n_steps
 
+        h_emb = self.condition_embedder(h)
+
         print(f"Decoding with {n_steps} steps and CFG scale w={w_cfg}")
         # Iteratively solve the ODE using the Euler method
         for t_step in tqdm(range(n_steps), desc="Forward Process", ncols=88, leave=False):
@@ -76,10 +81,10 @@ class Cond_FM(nn.Module, ABC):
 
             # --- 3. MODIFIED: CFG logic for sampling ---
             # Predict the conditional vector field
-            v_cond = self._decoder(x_t=x_t, t=t_vec, c=h)
+            v_cond = self._decoder(x_t=x_t, t=t_vec, c=h_emb)
 
             # Predict the unconditional vector field if guidance is used
-            v_uncond = self._decoder(x_t=x_t, t=t_vec, c=torch.zeros_like(h, device=device))
+            v_uncond = self._decoder(x_t=x_t, t=t_vec, c=torch.zeros_like(h_emb, device=device))
             
             # Combine them using the guidance scale
             v_guided = v_uncond + w_cfg * (v_cond - v_uncond)
@@ -125,7 +130,9 @@ class Cond_FM(nn.Module, ABC):
         print(f"Editing from t=1.0 back to t={n_edit_steps * dt:.2f}, then forward with new condition.")
         
         x_t = x.clone()
-        
+
+        c_emb = self.condition_embedder(c)
+        c_prime_emb = self.condition_embedder(c_prime)
         # --- 1. Backward Process (Inversion) ---
         # Integrate from t=1 down to t_edit using the original condition 'c'
         for t_step in tqdm(range(n_steps, n_edit_steps, -1), desc="Backward Process (Inversion), cfg: {:.2e}".format(w_cfg_backward), ncols=88, leave=False):
@@ -133,10 +140,9 @@ class Cond_FM(nn.Module, ABC):
             t_vec = torch.full((batch_size,), t_current, device=device)
             
             # Use the original condition 'c' and backward cfg scale
-            v_cond = self._decoder(x_t=x_t, t=t_vec, c=c)
+            v_cond = self._decoder(x_t=x_t, t=t_vec, c=c_emb)
+            v_uncond = self._decoder(x_t=x_t, t=t_vec, c= torch.zeros_like(c_emb, device=device))
 
-            c_uncond = torch.zeros_like(c, device=device)
-            v_uncond = self._decoder(x_t=x_t, t=t_vec, c=c_uncond)
             v_guided = v_uncond + w_cfg_backward * (v_cond - v_uncond)
 
             
@@ -145,6 +151,7 @@ class Cond_FM(nn.Module, ABC):
 
         if(noise_add > 0):
             print("Adding noise to the edited sample with std = {:.2e}".format(noise_add))
+        
         x_t = x_t + noise_add * torch.randn_like(x_t)
         # --- 2. Forward Process (Editing) ---
         # Integrate from t_edit up to t=1 using the new condition 'c_prime'
@@ -153,10 +160,8 @@ class Cond_FM(nn.Module, ABC):
             t_vec = torch.full((batch_size,), t_current, device=device)
 
             # Use the new condition 'c_prime' and forward cfg scale
-            v_cond = self._decoder(x_t=x_t, t=t_vec, c=c_prime)
-
-            c_uncond = torch.zeros_like(c_prime, device=device)
-            v_uncond = self._decoder(x_t=x_t, t=t_vec, c=c_uncond)
+            v_cond = self._decoder(x_t=x_t, t=t_vec, c=c_prime_emb)
+            v_uncond = self._decoder(x_t=x_t, t=t_vec, c=torch.zeros_like(c_prime_emb, device=device))
             v_guided = v_uncond + w_cfg_forward * (v_cond - v_uncond)
 
 
@@ -218,8 +223,10 @@ class Cond_FM(nn.Module, ABC):
                 x_batch = x_batch.to(device)
                 concepts_batch = concepts_batch.to(device)
 
-                uncond_mask = torch.rand(concepts_batch.shape[0], device=device) < self.p_uncond
-                concepts_batch[uncond_mask] = 0
+                concepts_batch_emb = self.condition_embedder(concepts_batch)
+
+                uncond_mask = torch.rand(concepts_batch_emb.shape[0], device=device) < self.p_uncond
+                concepts_batch_emb[uncond_mask] = 0
 
 
                 # 4. Prepare for Flow Matching Loss
@@ -230,13 +237,13 @@ class Cond_FM(nn.Module, ABC):
                 v = x_1 - x_0
 
                 # 5. Get the Model's Prediction
-                v_pred = self._decoder(x_t=x_t, t=t.squeeze(-1), c=concepts_batch)
+                v_pred = self._decoder(x_t=x_t, t=t.squeeze(-1), c=concepts_batch_emb)
 
                 # 6. Calculate loss
                 loss_dict = self.loss_function(
                     v_pred=v_pred,
                     v=v,
-                    concepts=concepts_batch,
+                    concepts=concepts_batch_emb,
                 )
                 loss = loss_dict["Total_loss"]
 
