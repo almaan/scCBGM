@@ -533,7 +533,6 @@ def evaluate_intervention_r2_with_target(
 
     return score
 
-<<<<<<< HEAD
 def evaluate_intervention_DE_with_target(
         x_train,
         x_ivn,
@@ -599,7 +598,6 @@ def evaluate_intervention_DE_with_target(
     score = dict(recall_pos=recall_pos, recall_negs=recall_negs)
 
     return score
-=======
 def evaluate_intervention_knn_with_target(
     x_train,
     x_ivn,
@@ -668,4 +666,3 @@ def evaluate_intervention_cosine_with_target(
     ivn_target_cosine_sim = met.cosine_sim(x_ivn_mean, x_target_mean)
 
     return ivn_target_cosine_sim/train_target_cosine_sim_max
->>>>>>> d9366b5ac91af17a791f8eb0d1acdac76b0a47e5
