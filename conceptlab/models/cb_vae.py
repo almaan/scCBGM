@@ -283,11 +283,9 @@ class CB_VAE(BaseCBVAE):
         
         # --- 2. The Training Loop ---
         pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=100)
-        history = {"total_loss": [], "rec_loss": [], "kl_loss": [], "concept_loss": [], "orth_loss": []}
 
         for epoch in pbar:
-            epoch_losses = {key: 0.0 for key in history.keys()}
-
+            total_loss = 0.0
             for x_batch, concepts_batch in data_loader:
                 # Move batch to the correct device
                 x_batch = x_batch.to(device)
@@ -300,35 +298,31 @@ class CB_VAE(BaseCBVAE):
 
                 # 2. Calculate loss
                 loss_dict = self.loss_function(x_batch, concepts_batch, **out)
-                total_loss = loss_dict["Total_loss"]
+                loss = loss_dict["Total_loss"]
                 # -------------------------------------------
 
                 # 3. Backward pass and optimization
                 optimizer.zero_grad()
-                total_loss.backward()
+                loss.backward()
                 optimizer.step()
 
                 # Accumulate losses for logging
-                for key in epoch_losses.keys():
-                     epoch_losses[key] += loss_dict.get(key.replace("_loss", "") + "_loss", torch.tensor(0.0)).item()
-
-            # --- 3. End of Epoch ---
-            # Update learning rate
-            scheduler.step()
-
-            # Log average losses for the epoch
-            num_batches = len(data_loader)
-            for key in history.keys():
-                history[key].append(epoch_losses[key] / num_batches)
-            
+                total_loss += loss.item()
+           
+           # --- End of Epoch ---
+            avg_loss = total_loss / len(data_loader)
+             
             pbar.set_postfix({
-                "Loss": history['total_loss'][-1],
-                "LR": scheduler.get_last_lr()[0]
+                "avg_loss": f"{avg_loss:.3e}",
+                "lr": f"{scheduler.get_last_lr()[0]:.5e}"
             })
+             
+            scheduler.step()
+             
 
         print("Training finished.")
         self.eval() # Set the model to evaluation mode
-        return history
+
 
 class scCBGM(CB_VAE):
     def __init__(self, config, **kwargs):

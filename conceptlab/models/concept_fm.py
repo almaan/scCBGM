@@ -96,10 +96,10 @@ class Concept_FM(nn.Module, ABC):
 
         self.dropout_layer = nn.Dropout(p=self.dropout)
 
-        self.concepts_hp = config.get("concepts_hp", 1.0)
-        self.orthogonality_hp = config.get("orthogonality_hp", 1.0)
+        self.concepts_hp = config.get("concepts_hp", 0.005)
+        self.orthogonality_hp = config.get("orthogonality_hp", 0.2)
         # --- VARIATIONAL CHANGE 2: Add KL loss hyperparameter ---
-        self.kl_hp = config.get("kl_hp", 0.01) # Add a weight for the new KL loss term
+        self.kl_hp = config.get("kl_hp", 0.1) # Add a weight for the new KL loss term
         # --- End of Change ---
 
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
@@ -151,7 +151,7 @@ class Concept_FM(nn.Module, ABC):
         )
 
     @torch.no_grad()
-    def decode(self, h, n_steps: int = 1000, cfg_strength: float = 1.2, **kwargs):
+    def decode(self, h, n_steps: int = 1000, cfg_strength: float = 1.0, **kwargs):
         """
         Integrates the flow ODE forward from t=0 to t=1 using the Euler
         method, conditioned on the concept vector h.
@@ -182,6 +182,7 @@ class Concept_FM(nn.Module, ABC):
             v_cond = self._decoder(x_t=x_t, t=t_vec, c=h_emb)
             v_uncond = self._decoder(x_t=x_t, t=t_vec, c=torch.zeros_like(h_emb))
             v_guided = v_uncond + cfg_strength * (v_cond - v_uncond)
+            #v_guided = v_uncond * (1 - cfg_strength) + v_cond * cfg_strength
 
             x_t = x_t + v_guided * dt
 
@@ -350,8 +351,8 @@ class Concept_FM(nn.Module, ABC):
             avg_loss = total_loss / len(data_loader)
              
             pbar.set_postfix({
-                "avg_loss": f"{avg_loss:.4f}",
-                "lr": f"{scheduler.get_last_lr()[0]:.6f}"
+                "avg_loss": f"{avg_loss:.3e}",
+                "lr": f"{scheduler.get_last_lr()[0]:.5e}"
             })
              
             scheduler.step()

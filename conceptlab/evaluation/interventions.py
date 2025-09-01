@@ -496,7 +496,10 @@ def evaluate_intervention_mmd_with_target(
 
         for k, s in enumerate(source):
             x_source = x_train[labels_train == s]
-            scores[k] = met.mmd(x_target, x_source)
+            if x_source.shape[0] < 10:
+                scores[k] = np.inf
+            else:
+                scores[k] = met.mmd(x_target, x_source)
 
         min_train_score = np.min(scores)
     else:
