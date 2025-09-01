@@ -3,33 +3,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch as t
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import TensorDataset, DataLoader
+from torch.optim.lr_scheduler import CosineAnnealingLR, ExponentialLR
 import torch.nn.utils.parametrizations as param
 from wandb import Histogram
-import wandb
+
+from tqdm import tqdm
 
 from .base import BaseCBVAE
 from .utils import sigmoid
-from .encoder import DefaultEncoderBlock
-from .decoder import DefaultDecoderBlock, SkipDecoderBlock
+from .encoder import EncoderBlock
+from .decoder import DecoderBlock
 
 EPS = 1e-6
-
-
-import pytorch_lightning as pl
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch as t
-from torch.optim.lr_scheduler import CosineAnnealingLR
-import torch.nn.utils.parametrizations as param
-from wandb import Histogram
-import wandb
-
-from .base import BaseCBVAE
-from .utils import sigmoid
-from .encoder import DefaultEncoderBlock
-from .decoder import DefaultDecoderBlock, SkipDecoderBlock
 
 import conceptlab as clab
 import pytorch_lightning as pl
@@ -37,15 +23,14 @@ import numpy as np
 import anndata as ad
 from omegaconf import OmegaConf
 
-EPS = 1e-6
 
 
 class CB_VAE(BaseCBVAE):
     def __init__(
         self,
         config,
-        _encoder: nn.Module = DefaultEncoderBlock,
-        _decoder: nn.Module = DefaultDecoderBlock,
+        _encoder: nn.Module = EncoderBlock,
+        _decoder: nn.Module = DecoderBlock,
         **kwargs,
     ):
 
@@ -61,6 +46,7 @@ class CB_VAE(BaseCBVAE):
         self._encoder = _encoder(
             input_dim=self.input_dim,
             hidden_dim=self.hidden_dim,
+            n_layers=self.n_layers,
             latent_dim=self.latent_dim,
             dropout=self.dropout,
         )
@@ -102,6 +88,7 @@ class CB_VAE(BaseCBVAE):
 
         self._decoder = _decoder(
             input_dim=self.input_dim,
+            n_layers = self.n_layers,
             n_concepts=self.n_concepts,
             n_unknown=n_unknown,
             hidden_dim=self.hidden_dim,
@@ -124,7 +111,6 @@ class CB_VAE(BaseCBVAE):
             self.concept_loss = self._hard_concept_loss
             self.concept_transform = sigmoid
 
-        self.save_hyperparameters()
 
     @property
     def has_concepts(
@@ -163,6 +149,17 @@ class CB_VAE(BaseCBVAE):
             h=h,
         )
 
+    def forward(self, x, concepts=None, **kwargs):
+        enc = self.encode(x, concepts=concepts, **kwargs)
+        z_dict = self.reparametrize(**enc)
+        cbm_dict = self.cbm(**z_dict, concepts=concepts, **enc)
+        dec_dict = self.decode(**enc, **z_dict, **cbm_dict, concepts=concepts)
+
+        out = {}
+        for d in [enc, z_dict, cbm_dict, dec_dict]:
+            out.update(d)
+        return out
+    
     def intervene(self, x, concepts, mask, **kwargs):
         enc = self.encode(x)
         z = self.reparametrize(**enc)
@@ -253,31 +250,84 @@ class CB_VAE(BaseCBVAE):
 
         return loss_dict
 
-    def configure_optimizers(
-        self,
-    ):
+    
+    def train_loop(self, data: torch.Tensor,
+               concepts: torch.Tensor,
+               num_epochs: int,
+               batch_size: int,
+               lr: float = 3e-4,
+               lr_gamma: float = 0.997):
+        """
+        Defines the training loop for the scCBGM model.
+        """
+        # --- 1. Setup Device, DataLoader, Optimizer, Scheduler ---
+        torch.set_flush_denormal(True) # Add this to prevent slowdowns
+        
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.to(device)
 
-        optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate
-        )
-        # Define the CosineAnnealingLR scheduler
-        scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
+        dataset = TensorDataset(data, concepts)
+        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-        # Return a dictionary with the optimizer and the scheduler
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,  # The LR scheduler instance
-                "interval": "epoch",  # The interval to step the scheduler ('epoch' or 'step')
-                "frequency": 1,  # How often to update the scheduler
-                "monitor": "val_loss",  # Optional: if you use reduce-on-plateau schedulers
-            },
-        }
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=lr_gamma)
 
+        print(f"Starting training on {device} for {num_epochs} epochs...")
+
+        self.train() # Set the model to training mode
+        
+        # --- 2. The Training Loop ---
+        pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=100)
+        history = {"total_loss": [], "rec_loss": [], "kl_loss": [], "concept_loss": [], "orth_loss": []}
+
+        for epoch in pbar:
+            epoch_losses = {key: 0.0 for key in history.keys()}
+
+            for x_batch, concepts_batch in data_loader:
+                # Move batch to the correct device
+                x_batch = x_batch.to(device)
+                concepts_batch = concepts_batch.to(device)
+
+                # --- Core logic from your _step function ---
+                # 1. Forward pass
+                # We assume independent_training=True for this standalone loop
+                out = self.forward(x_batch, concepts_batch)
+
+                # 2. Calculate loss
+                loss_dict = self.loss_function(x_batch, concepts_batch, **out)
+                total_loss = loss_dict["Total_loss"]
+                # -------------------------------------------
+
+                # 3. Backward pass and optimization
+                optimizer.zero_grad()
+                total_loss.backward()
+                optimizer.step()
+
+                # Accumulate losses for logging
+                for key in epoch_losses.keys():
+                     epoch_losses[key] += loss_dict.get(key.replace("_loss", "") + "_loss", torch.tensor(0.0)).item()
+
+            # --- 3. End of Epoch ---
+            # Update learning rate
+            scheduler.step()
+
+            # Log average losses for the epoch
+            num_batches = len(data_loader)
+            for key in history.keys():
+                history[key].append(epoch_losses[key] / num_batches)
+            
+            pbar.set_postfix({
+                "Loss": history['total_loss'][-1],
+                "LR": scheduler.get_last_lr()[0]
+            })
+
+        print("Training finished.")
+        self.eval() # Set the model to evaluation mode
+        return history
 
 class scCBGM(CB_VAE):
     def __init__(self, config, **kwargs):
-        super().__init__(config, _decoder=SkipDecoderBlock, **kwargs)
+        super().__init__(config, _decoder=DecoderBlock, **kwargs)
 
     def decode(self, input_concept, unknown, **kwargs):
         return self._decoder(input_concept, unknown, **kwargs)

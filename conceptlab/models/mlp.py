@@ -3,6 +3,34 @@ import torch.nn as nn
 import math
 from typing import Optional
 
+class ConditionEmbedding(nn.Module):
+    """
+    A learnable embedding layer for the condition vector 'c'.
+    This layer projects the condition vector into a higher-dimensional space.
+    """
+    def __init__(self, c_dim: int, emb_dim: int):
+        """
+        Initializes the condition embedding layer.
+        Args:
+            c_dim (int): The dimensionality of the condition vector.
+            emb_dim (int): The dimensionality of the embedding space.
+        """
+        super().__init__()
+        self.linear = nn.Linear(c_dim, emb_dim)
+
+    def forward(self, c: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the condition embedding layer.
+        Args:
+            c (torch.Tensor): The condition vector, shape (batch_size, c_dim).
+        Returns:
+            torch.Tensor: The embedded condition vector, shape (batch_size, emb_dim).
+        """
+        c_emb = self.linear(c)
+        c_emb = c_emb / c_emb.norm(dim=-1, keepdim=True)  # normalize to be on hypersphere
+        return c_emb
+
+
 class FourierEmbedding(nn.Module):
     """
     Projects a scalar time value 't' into a higher-dimensional Fourier feature space.
@@ -75,7 +103,7 @@ class MLPBlock(nn.Module):
         return x + residual
 
 
-class MLP(nn.Module):
+class FlowDecoder(nn.Module):
     """
     A fully-connected neural network with skip connections, designed for
     flow matching. It takes cell data, time, and an optional concept vector as input.
@@ -123,6 +151,10 @@ class MLP(nn.Module):
             nn.Linear(emb_dim, self.x_dim)
         )
 
+        final_linear_layer = self.output_layer[1]
+        nn.init.xavier_uniform_(final_linear_layer.weight, gain=0.01) 
+        nn.init.zeros_(final_linear_layer.bias)
+
     def forward(self, x_t: torch.Tensor, t: torch.Tensor, c: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         The forward pass for the entire model.
@@ -157,3 +189,80 @@ class MLP(nn.Module):
         # 3. Project to output dimension
         output = self.output_layer(h)
         return output
+
+
+class FeedForwardBlock(nn.Module):
+    """
+    A single block of the MLP, consisting of a linear layer, normalization,
+    activation, and dropout, with skip connections for the main data path.
+    """
+    def __init__(self, emb_dim: int, dropout: float = 0.1):
+        """
+        Initializes the MLP block.
+        Args:
+            emb_dim (int): The dimension of the input, output, and embeddings.
+            dropout (float): The dropout rate.
+        """
+        super().__init__()
+        self.linear = nn.Linear(emb_dim, emb_dim)
+        self.norm = nn.LayerNorm(emb_dim)
+        self.activation = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the MLP block.
+        Args:
+            x (torch.Tensor): The main input tensor from the previous layer.
+            c_emb (torch.Tensor): The embedding of the concept vector.
+            t_emb (torch.Tensor): The embedding of the time value.
+        Returns:
+            torch.Tensor: The output tensor of the block.
+        """
+        residual = x
+        x = self.linear(x)
+        x = self.norm(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+        return x + residual
+
+
+class DenseEncoder(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int,
+        latent_dim: int,
+        dropout: float,
+        n_layers: int = 4,
+        **kwargs,
+    ):
+
+        super().__init__()
+
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
+        self.latent_dim = latent_dim
+        self.dropout = dropout
+
+        self.x_embedder = nn.Linear(self.input_dim, self.hidden_dim)
+
+        self.layers = nn.ModuleList(
+            [FeedForwardBlock(self.hidden_dim, self.dropout) for _ in range(self.n_layers)]
+        ) 
+
+        self.output_layer = nn.Linear(self.hidden_dim, self.latent_dim)
+
+
+    def forward(self, x, **kwargs):
+
+        x_emb = self.x_embedder(x)
+
+        h = x_emb
+        for layer in self.layers:
+            h = layer(h)
+        z = self.output_layer(h)
+
+        return z
+

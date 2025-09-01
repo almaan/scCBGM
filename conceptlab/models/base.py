@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from abc import ABC, abstractmethod
 
 
-class BaseCBVAE(pl.LightningModule, ABC):
+class BaseCBVAE(nn.Module, ABC):
     def __init__(self, config, **kwargs):
 
         super(BaseCBVAE, self).__init__()
@@ -16,6 +16,7 @@ class BaseCBVAE(pl.LightningModule, ABC):
         self.input_dim = config.get("input_dim", kwargs.get("input_dim"))
         self.hidden_dim = config.get("hidden_dim", kwargs.get("hidden_dim"))
         self.latent_dim = config.get("latent_dim", kwargs.get("latent_dim"))
+        self.n_layers = config.get("n_layers", kwargs.get("n_layers"))
         self.n_concepts = config.get("n_concepts", kwargs.get("n_concepts"))
         self.learning_rate = config.lr
         self.independent_training = config.get("independent_training", False)

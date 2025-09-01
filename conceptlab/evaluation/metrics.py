@@ -1,5 +1,16 @@
 import numpy as np
 from scipy.linalg import sqrtm
+import ot
+
+
+def emd(x, y):
+    dist_mat = ot.dist(x, y)
+    dist_mat_norm = dist_mat/dist_mat.max()
+
+    ot_matrix = ot.emd([],[], dist_mat_norm, numItermax=1e7)
+    emd = np.sum(ot_matrix * dist_mat)
+
+    return emd
 
 
 def rbf_kernel(x, y, sigma=1.0):
@@ -109,3 +120,16 @@ def mmd(X, Y, sigma=1.0, kernel=polynomial_kernel, kernel_params={}):
     mmd_squared = term_xx + term_yy - 2 * term_xy
 
     return mmd_squared
+
+def cosine_sim(vector_a,vector_b):
+    dot_product = np.dot(vector_a, vector_b)
+
+    # Calculate the magnitude (L2 norm) of each vector
+    norm_a = np.linalg.norm(vector_a)
+    norm_b = np.linalg.norm(vector_b)
+
+    # Calculate the cosine similarity
+    # The calculation is robust against division by zero
+    similarity = dot_product / (norm_a * norm_b)
+
+    return similarity
