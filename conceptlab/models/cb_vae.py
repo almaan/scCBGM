@@ -290,7 +290,21 @@ class CBM_MetaTrainer:
                  max_epochs,
                  log_every_n_steps,
                 concept_key,
-                num_workers):
+                num_workers,
+                pca:bool = False,
+                z_score:bool = False
+            ):
+        """
+        Class to train and predict interventions with a scCBMG model
+        Inputs:
+        - cbm_config: config for the model
+        - max_epochs: max number of epochs to train for
+        - log_every_n_steps: 
+        - concept_key: Key in adata.obsm where the concept vectors are stored
+        - num_workers: num workers in the dataloaders
+        - pca: whether to train, and predict in PCA space.
+        - zscore: whether to whiten the data
+        """
         self.cbm_config = cbm_config
         self.max_epochs = max_epochs
         self.log_every_n_steps = log_every_n_steps
@@ -298,11 +312,21 @@ class CBM_MetaTrainer:
         self.num_workers = num_workers
 
         self.model = None
+
+        self.pca = pca
+        self.z_score = z_score
     
     def train(self, adata_train):
 
         """Trains and returns the scCBGM model."""
         print("Training scCBGM model...")
+
+        if self.pca:
+            data_matrix = adata_train.obsm['X_pca']
+        else:
+            data_matrix = adata_train.X
+            if self.z_score:
+                data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization       
 
         config = OmegaConf.create(dict(
             input_dim=adata_train.shape[1], 
