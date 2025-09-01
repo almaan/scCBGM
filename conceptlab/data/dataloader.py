@@ -55,7 +55,8 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         data: pd.DataFrame | ad.AnnData | xr.Dataset,
         batch_size: int = 32,
         val_split: float = 0.2,
-        layer: str = None,
+        layer: str | None = None,
+        obsm_key: str | None = None, # <-- Added parameter
         add_concepts: bool = False,
         concept_key: str = "concepts",
         normalize: bool = True,
@@ -71,9 +72,19 @@ class GeneExpressionDataModule(pl.LightningDataModule):
             if self.add_concepts:
                 self.concepts = data.concepts.to_dataframe().unstack()
         elif isinstance(data, ad.AnnData):
-            self.data = data.to_df(layer=layer)
+            # --- MODIFICATION START ---
+            if obsm_key:
+                print(f"Using data from .obsm['{obsm_key}']")
+                # Ensure the data from obsm is a DataFrame with the correct index
+                self.data = pd.DataFrame(data.obsm[obsm_key], index=data.obs.index)
+            else:
+                # Fallback to the original behavior if obsm_key is not provided
+                print(f"Using data from .X or layer='{layer}'")
+                self.data = data.to_df(layer=layer)
+            # --- MODIFICATION END ---
+
             if self.add_concepts:
-                self.concepts = pd.DataFrame(data.obsm[concept_key])
+                self.concepts = pd.DataFrame(data.obsm[concept_key], index=data.obs.index)
         elif isinstance(data, pd.DataFrame):
             self.data = data.copy()
         else:
@@ -85,10 +96,14 @@ class GeneExpressionDataModule(pl.LightningDataModule):
             self.concepts = None
 
         if normalize:
-            X = self.data.values
-            X = X / np.sum(X, axis=1, keepdims=True) * 1e4
+            print("Applying log(1+CPM) normalization...")
+            X = self.data.values.astype(np.float32)
+            # Avoid division by zero for rows with all zeros
+            row_sums = np.sum(X, axis=1, keepdims=True)
+            safe_row_sums = np.where(row_sums == 0, 1, row_sums)
+            X = X / safe_row_sums * 1e4
             X = np.log1p(X)
-            self.data = pd.DataFrame(X)
+            self.data = pd.DataFrame(X, index=self.data.index, columns=self.data.columns)
 
         self.batch_size = batch_size
         self.val_split = val_split

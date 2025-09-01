@@ -330,8 +330,9 @@ class CB_FM:
             t = torch.full((num_samples,), t_val, device=self.device)
             
             v_cond = self.model(xt, t, c_orig)
-            v_uncond = self.model(xt, t, c_uncond)
-            v = v_uncond + w_cfg * (v_cond - v_uncond) # CFG
+            #v_uncond = self.model(xt, t, c_uncond)
+            #v = v_uncond + w_cfg * (v_cond - v_uncond) # CFG
+            v = v_cond
             
             xt = xt - v * dt # Step from t to t-dt
 

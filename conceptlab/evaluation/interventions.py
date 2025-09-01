@@ -12,10 +12,11 @@ from sklearn.metrics import (
     roc_curve,
     roc_auc_score,
 )
+
+import sklearn.neighbors    
 import torch
 import wandb
 from scipy.stats import spearmanr, pearsonr
-
 
 class DistributionShift(EvaluationClass):
     """
@@ -450,6 +451,33 @@ def intervene(
 
     return x_ivn
 
+def evaluate_intervention_emd_with_target(
+    x_train,
+    x_ivn,
+    x_target,
+    labels_train,
+    pre_computed_emd_train=None,
+) -> Dict[str, Any]:
+
+    if pre_computed_emd_train is None:
+        source = np.unique(labels_train)
+        scores = np.zeros_like(source)
+
+        for k, s in enumerate(source):
+            x_source = x_train[labels_train == s]
+            scores[k] = met.emd(x_target, x_source)
+
+        min_train_score = np.min(scores)
+    else:
+        min_train_score = pre_computed_emd_train
+
+    ivn_score = met.emd(x_target, x_ivn)
+
+    mmd_ratio = ivn_score / (min_train_score + 1e-8)
+
+    score = dict(mmd_ratio=mmd_ratio, pre_computed_emd_train=min_train_score)
+
+    return score
 
 def evaluate_intervention_mmd_with_target(
     x_train,
@@ -501,3 +529,72 @@ def evaluate_intervention_r2_with_target(
     )
 
     return score
+
+def evaluate_intervention_knn_with_target(
+    x_train,
+    x_ivn,
+    x_target,
+    labels_train,
+) -> float:
+
+
+    total_labels = np.concatenate([labels_train, 
+                                  ['target'] * x_target.shape[0]], axis = 0)
+    x_total = np.concatenate([x_train, x_target], axis = 0)
+    knn = sklearn.neighbors.KNeighborsClassifier(n_neighbors=1).fit(x_total, total_labels)
+
+    predict_ivn = knn.predict(x_ivn)
+    
+    score = np.mean(predict_ivn == 'target')
+    return score
+
+
+def evaluate_intervention_1nn_acc_with_target(
+    x_ivn,
+    x_target,
+    **kwargs
+) -> float:
+    
+    x_ivn = np.asarray(x_ivn.copy())
+    x_target = np.asarray(x_target.copy())
+
+
+    print("subsampling to match sizes...")
+    
+    if(x_ivn.shape[0] < x_target.shape[0]):
+        x_target = x_target[np.random.choice(np.arange(x_target.shape[0]), x_ivn.shape[0], replace=False)]
+    elif(x_ivn.shape[0] > x_target.shape[0]):
+        x_ivn = x_ivn[np.random.choice(np.arange(x_ivn.shape[0]), x_target.shape[0], replace=False)]
+
+
+
+    x_concat = np.concatenate([x_ivn, x_target], axis=0)
+    label_concat = np.asarray([0] * x_ivn.shape[0] + [1] * x_target.shape[0])
+
+    print("calculating 1NN graph...")
+
+    knn_graph = sklearn.neighbors.kneighbors_graph(x_concat, n_neighbors=1).tocoo()
+    nn_ind = knn_graph.col
+
+    print("calculating 1NN acc...")
+
+    nn_acc = np.mean((label_concat[nn_ind] == label_concat)[:x_ivn.shape[0]])
+
+    return nn_acc
+
+def evaluate_intervention_cosine_with_target(
+    x_train,
+    x_ivn,
+    x_target,
+    labels_train,
+    pre_computed_mmd_train=None,
+) -> float:
+
+    x_train_means = [x_train[labels_train == s].mean(0) for s in np.unique(labels_train)]
+    x_ivn_mean = x_ivn.mean(0)
+    x_target_mean = x_target.mean(0)
+
+    train_target_cosine_sim_max = np.max([met.cosine_sim(x_train_mean, x_target_mean) for x_train_mean in x_train_means])
+    ivn_target_cosine_sim = met.cosine_sim(x_ivn_mean, x_target_mean)
+
+    return ivn_target_cosine_sim/train_target_cosine_sim_max
