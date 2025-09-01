@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from abc import ABC, abstractmethod
 
 
-class BaseCBVAE(pl.LightningModule, ABC):
+class BaseCBVAE(nn.Module, ABC):
     def __init__(self, config, **kwargs):
 
         super(BaseCBVAE, self).__init__()

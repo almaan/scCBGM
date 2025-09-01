@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch as t
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, ExponentialLR
 import torch.nn.utils.parametrizations as param
 from wandb import Histogram
 import wandb
@@ -286,7 +286,7 @@ class CEM_VAE(BaseCBVAE):
             filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate
         )
         # Define the CosineAnnealingLR scheduler
-        scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-5)
+        scheduler = ExponentialLR(optimizer, gamma=0.997)
 
         # Return a dictionary with the optimizer and the scheduler
         return {
