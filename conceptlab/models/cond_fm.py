@@ -259,8 +259,8 @@ class Cond_FM(nn.Module, ABC):
             
             # Update the epoch-level progress bar
             pbar.set_postfix({
-                "avg_loss": f"{avg_loss:.4f}",
-                "lr": f"{scheduler.get_last_lr()[0]:.6f}"
+                "avg_loss": f"{avg_loss:.3e}",
+                "lr": f"{scheduler.get_last_lr()[0]:.5e}"
             })
             
             # Step the scheduler
