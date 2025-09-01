@@ -6,6 +6,8 @@ p_drop: 0.1
 raw: True
 concept_key: ${data.concept_key}
 num_workers: 4
+pca: False
+z_score: False
 fm_mod_cfg:
   hidden_dim: 1024
   latent_dim: 128

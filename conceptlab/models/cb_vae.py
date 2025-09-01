@@ -364,6 +364,8 @@ class CBM_MetaTrainer:
 
         self.pca = pca
         self.z_score = z_score
+        
+        assert type(pca) == bool
     
     def train(self, adata_train):
 
@@ -383,7 +385,7 @@ class CBM_MetaTrainer:
         torch.set_flush_denormal(True)
 
         config = OmegaConf.create(dict(
-            input_dim=adata_train.shape[1], 
+            input_dim=data_matrix.shape[1], 
             n_concepts=adata_train.obsm[self.concept_key].shape[1],
         ))
         merged_config = OmegaConf.merge(config, self.cbm_config)

@@ -1,3 +1,4 @@
+name: COT_Kang
 program: benchmark_scdata.py
 method: grid
 parameters:

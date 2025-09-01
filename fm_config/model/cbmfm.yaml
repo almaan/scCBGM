@@ -6,6 +6,8 @@ p_drop: 0.1
 raw: False
 concept_key: ${data.concept_key}
 num_workers: 4
+pca: False
+z_score: False
 fm_mod_cfg:
   hidden_dim: 1024
   latent_dim: 128
@@ -18,6 +20,8 @@ cbm_mod:
   max_epochs: 200
   log_every_n_steps: 10
   num_workers: 4
+  pca: ${model.pca}
+  z_score: ${model.z_score}
   cbm_config:
     has_cbm: True
     lr: 3e-4

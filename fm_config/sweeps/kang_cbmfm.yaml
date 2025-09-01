@@ -1,3 +1,4 @@
+name: CBMFM_Kang
 program: benchmark_scdata.py
 method: grid
 parameters:
@@ -15,6 +16,10 @@ parameters:
       - dendritic_cells
       - fcgr3a_monocytes
       - megakaryocytes
+  model.pca:
+    values:
+      - True
+      - False
 command:
   - uv
   - run

@@ -10,6 +10,10 @@ parameters:
   data/intervention_labels:
     values: 
       - cui_IL4_bcells
+      - cui_IL7_CD4
+      - cui_IL15_NK
+      - cui_TNF_CDC1
+      - cui_IFNb_macrophage
 command:
   - uv
   - run
