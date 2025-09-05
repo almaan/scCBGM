@@ -282,10 +282,17 @@ class CB_VAE(BaseCBVAE):
         self.train() # Set the model to training mode
         
         # --- 2. The Training Loop ---
-        pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=100)
+        pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=150)
 
         for epoch in pbar:
             total_loss = 0.0
+            
+            # --- CHANGE: Initialize counters for F1 score calculation ---
+            epoch_tp = 0.0
+            epoch_fp = 0.0
+            epoch_fn = 0.0
+            # --- End of Change ---
+            
             for x_batch, concepts_batch in data_loader:
                 # Move batch to the correct device
                 x_batch = x_batch.to(device)
@@ -294,7 +301,7 @@ class CB_VAE(BaseCBVAE):
                 # --- Core logic from your _step function ---
                 # 1. Forward pass
                 # We assume independent_training=True for this standalone loop
-                out = self.forward(x_batch, concepts_batch)
+                out = self.forward(x_batch)
 
                 # 2. Calculate loss
                 loss_dict = self.loss_function(x_batch, concepts_batch, **out)
@@ -308,14 +315,36 @@ class CB_VAE(BaseCBVAE):
 
                 # Accumulate losses for logging
                 total_loss += loss.item()
-           
+                
+                # --- CHANGE: Calculate and accumulate TP, FP, FN for the batch ---
+                with torch.no_grad():
+                    pred_concepts = out["pred_concept"]
+                    predicted_labels = (pred_concepts > 0.5).float()
+                    true_labels = concepts_batch
+                    
+                    # True Positives: predicted is 1 and true is 1
+                    epoch_tp += (predicted_labels * true_labels).sum().item()
+                    # False Positives: predicted is 1 and true is 0
+                    epoch_fp += (predicted_labels * (1 - true_labels)).sum().item()
+                    # False Negatives: predicted is 0 and true is 1
+                    epoch_fn += ((1 - predicted_labels) * true_labels).sum().item()
+                # --- End of Change ---
+
            # --- End of Epoch ---
             avg_loss = total_loss / len(data_loader)
              
+            # --- CHANGE: Calculate epoch-level F1 score and update progress bar ---
+            epsilon = 1e-7 # To avoid division by zero
+            precision = epoch_tp / (epoch_tp + epoch_fp + epsilon)
+            recall = epoch_tp / (epoch_tp + epoch_fn + epsilon)
+            f1_score = 2 * (precision * recall) / (precision + recall + epsilon)
+
             pbar.set_postfix({
                 "avg_loss": f"{avg_loss:.3e}",
+                "concept_f1": f"{f1_score:.4f}", # Display F1 score
                 "lr": f"{scheduler.get_last_lr()[0]:.5e}"
             })
+            # --- End of Change ---
              
             scheduler.step()
              

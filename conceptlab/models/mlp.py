@@ -235,6 +235,7 @@ class DenseEncoder(nn.Module):
         latent_dim: int,
         dropout: float,
         n_layers: int = 4,
+        output_activation: 'str' = 'none',
         **kwargs,
     ):
 
@@ -254,6 +255,12 @@ class DenseEncoder(nn.Module):
 
         self.output_layer = nn.Linear(self.hidden_dim, self.latent_dim)
 
+        if(output_activation == 'sigmoid'):
+            self.output_layer_activation = nn.Sigmoid()
+        elif(output_activation == 'relu'):
+            self.output_layer_activation = nn.ReLU()
+        else:
+            self.output_layer_activation = nn.Identity()
 
     def forward(self, x, **kwargs):
 
@@ -263,6 +270,6 @@ class DenseEncoder(nn.Module):
         for layer in self.layers:
             h = layer(h)
         z = self.output_layer(h)
-
+        z = self.output_layer_activation(z)
         return z
 

@@ -46,9 +46,7 @@ class InterventionDataset:
             adata, hold_out_label, mod_label, label_variable
         )
 
-        breakpoint()
-
-        adata.uns['pc_transform'] = PCA(n_components=80).fit(adata_train.X)
+        adata.uns['pc_transform'] = PCA(n_components=128).fit(adata_train.X)
 
         for x_data in [adata, adata_train, adata_test, adata_inter]:
             x_data.uns['pc_transform'] = adata.uns['pc_transform']

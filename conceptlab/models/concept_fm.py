@@ -17,6 +17,7 @@ from tqdm import tqdm
 
 from abc import ABC, abstractmethod
 
+
 class Concept_FM(nn.Module, ABC):
     def __init__(
         self,
@@ -37,53 +38,53 @@ class Concept_FM(nn.Module, ABC):
         self.dropout = config.get("dropout", 0.1)
         self.p_uncond = config.get("p_uncond", 0.1)
 
-        if(self.p_uncond > 0):
-            self.condition_embedder = ConditionEmbedding(c_dim=self.n_concepts + self.n_unknown, emb_dim=self.hidden_dim)
-            self.concept_emb_dim = self.hidden_dim
-        else:
-            self.condition_embedder = nn.Identity()
-            self.concept_emb_dim = self.n_concepts + self.n_unknown
+        # if(self.p_uncond > 0):
+        self.condition_embedder = ConditionEmbedding(c_dim=self.n_concepts + self.n_unknown, emb_dim=self.hidden_dim)
+        self.concept_emb_dim = self.hidden_dim
+        # else:
+        #     self.condition_embedder = nn.Identity()
+        #     self.concept_emb_dim = self.n_concepts + self.n_unknown
 
         # Encoder
         self._encoder = _encoder(
             input_dim=self.input_dim,
-            hidden_dim=self.concept_emb_dim,
+            hidden_dim=self.hidden_dim,
             latent_dim=self.latent_dim,
             n_layers =self.n_layers,
             dropout=self.dropout,
         )
 
-        if "cb_layers" in config:
-            cb_layers = config["cb_layers"]
-        else:
-            cb_layers = 1
+        self.cb_layers = config.get("cb_layers", 2)
 
-        cb_concepts_layers = []
-        cb_unk_layers = []
 
-        for k in range(0, cb_layers - 1):
-            layer_k = [
-                nn.Linear(self.latent_dim, self.latent_dim),
-                nn.ReLU(),
-                nn.Dropout(p=self.dropout),
-            ]
-            cb_concepts_layers += layer_k
-            cb_unk_layers += layer_k
+        self.cb_concepts_layers = _encoder(
+            input_dim=self.latent_dim,
+            hidden_dim=self.hidden_dim,
+            latent_dim=self.n_concepts,
+            n_layers=self.cb_layers,
+            dropout=self.dropout,
+            output_activation='sigmoid')
 
-        cb_concepts_layers.append(nn.Linear(self.latent_dim, self.n_concepts))
-        cb_concepts_layers.append(nn.Sigmoid())
-
-        cb_unk_layers.append(nn.Linear(self.latent_dim, self.n_unknown))
-        cb_unk_layers.append(nn.ReLU())
-
-        self.cb_concepts_layers = nn.Sequential(*cb_concepts_layers)
-        self.cb_unk_layers = nn.Sequential(*cb_unk_layers)
+        self.cb_unk_layers = _encoder(
+            input_dim=self.latent_dim,
+            hidden_dim=self.hidden_dim,
+            latent_dim=self.n_unknown,
+            n_layers=self.cb_layers,
+            dropout=self.dropout,
+            output_activation='relu')
 
         # --- VARIATIONAL CHANGE 1: Add layers for mu and logvar ---
         # These new layers will map the concept vector 'h' to the parameters
         # of a Gaussian distribution, which will serve as the prior for the flow.
-        self.fc_mu = nn.Linear(self.n_concepts + self.n_unknown, self.input_dim)
-        self.fc_logvar = nn.Linear(self.n_concepts + self.n_unknown, self.input_dim)
+
+        self.fc_mu_logvar = _encoder(
+            input_dim=self.n_concepts + self.n_unknown,
+            hidden_dim=self.hidden_dim,
+            latent_dim=self.input_dim*2,
+            n_layers =2,
+            dropout=self.dropout,
+        )
+    
         # --- End of Change ---
 
         self._decoder = _decoder(
@@ -96,10 +97,11 @@ class Concept_FM(nn.Module, ABC):
 
         self.dropout_layer = nn.Dropout(p=self.dropout)
 
-        self.concepts_hp = config.get("concepts_hp", 0.005)
+        self.flow_hp = config.get("flow_hp", 1.0)
+        self.concepts_hp = config.get("concepts_hp", 0.1)
         self.orthogonality_hp = config.get("orthogonality_hp", 0.2)
         # --- VARIATIONAL CHANGE 2: Add KL loss hyperparameter ---
-        self.kl_hp = config.get("kl_hp", 0.1) # Add a weight for the new KL loss term
+        self.kl_hp = config.get("kl_hp", 0.01) # Add a weight for the new KL loss term
         # --- End of Change ---
 
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
@@ -112,7 +114,9 @@ class Concept_FM(nn.Module, ABC):
             self.concept_loss = self._hard_concept_loss
             self.concept_transform = sigmoid
 
-    @property
+        print(self)
+
+    @property   
     def has_concepts(self):
         return True
 
@@ -120,18 +124,12 @@ class Concept_FM(nn.Module, ABC):
         return self._encoder(x, **kwargs)
     
     def get_prior_params(self, h):
-        """
-        Calculates mu and logvar from the combined concept vector h.
-        These parameters define the N(mu, sigma^2) prior for the flow matching.
-        """
-        mu = self.fc_mu(h)
-        logvar = self.fc_logvar(h)
+        mu_logvar = self.fc_mu_logvar(h)
+        mu, logvar = torch.chunk(mu_logvar, 2, dim=1)
         return dict(mu=mu, logvar=logvar)
-
 
     def cbm(self, z, concepts=None, mask=None, intervene=False, **kwargs):
         known_concepts = self.cb_concepts_layers(z)
-        unknown = self.cb_unk_layers(z)
 
         if intervene:
             input_concept = known_concepts * (1 - mask) + concepts * mask
@@ -141,40 +139,112 @@ class Concept_FM(nn.Module, ABC):
             else:
                 input_concept = concepts
 
-        h = torch.cat((input_concept, unknown), 1)
+        output_dict = {}
+        if self.n_unknown > 0 and self.cb_unk_layers is not None:
+            unknown = self.cb_unk_layers(z)
+            h = torch.cat((input_concept, unknown), 1)
+            output_dict["unknown"] = unknown
+        else:
+            h = input_concept
 
-        return dict(
-            input_concept=input_concept,
-            pred_concept=known_concepts,
-            unknown=unknown,
-            h=h,
-        )
+        output_dict.update({
+            "input_concept": input_concept,
+            "pred_concept": known_concepts,
+            "h": h
+        })
+        return output_dict
+
 
     @torch.no_grad()
-    def decode(self, h, n_steps: int = 1000, cfg_strength: float = 1.0, **kwargs):
+    def edit(self, 
+             x: torch.Tensor, 
+             c: torch.Tensor, 
+             c_prime: torch.Tensor, 
+             t_edit: float, 
+             n_steps: int = 1000, 
+             w_cfg_forward: float = 1.0, 
+             w_cfg_backward: float = 1.0,
+             noise_add: float = 0.1):
         """
-        Integrates the flow ODE forward from t=0 to t=1 using the Euler
-        method, conditioned on the concept vector h.
+        Edits a sample 'x' from its original condition 'c' to a new condition 'c_prime'.
         
-        VARIATIONAL CHANGE: The starting point x_t at t=0 is now sampled
-        from the learned prior N(mu, sigma^2) instead of N(0, I).
+        This is done by first integrating backwards from x (at t=1) to an intermediate
+        time t_edit using the original condition c. Then, it integrates forward from
+        that point to t=1 using the new condition c_prime.
+
+        Args:
+            x (torch.Tensor): The initial data sample to edit.
+            c (torch.Tensor): The original condition vector for x.
+            c_prime (torch.Tensor): The target condition vector for editing.
+            t_edit (float): The time to integrate back to (between 0.0 and 1.0).
+            n_steps (int): Total number of integration steps for a full t=0 to t=1 pass.
+            w_cfg_forward (float): The CFG scale for the forward (editing) pass.
+            w_cfg_backward (float): The CFG scale for the backward (inversion) pass.
         """
+        batch_size, device = x.shape[0], x.device
+        dt = 1.0 / n_steps
+        
+        # --- Snap t_edit to the discrete time grid ---
+        n_edit_steps = int(t_edit * n_steps)
+        print(f"Editing from t=1.0 back to t={n_edit_steps * dt:.2f}, then forward with new condition.")
+        
+        x_t = x.clone()
+
+        c_emb = self.condition_embedder(c)
+        c_prime_emb = self.condition_embedder(c_prime)
+        # --- 1. Backward Process (Inversion) ---
+        # Integrate from t=1 down to t_edit using the original condition 'c'
+        for t_step in tqdm(range(n_steps, n_edit_steps, -1), desc="Backward Process (Inversion), cfg: {:.2e}".format(w_cfg_backward), ncols=88, leave=False):
+            t_current = t_step * dt
+            t_vec = torch.full((batch_size,), t_current, device=device)
+            
+            # Use the original condition 'c' and backward cfg scale
+            v_cond = self._decoder(x_t=x_t, t=t_vec, c=c_emb)
+            v_uncond = self._decoder(x_t=x_t, t=t_vec, c= torch.zeros_like(c_emb, device=device))
+
+            v_guided = v_uncond + w_cfg_backward * (v_cond - v_uncond)
+
+            
+            # To go backward in time, we subtract the vector field
+            x_t = x_t - v_guided * dt
+
+        if(noise_add > 0):
+            print("Adding noise to the edited sample with std = {:.2e}".format(noise_add))
+        
+        x_t = x_t + noise_add * torch.randn_like(x_t)
+        # --- 2. Forward Process (Editing) ---
+        # Integrate from t_edit up to t=1 using the new condition 'c_prime'
+        for t_step in tqdm(range(n_edit_steps, n_steps), desc="Forward Process (Editing), cfg: {:.2e}".format(w_cfg_forward), ncols=88, leave=False):
+            t_current = t_step * dt
+            t_vec = torch.full((batch_size,), t_current, device=device)
+
+            # Use the new condition 'c_prime' and forward cfg scale
+            v_cond = self._decoder(x_t=x_t, t=t_vec, c=c_prime_emb)
+            v_uncond = self._decoder(x_t=x_t, t=t_vec, c=torch.zeros_like(c_prime_emb, device=device))
+            v_guided = v_uncond + w_cfg_forward * (v_cond - v_uncond)
+
+
+            # To go forward in time, we add the vector field
+            x_t = x_t + v_guided * dt
+            
+        x_edited = x_t
+        return x_edited
+    
+    @torch.no_grad()
+    def decode(self, h, n_steps: int = 1000, cfg_strength: float = 1.0, **kwargs):
         batch_size, device = h.shape[0], h.device
 
-        # --- VARIATIONAL CHANGE 4 & REFACTOR: Use renamed function ---
         prior_params = self.get_prior_params(h)
         mu, logvar = prior_params["mu"], prior_params["logvar"]
         std = torch.exp(0.5 * logvar)
-        # Sample the starting point x_0 from N(mu, sigma^2)
         x_t = mu + std * torch.randn_like(mu)
-        # --- End of Change ---
-
+        # x_t = torch.randn(batch_size, self.input_dim, device=device)
+        
         dt = 1.0 / n_steps
 
         print(f"Decoding with {n_steps} steps and cfg_strength {cfg_strength}")
 
         h_emb = self.condition_embedder(h)
-        # Iteratively solve the ODE using the Euler method
         for t_step in tqdm(range(n_steps), desc="Forward Process", ncols=88, leave=False):
             t_current = t_step * dt
             t_vec = torch.full((batch_size,), t_current, device=device)
@@ -182,20 +252,17 @@ class Concept_FM(nn.Module, ABC):
             v_cond = self._decoder(x_t=x_t, t=t_vec, c=h_emb)
             v_uncond = self._decoder(x_t=x_t, t=t_vec, c=torch.zeros_like(h_emb))
             v_guided = v_uncond + cfg_strength * (v_cond - v_uncond)
-            #v_guided = v_uncond * (1 - cfg_strength) + v_cond * cfg_strength
 
             x_t = x_t + v_guided * dt
 
         x_pred = x_t
         return x_pred
 
-    # --- REFACTOR: Simplified intervene function call ---
     def intervene(self, x, concepts, mask, **kwargs):
         z = self.encode(x)
         cbm_out = self.cbm(z=z, concepts=concepts, mask=mask, intervene=True)
         dec = self.decode(**cbm_out)
         return dec
-    # --- End of Change ---
 
     def orthogonality_loss(self, c, u):
         batch_size = u.size(0)
@@ -207,14 +274,13 @@ class Concept_FM(nn.Module, ABC):
         loss = (cross_covariance**2).sum()
         return loss
     
-    # --- VARIATIONAL CHANGE 5: New KL divergence loss function ---
     def kl_loss(self, mu, logvar):
         """
         Calculates the KL divergence between the learned distribution N(mu, sigma^2)
         and a standard normal distribution N(0, I). This regularizes the latent space.
         """
         # Sum over the dimensions and average over the batch
-        kl_div = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
+        kl_div = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
         return kl_div.mean()
     # --- End of Change ---
 
@@ -227,15 +293,14 @@ class Concept_FM(nn.Module, ABC):
     def _hard_concept_loss(self, pred_concept, concepts, **kwargs):
         return self.n_concepts * F.binary_cross_entropy(pred_concept, concepts, reduction="mean")
 
-    # --- VARIATIONAL CHANGE 6: Update main loss function ---
-    def loss_function(self, v_pred, v, concepts, pred_concept, unknown, mu, logvar, **kwargs):
-        """
-        Calculates the total loss for the model, now including the KL divergence loss.
-        """
+    def loss_function(self, v_pred, v, concepts, pred_concept, mu, logvar, unknown=None, **kwargs):
         loss_dict = {}
         flow_loss = self.fm_loss(v_pred, v)
+        
         loss_dict["fm_loss"] = flow_loss
-        loss_dict["Total_loss"] = flow_loss
+
+        loss_dict["Total_loss"] = 0
+        loss_dict["Total_loss"] += self.flow_hp * flow_loss
 
         pred_concept_clipped = torch.clip(pred_concept, 0, 1)
 
@@ -245,17 +310,18 @@ class Concept_FM(nn.Module, ABC):
             loss_dict["Total_loss"] += self.concepts_hp * overall_concept_loss
 
         if self.use_orthogonality_loss:
-            orth_loss = self.orthogonality_loss(pred_concept_clipped, unknown)
-            loss_dict["orth_loss"] = orth_loss
-            loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
+            if unknown is not None:
+                orth_loss = self.orthogonality_loss(pred_concept_clipped, unknown)
+                loss_dict["orth_loss"] = orth_loss
+                loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
+            else:
+                print("Warning: use_orthogonality_loss is True, but 'unknown' tensor was not provided.")
 
-        # Add the new KL loss to the total loss
         kld_loss = self.kl_loss(mu, logvar)
         loss_dict["kl_loss"] = kld_loss
         loss_dict["Total_loss"] += self.kl_hp * kld_loss
 
         return loss_dict
-    # --- End of Change ---
 
     def train_loop(self, data: torch.Tensor,
                concepts: torch.Tensor,
@@ -284,79 +350,96 @@ class Concept_FM(nn.Module, ABC):
         print(f"Starting training on {device} for {num_epochs} epochs...")
 
         self.train()
-        # --- 2. The Training Loop ---
-        pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=100)
+        pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=150)
      
         for epoch in pbar:
             self.train()
             total_loss = 0.0
+            total_fm_loss = 0.0
+            
+            # --- CHANGE: Initialize counters for F1 score calculation ---
+            # We accumulate TP, FP, FN over the epoch for a more stable F1 score
+            epoch_tp = 0.0
+            epoch_fp = 0.0
+            epoch_fn = 0.0
+            # --- End of Change ---
              
             for x_batch, concepts_batch in data_loader:
                 x_batch = x_batch.to(device)
                 concepts_batch = concepts_batch.to(device)
                  
-                # --- REFACTOR: Simplified encoding and CBM calls ---
-                # 1. Encode the input data to a latent vector z
                 z = self.encode(x_batch)
-
-                # 2. Break z into concepts
                 cbm_out = self.cbm(z=z)
-                # --- End of Refactor ---
                 h = cbm_out["h"]
 
                 prior_params = self.get_prior_params(h)
                 mu, logvar = prior_params["mu"], prior_params["logvar"]
                 std = torch.exp(0.5 * logvar)
 
-                # 3. Classifier-Free Guidance Training
-
                 h_emb = self.condition_embedder(h)
                 is_unconditional = torch.rand(x_batch.shape[0], device=device) < self.p_uncond
                 h_guided = torch.where(is_unconditional.unsqueeze(-1), 0.0, h_emb)
 
-                # Sample x_0 from the learned distribution N(mu, sigma^2)
                 x_0 = mu + std * torch.randn_like(mu)
-                
-                # The target x_1 remains the real data
                 x_1 = x_batch
 
-                # 5. Prepare for Flow Matching Loss
                 t = torch.rand(x_batch.shape[0], 1, device=device)
                 x_t = (1 - t) * x_0 + t * x_1
                 v = x_1 - x_0
-                # --- End of Change ---
 
-                # 6. Get the Model's Prediction
                 v_pred = self._decoder(x_t=x_t, t=t.squeeze(-1), c=h_guided)
-
-                # 7. Calculate loss (now including mu and logvar)
+                
+                unknown_tensor = cbm_out.get("unknown", None)
+                
                 loss_dict = self.loss_function(
                     v_pred=v_pred,
                     v=v,
                     concepts=concepts_batch,
                     pred_concept=cbm_out["pred_concept"],
-                    unknown=cbm_out["unknown"],
+                    unknown=unknown_tensor,
                     mu=mu,
-                    logvar=logvar, # Pass new params to the loss function
+                    logvar=logvar,
                 )
                 loss = loss_dict["Total_loss"]
 
-                # 8. Backpropagation
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                  
                 total_loss += loss.item()
+                total_fm_loss += loss_dict["fm_loss"].item()
+                
+                # --- CHANGE: Calculate and accumulate TP, FP, FN for the batch ---
+                with torch.no_grad():
+                    pred_concepts = cbm_out["pred_concept"]
+                    predicted_labels = (pred_concepts > 0.5).float()
+                    true_labels = concepts_batch
+                    
+                    # True Positives: predicted is 1 and true is 1
+                    epoch_tp += (predicted_labels * true_labels).sum().item()
+                    # False Positives: predicted is 1 and true is 0
+                    epoch_fp += (predicted_labels * (1 - true_labels)).sum().item()
+                    # False Negatives: predicted is 0 and true is 1
+                    epoch_fn += ((1 - predicted_labels) * true_labels).sum().item()
+                # --- End of Change ---
 
-            # --- End of Epoch ---
+            # --- CHANGE: Calculate epoch-level F1 score and update progress bar ---
             avg_loss = total_loss / len(data_loader)
-             
+            avg_fm_loss = total_fm_loss / len(data_loader)
+            
+            # Calculate precision, recall, and F1
+            epsilon = 1e-7 # To avoid division by zero
+            precision = epoch_tp / (epoch_tp + epoch_fp + epsilon)
+            recall = epoch_tp / (epoch_tp + epoch_fn + epsilon)
+            f1_score = 2 * (precision * recall) / (precision + recall + epsilon)
+            
             pbar.set_postfix({
                 "avg_loss": f"{avg_loss:.3e}",
-                "lr": f"{scheduler.get_last_lr()[0]:.5e}"
+                "fm_loss": f"{avg_fm_loss:.3e}",
+                "concept_f1": f"{f1_score:.3e}", # Display F1 score
             })
+            # --- End of Change ---
              
             scheduler.step()
 
         self.eval()
-

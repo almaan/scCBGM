@@ -95,7 +95,7 @@ def frechet_distance(X, Y):
     return frechet_dist
 
 
-def mmd(X, Y, sigma=1.0, kernel=polynomial_kernel, kernel_params={}):
+def mmd(X, Y, sigma=1.0, kernel=rbf_kernel, kernel_params={}):
     """
     Compute the unbiased MMD^2 between two matrices X and Y.
     X: (m, d) matrix
@@ -133,3 +133,111 @@ def cosine_sim(vector_a,vector_b):
     similarity = dot_product / (norm_a * norm_b)
 
     return similarity
+
+def _calculate_median_distance(X, Y):
+    """
+    Calculates the median of pairwise distances between points in X and Y.
+    This is used for the median heuristic for setting the RBF kernel gamma.
+    """
+    # Combine the two point clouds
+    Z = np.concatenate([X, Y], 0)
+    
+    # Calculate pairwise squared Euclidean distances
+    Z_norm = np.sum(Z**2, axis=1, keepdims=True)
+    dist_sq = Z_norm - 2 * np.dot(Z, Z.T) + Z_norm.T
+    
+    # Get the unique, non-zero distances and take the square root
+    distances = np.sqrt(np.clip(dist_sq, a_min=0, a_max=None))
+    
+    # Get the upper triangular part to avoid duplicates and diagonal zeros
+    triu_indices = np.triu_indices_from(distances, k=1)
+    unique_distances = distances[triu_indices]
+    
+    # Return the median
+    return np.median(unique_distances)
+
+def rbf_kernel(X, Y, gamma=1.0):
+    """
+    Computes the Radial Basis Function (RBF) kernel between two sets of vectors.
+    The RBF kernel is defined as: k(x, y) = exp(-gamma * ||x - y||^2)
+
+    Args:
+        X (np.ndarray): An array of shape (m, d), where m is the number of points
+                        and d is the dimension of each point.
+        Y (np.ndarray): An array of shape (n, d), where n is the number of points
+                        and d is the dimension of each point.
+        gamma (float): The bandwidth parameter of the RBF kernel. It controls
+                       the "width" of the kernel.
+
+    Returns:
+        np.ndarray: The kernel matrix of shape (m, n).
+    """
+    # Calculate the pairwise squared Euclidean distances using broadcasting
+    # ||x - y||^2 = ||x||^2 - 2 * x^T * y + ||y||^2
+    X_norm = np.sum(X**2, axis=1, keepdims=True)
+    Y_norm = np.sum(Y**2, axis=1, keepdims=True)
+    
+    XY = np.dot(X, Y.T)
+    
+    dist_sq = X_norm - 2 * XY + Y_norm.T
+    
+    # Apply the RBF kernel function
+    K = np.exp(-gamma * dist_sq)
+    return K
+
+def calculate_mmd(X, Y, gamma=None):
+    """
+    Calculates the Maximum Mean Discrepancy (MMD) using the unbiased estimator.
+    This function computes the squared MMD between two point clouds.
+
+    Args:
+        X (np.ndarray): The first point cloud, an array of shape (m, d).
+                        In this case, d=128.
+        Y (np.ndarray): The second point cloud, an array of shape (n, d).
+                        In this case, d=128.
+        gamma (float, optional): The bandwidth for the RBF kernel. If None, it is
+                                 set using the median heuristic, which is a robust
+                                 way to account for data dimensionality and scale.
+                                 Defaults to None.
+
+    Returns:
+        float: The squared MMD value.
+    """
+    m, d = X.shape
+    n = Y.shape[0]
+
+    if m < 2 or n < 2:
+        # The unbiased estimator is not defined for fewer than 2 samples.
+        return 0.0
+    
+    # If gamma is not specified, use the median heuristic. This is crucial for
+    # high-dimensional data. gamma = 1 / (2 * sigma^2), where sigma is the median distance.
+    if gamma is None:
+        median_dist = _calculate_median_distance(X, Y)
+        # Avoid division by zero if all points are identical
+        if median_dist > 0:
+            gamma = 1.0 / (2 * median_dist**2)
+        else:
+            gamma = 1.0 / d # Fallback heuristic
+
+        #print("Using median heuristic for gamma:", gamma)
+    # else:
+    #     print("Using provided gamma:", gamma)
+    # Calculate the kernel matrices
+    K_XX = rbf_kernel(X, X, gamma)
+    K_YY = rbf_kernel(Y, Y, gamma)
+    K_XY = rbf_kernel(X, Y, gamma)
+    
+    # Unbiased MMD^2 estimator.
+    # We set the diagonal elements to 0 to avoid comparing a point with itself.
+    np.fill_diagonal(K_XX, 0)
+    np.fill_diagonal(K_YY, 0)
+    
+    term1 = np.sum(K_XX) / (m * (m - 1))
+    term2 = np.sum(K_YY) / (n * (n - 1))
+    term3 = -2 * np.mean(K_XY)
+    
+    mmd_sq = term1 + term2 + term3
+    
+    # MMD can sometimes be slightly negative due to numerical precision, so we clamp at 0.
+    return np.clip(mmd_sq, a_min=0, a_max=None)
