@@ -487,6 +487,8 @@ def evaluate_intervention_mmd_with_target(
     pre_computed_mmd_train=None,
 ) -> Dict[str, Any]:
 
+    gamma = 1/x_train.shape[-1]
+
     if pre_computed_mmd_train is None:
         source = np.unique(labels_train)
         scores = np.zeros_like(source)
@@ -496,13 +498,13 @@ def evaluate_intervention_mmd_with_target(
             if x_source.shape[0] < 10:
                 scores[k] = np.inf
             else:
-                scores[k] = met.mmd(x_target, x_source)
+                scores[k] = met.calculate_mmd(x_target, x_source, gamma)
 
         min_train_score = np.min(scores)
     else:
         min_train_score = pre_computed_mmd_train
 
-    ivn_score = met.mmd(x_target, x_ivn)
+    ivn_score = met.calculate_mmd(x_target, x_ivn, gamma)
 
     mmd_ratio = ivn_score / (min_train_score + 1e-8)
 
@@ -601,3 +603,5 @@ def evaluate_intervention_cosine_with_target(
     ivn_target_cosine_sim = met.cosine_sim(x_ivn_mean, x_target_mean)
 
     return ivn_target_cosine_sim/train_target_cosine_sim_max
+
+
