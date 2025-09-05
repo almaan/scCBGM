@@ -65,7 +65,7 @@ class CB_VAE_FM(BaseCBVAE):
         # --- Initialize the FlowDecoder ---
         self.bottleneck_dim = self.n_concepts + n_unknown
         
-        self._decoder = FlowDecoder(
+        self._decoder = _decoder(
             x_dim=self.input_dim,
             c_dim=self.bottleneck_dim,
             emb_dim=self.hidden_dim,
@@ -90,6 +90,10 @@ class CB_VAE_FM(BaseCBVAE):
             self.concept_loss = self._hard_concept_loss
             self.concept_transform = sigmoid
 
+    @property
+    def has_concepts(self):
+        return True
+    
     def reparametrize(self, mu, logvar, **kwargs):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
@@ -107,6 +111,14 @@ class CB_VAE_FM(BaseCBVAE):
     def decode(self, h, **kwargs):
         # For inference, we integrate
         return self._decoder.integrate(h)
+
+    def intervene(self, x, concepts, mask, **kwargs):
+        enc = self.encode(x)
+        z_dict = self.reparametrize(**enc)
+        cbm_dict = self.cbm(**z_dict, concepts=concepts, mask=mask, intervene=True)
+        dec_dict = self.decode(**cbm_dict)
+        return dec_dict
+
 
     def forward(self, x, **kwargs):
         # Forward pass for training
@@ -164,7 +176,7 @@ class CB_VAE_FM(BaseCBVAE):
         # 4. Calculate FM loss (MSE)
         fm_loss = self.fm_loss(pred_v, ut)
         loss_dict["fm_loss"] = fm_loss
-        loss_dict["Total_loss"] = self.fm_loss_hp * fm_loss
+        loss_dict["Total_loss"] = fm_loss
         # --- End of Flow Matching Loss ---
         
         KLD = self.KL_loss(mu, logvar)

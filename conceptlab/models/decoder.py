@@ -3,6 +3,8 @@ import torch.nn.functional as F
 import torch as t
 import torch
 
+import math
+
 class MLPBlock(nn.Module):
     """
     A single block of the MLP, consisting of a linear layer, normalization,
@@ -320,7 +322,6 @@ class FlowDecoder(nn.Module):
         output = self.output_layer(h)
         return output
 
-    # BUG FIX: Added integrate method required for inference/generation.
     @torch.no_grad()
     def integrate(self, h: torch.Tensor, steps: int = 100) -> dict:
         """
