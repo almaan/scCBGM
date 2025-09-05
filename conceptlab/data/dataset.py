@@ -30,7 +30,7 @@ class InterventionDataset:
         if single_cell_preproc:
             sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
             sc.pp.log1p(adata)
-            sc.pp.highly_variable_genes(adata, n_top_genes=2048, subset=True)
+            sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
         
         adata.X = adata.X.toarray()
 
@@ -45,7 +45,9 @@ class InterventionDataset:
         adata, adata_train, adata_test, adata_inter = split_data_for_counterfactuals(
             adata, hold_out_label, mod_label, label_variable
         )
-        
+
+        breakpoint()
+
         adata.uns['pc_transform'] = PCA(n_components=80).fit(adata_train.X)
 
         for x_data in [adata, adata_train, adata_test, adata_inter]:
@@ -60,6 +62,7 @@ class InterventionDataset:
         self.concept_key = concept_key
         self.hold_out_label = hold_out_label
         self.concepts_to_flip = intervention_labels.concepts_to_flip
+        self.control_reference = intervention_labels.reference # The value of controls in the concepts to flip
 
         self.label_variable = label_variable
 

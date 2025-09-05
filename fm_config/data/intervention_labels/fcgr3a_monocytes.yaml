@@ -2,3 +2,4 @@
 hold_out_label: 'FCGR3A+ Monocytes_stim'
 mod_label: 'FCGR3A+ Monocytes_ctrl'
 concepts_to_flip: ["stim"]
+reference: [0] # reference for the concepts to flip (control)

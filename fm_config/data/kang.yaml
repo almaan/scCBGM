@@ -2,7 +2,7 @@ defaults:
   - intervention_labels: cd4
 
 _target_: conceptlab.data.dataset.InterventionDataset
-data_path: /braid/havivd/scgen/kang.h5ad
+data_path: /braid/havivd/scgen/kang_scimilarity_v2_with_concepts.h5ad 
 concept_key: concepts
-label_variable: cell_stim
+label_variable: L2_stim # variable to select the train/inter/test groups
 intervention_labels: ${intervention_labels}

@@ -262,7 +262,8 @@ class Concept_FM(nn.Module, ABC):
                num_epochs: int,
                batch_size: int,
                lr: float = 3e-4,
-               lr_gamma: float = 0.997):
+               lr_gamma: float = 0.997,
+               num_workers = 0):
         """
         Defines the training loop for the Variational Concept_FM model.
 
@@ -275,7 +276,7 @@ class Concept_FM(nn.Module, ABC):
         self.to(device)
 
         dataset = TensorDataset(data, concepts)
-        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers= num_workers)
 
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=lr_gamma)

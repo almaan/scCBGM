@@ -26,25 +26,33 @@ def main(cfg: DictConfig):
     model.train(adata_train.copy())
     adata_preds = model.predict_intervention(adata_inter.copy(), hold_out_label = dataset.hold_out_label, concepts_to_flip = dataset.concepts_to_flip)
 
-    if isinstance(adata_train.X,np.ndarray):
+    if cfg.model.pca:
+        x_baseline = adata_train.obsm["X_pca"]
+        x_target = adata_test.obsm["X_pca"]
+        x_ivn = adata_preds.obsm["X_pca"]
+        
+        x_baseline_rec = adata_train.X
+        x_target_rec = adata_test.X
+        x_ivn_rec = adata_train.uns["pc_transform"].inverse_transform(x_ivn)
+
+    else:
         x_baseline = adata_train.X
         x_target = adata_test.X
-    else:
-        x_baseline = adata_train.X.toarray()
-        x_target = adata_test.X.toarray()
-
+        x_ivn = adata_preds.X 
+    
     mmd_score = clab.evaluation.interventions.evaluate_intervention_mmd_with_target(
         x_train = x_baseline,
-        x_ivn = adata_preds.X,
+        x_ivn = x_ivn,
         x_target = x_target,
         labels_train = adata_train.obs[dataset.label_variable].values
         )
     
+    # The DE metric is only evaluated in gene space (reconstructions)
     de_score = clab.evaluation.interventions.evaluate_intervention_DE_with_target(
-        x_train = x_baseline,
-        x_ivn = adata_preds.X,
-        x_target = x_target,
-        genes_list = adata_train.var.index
+        x_train = x_baseline if not cfg.model.pca else x_baseline_rec,
+        x_ivn = x_ivn if not cfg.model.pca else x_ivn_rec,
+        x_target = x_target if not cfg.model.pca else x_target_rec,
+        genes_list = adata_train.var.index.tolist()
     ) 
     
     print(mmd_score)

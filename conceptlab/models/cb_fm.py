@@ -376,7 +376,6 @@ class CBMFM_MetaTrainer:
                  num_epochs = 1000,
                  batch_size = 128,
                  lr = 3e-4,
-                 p_drop = 0.1,
                  raw = False,
                  concept_key= "concepts",
                  num_workers = 0,
@@ -398,7 +397,6 @@ class CBMFM_MetaTrainer:
         self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.lr = lr
-        self.p_drop = p_drop
         self.concept_key = concept_key
         self.raw = raw
         self.num_workers = num_workers
@@ -458,17 +456,6 @@ class CBMFM_MetaTrainer:
                 num_epochs=self.num_epochs, batch_size=self.batch_size, lr=self.lr,
                 )
 
-            #fm_model = clab.models.cb_fm.CB_FM(
-            #x_dim=data_matrix.shape[1],
-            #c_known_dim=adata_train.obsm[self.concept_key].shape[1],
-            #emb_dim=self.emb_dim, n_layers=self.n_layers,
-            #num_workers = self.num_workers
-            #    )
-            #fm_model.train(
-            #data=torch.from_numpy(data_matrix.astype(np.float32)),
-            #concepts_known=torch.from_numpy(adata_train.obsm[self.concept_key].to_numpy().astype(np.float32)),
-            #num_epochs=self.num_epochs, batch_size=self.batch_size, lr = self.lr, p_drop=self.p_drop
-            #    )
         else:
             mod_cfg = hydra.utils.instantiate(self.fm_mod_cfg)
             mod_cfg["input_dim"] = data_matrix.shape[1]
@@ -548,6 +535,113 @@ class CBMFM_MetaTrainer:
         if(self.z_score):
             x_inter_preds = (x_inter_preds * adata_inter.var['std'].to_numpy()[None, :]) + adata_inter.var['mean'].to_numpy()[None, :]
 
+
+        pred_adata = ad.AnnData(x_inter_preds, var=adata_inter.var)
+        pred_adata.obs['ident'] = 'intervened on'
+        pred_adata.obs['cell_stim'] = hold_out_label + '*'
+
+        if self.pca:
+            pred_adata.obsm['X_pca'] = inter_preds
+
+        return pred_adata
+    
+
+class ConceptFlow_MetaTrainer:
+    def __init__(self,
+                 mod_cfg,
+                 num_epochs = 1000,
+                 batch_size = 128,
+                 lr = 3e-4,
+                 raw = False,
+                 concept_key= "concepts",
+                 num_workers = 0,
+                 pca: bool = False,
+                 z_score: bool = False):
+        """
+        Class to train and predict interventions with a scCBMG-FM model
+        Inputs:
+        - cbm_mod: the scCBMG model underlying the model
+        - fm_mod: the Flow Matching model configuration
+        - num_epochs: max number of epochs to train for
+        - concept_key: Key in adata.obsm where the concept vectors are stored
+        - num_workers: num workers in the dataloaders
+        - pca: whether to train, and predict in PCA space.
+        - zscore: whether to whiten the data
+        - raw: whether to use "CellFlow" style - using only raw concepts
+        """
+        self.num_epochs = num_epochs
+        self.batch_size = batch_size
+        self.lr = lr
+        self.concept_key = concept_key
+        self.raw = raw
+        self.num_workers = num_workers
+        self.pca = pca
+        self.z_score = z_score
+
+        self.mod_cfg = mod_cfg
+    
+    def train(self, adata_train):
+        """Trains and returns the CB-FM model using learned concepts."""
+        print("Training CB-FM model with learned concepts...")
+
+        if(self.pca):
+            data_matrix = adata_train.obsm['X_pca']
+        else:
+            data_matrix = adata_train.X
+            if(self.z_score):
+                data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization
+
+        mod_cfg = hydra.utils.instantiate(self.mod_cfg)
+        mod_cfg["input_dim"] = data_matrix.shape[1]
+        mod_cfg["n_concepts"] = adata_train.obsm[self.concept_key].to_numpy().shape[1]
+        
+        self.fm_model = clab.models.concept_fm.Concept_FM(config=mod_cfg)
+        self.fm_model.train_loop(
+            data=torch.from_numpy(data_matrix.astype(np.float32)),
+            concepts=torch.from_numpy(adata_train.obsm[self.concept_key].to_numpy().astype(np.float32)),
+            num_epochs=self.num_epochs, batch_size=self.batch_size, lr=self.lr,
+            num_workers = self.num_workers
+            )
+        return self.fm_model
+
+    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
+        """Performs intervention using a trained learned-concept CB-FM model.
+        Concepts_to_flip: List of binary concepts to flip during intervention."""
+
+        print("Performing intervention with CB-FM (learned)...")
+
+        concept_to_intervene_idx = [idx for idx,c in enumerate(adata_inter.obsm[self.concept_key].columns) if c in concepts_to_flip]
+
+        if self.pca:
+            data_matrix = adata_inter.obsm['X_pca']
+        else:
+            data_matrix = adata_inter.X
+            if(self.z_score):
+                data_matrix = (data_matrix - adata_inter.var['mean'].to_numpy()[None, :]) / adata_inter.var['std'].to_numpy()[None, :]  # Z-score normalization
+
+        x_intervene_on = torch.from_numpy(data_matrix)
+        c_intervene_on = torch.from_numpy(adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32))
+
+        inter_concepts_known = c_intervene_on.clone()
+        inter_concepts_known[:, concept_to_intervene_idx] = 1 - torch.Tensor(adata_inter.obsm[self.concept_key].values)[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
+
+        mask = torch.zeros(c_intervene_on.shape, dtype=torch.float32)
+        mask[:, concept_to_intervene_idx] = 1
+
+        #inter_concepts = torch.tensor(c_intervene_on, dtype=torch.float32)
+        #inter_concepts[:, -1] = 1 # Set stim concept to 1
+
+        with torch.no_grad():
+            inter_preds = self.fm_model.intervene(x_intervene_on.to('cuda'), mask=mask.to('cuda'), concepts=inter_concepts_known.to('cuda'))
+
+        inter_preds = inter_preds.detach().cpu().numpy()
+
+        if(self.pca):
+            x_inter_preds = adata_inter.uns['pc_transform'].inverse_transform(inter_preds)
+        else:
+            x_inter_preds = inter_preds
+            if(self.z_score):
+                x_inter_preds = (x_inter_preds * adata_inter.var['std'].to_numpy()[None, :]) + adata_inter.var['mean'].to_numpy()[None, :]
 
         pred_adata = ad.AnnData(x_inter_preds, var=adata_inter.var)
         pred_adata.obs['ident'] = 'intervened on'
