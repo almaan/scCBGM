@@ -2,7 +2,7 @@ defaults:
   - intervention_labels: cd4
 
 _target_: conceptlab.data.dataset.InterventionDataset
-data_path: /braid/havivd/scgen/kang_scimilarity_v2_with_concepts.h5ad 
+data_path: /braid/havivd/scgen/kang_scimilarity_v3_with_concepts.h5ad 
 concept_key: concepts
 intervention_labels: ${intervention_labels}
 mmd_label: "cell_stim"
