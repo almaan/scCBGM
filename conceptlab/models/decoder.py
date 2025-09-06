@@ -4,6 +4,7 @@ import torch as t
 import torch
 
 import math
+from tqdm import tqdm
 
 class MLPBlock(nn.Module):
     """
@@ -288,11 +289,11 @@ class FlowDecoder(nn.Module):
 
         # --- Embedding Layers ---
         # BUG FIX: Added an x0_embedder, as it's required by the conditional flow matching loss function.
-        self.x0_embedder = nn.Sequential(
-            nn.Linear(c_dim, emb_dim),
-            nn.ReLU(),
-            nn.Linear(emb_dim, x_dim)
-        )
+        # self.x0_embedder = nn.Sequential(
+        #     nn.Linear(c_dim, emb_dim),
+        #     nn.ReLU(),
+        #     nn.Linear(emb_dim, x_dim)
+        # )
         self.x_embedder = nn.Linear(x_dim, emb_dim)
         self.c_embedder = nn.Linear(self.c_dim, emb_dim) if self.c_dim > 0 else None
         self.t_embedder = FourierEmbedding(emb_dim)
@@ -302,9 +303,9 @@ class FlowDecoder(nn.Module):
         self.output_layer = nn.Sequential(nn.LayerNorm(emb_dim), nn.Linear(emb_dim, self.x_dim))
 
     # BUG FIX: Added get_x0 method required by the loss function.
-    def get_x0(self, c: torch.Tensor) -> torch.Tensor:
-        """ Get the initial state of the flow from the bottleneck vector c. """
-        return self.x0_embedder(c)
+    # def get_x0(self, c: torch.Tensor) -> torch.Tensor:
+    #     """ Get the initial state of the flow from the bottleneck vector c. """
+    #     return self.x0_embedder(c)
 
     def forward(self, x_t: torch.Tensor, t: torch.Tensor, c: torch.Tensor) -> torch.Tensor:
         x_emb = self.x_embedder(x_t)
@@ -313,6 +314,7 @@ class FlowDecoder(nn.Module):
         
         if t.dim() == 1:
             t = t.unsqueeze(-1)
+            
         t_fourier_emb = self.t_embedder(t)
         t_emb = self.t_mapper(t_fourier_emb)
 
@@ -328,14 +330,18 @@ class FlowDecoder(nn.Module):
         Generates x1 by integrating from x0 using the learned velocity field.
         """
         device = h.device
-        x0 = self.get_x0(h)
+        x0 = torch.randn(h.size(0), self.x_dim, device=device)
+        #x0 = torch.zeros(h.size(0), self.x_dim, device=device)
+        
         xt = x0.clone()
         dt = 1.0 / steps
         
-        for i in range(steps):
-            t = torch.full((h.size(0), 1), i / steps, device=device)
+        for t_step in tqdm(range(steps), desc="Forward Process", ncols=88, leave=False):
             # Call forward with (x, t, c)
-            velocity = self.forward(xt, t, h)
+            t_current = t_step * dt
+            t_vec = torch.full((h.size(0),), t_current, device=device)
+
+            velocity = self.forward(xt, t_vec, h)
             xt = xt + velocity * dt
             
         return dict(x_pred=xt)
