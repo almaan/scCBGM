@@ -12,13 +12,13 @@ parameters:
       #- cd4_naive
       - cd4
       - bcells
-      #- nk
+      - nk
       #- bcells_germinal
       #- bcells_memory
-      #- cd8_tcells
-      #- cd14_monocytes
-      #- dendritic_cells
-      #- fcgr3a_monocytes
+      - cd8_tcells
+      - cd14_monocytes
+      - dendritic_cells
+      - fcgr3a_monocytes
   model.edit:
     values:
       - True
