@@ -11,3 +11,25 @@ Each model should have a `train()` and a `predict_intervention()` function.
 
 See an example in `conceptlab/models/cb_fm.py` with the class `CBMFM_MetaTrainer`
 
+
+## Launching a sweep:
+
+Go in `jobs/wandb` and run:
+
+`./init_sweep.sh ../fm_config/sweeps/kang_cbm.yaml`
+
+Where you can feed the path to the sweep you want to run.
+
+The output should look like:
+
+```
+Launching sweep from config: ../fm_config/sweeps/kang_cbmfm_raw.yaml
+Project: conceptlab | Entity: debroue1
+✅ Created sweep: debroue1/conceptlab/sweeps
+```
+
+Copy paste the sweep path in `pcluster_sweep.sh` and run it !
+
+`sbatch pclsuter_sweep.sh`
+
+Check your results in wandb !
