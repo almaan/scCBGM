@@ -18,10 +18,6 @@ parameters:
       - dendritic_cells
       - fcgr3a_monocytes
       - megakaryocytes
-  model.edit:
-    values:
-      - True
-      - False
 command:
   - uv
   - run
