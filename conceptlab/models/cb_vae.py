@@ -369,7 +369,7 @@ class CBM_MetaTrainer:
                  log_every_n_steps,
                 concept_key,
                 num_workers,
-                pca:bool = False,
+                obsm_key:str = "X",
                 z_score:bool = False
             ):
         """
@@ -380,7 +380,7 @@ class CBM_MetaTrainer:
         - log_every_n_steps: 
         - concept_key: Key in adata.obsm where the concept vectors are stored
         - num_workers: num workers in the dataloaders
-        - pca: whether to train, and predict in PCA space.
+        - obsm_key where to apply the method on (obsm) - "X" or "X_pca"
         - zscore: whether to whiten the data
         """
         self.cbm_config = cbm_config
@@ -391,26 +391,22 @@ class CBM_MetaTrainer:
 
         self.model = None
 
-        self.pca = pca
+        self.obsm_key = obsm_key
         self.z_score = z_score
         
-        assert type(pca) == bool
     
     def train(self, adata_train):
 
         """Trains and returns the scCBGM model."""
         print("Training scCBGM model...")
 
-        if self.pca:
-            data_matrix = adata_train.obsm['X_pca']
+        if self.obsm_key != "X":
+            data_matrix = adata_train.obsm[self.obsm_key]
         else:
             data_matrix = adata_train.X
-            if self.z_score:
-                data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization       
-
-        if issparse(data_matrix):
-            data_matrix = data_matrix.toarray()
-        
+            #if self.z_score:
+            #    data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization       
+ 
         torch.set_flush_denormal(True)
 
         config = OmegaConf.create(dict(
@@ -449,13 +445,11 @@ class CBM_MetaTrainer:
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call train() before predict_intervention().")
         
-        if self.pca:
-            x_intervene_on =  torch.tensor(adata_inter.obsm['X_pca'], dtype=torch.float32)
+        if self.obsm_key != "X":
+            x_intervene_on =  torch.tensor(adata_inter.obsm[self.obsm_key], dtype=torch.float32)
         else:
-            if isinstance(adata_inter.X, np.ndarray):
-                x_intervene_on = torch.tensor(adata_inter.X, dtype=torch.float32)
-            else:
-                x_intervene_on = torch.tensor(adata_inter.X.toarray(), dtype=torch.float32)
+            x_intervene_on = torch.tensor(adata_inter.X, dtype=torch.float32)
+
         c_intervene_on = adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)
 
         # what indices should we flip in the concepts
@@ -469,20 +463,21 @@ class CBM_MetaTrainer:
         inter_concepts[:, concept_to_intervene_idx] = 1 - inter_concepts[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
 
         with torch.no_grad():
-            inter_preds = self.model.intervene(x_intervene_on, mask=mask, concepts=inter_concepts)
+            inter_preds = self.model.intervene(x_intervene_on.to("cuda"), mask=mask.to("cuda"), concepts=inter_concepts.to("cuda"))
         
         inter_preds = inter_preds['x_pred'].cpu().numpy() 
 
-        if(self.pca):
-            x_inter_preds = adata_inter.uns['pc_transform'].inverse_transform(inter_preds)
+        if(self.obsm_key != "X"):
+            x_inter_preds = np.zeros_like(adata_inter.X)
         else:
             x_inter_preds = inter_preds
 
-        pred_adata = ad.AnnData(x_inter_preds, var=adata_inter.var)
+        pred_adata = adata_inter.copy()
+        pred_adata.X = x_inter_preds
         pred_adata.obs['ident'] = 'intervened on'
         pred_adata.obs['cell_stim'] = hold_out_label + '*'
 
-        if(self.pca):
-            pred_adata.obsm['X_pca'] = inter_preds
+        if(self.obsm_key != "X"):
+            pred_adata.obsm[self.obsm_key] = inter_preds
 
         return pred_adata

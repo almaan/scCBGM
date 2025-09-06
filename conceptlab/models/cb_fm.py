@@ -379,8 +379,9 @@ class CBMFM_MetaTrainer:
                  raw = False,
                  concept_key= "concepts",
                  num_workers = 0,
-                 pca: bool = False,
-                 z_score: bool = False):
+                 obsm_key: str = "X",
+                 z_score: bool = False,
+                 edit:bool = True):
         """
         Class to train and predict interventions with a scCBMG-FM model
         Inputs:
@@ -389,7 +390,7 @@ class CBMFM_MetaTrainer:
         - num_epochs: max number of epochs to train for
         - concept_key: Key in adata.obsm where the concept vectors are stored
         - num_workers: num workers in the dataloaders
-        - pca: whether to train, and predict in PCA space.
+        - obsm_key: key of the anndata obsm to train on.
         - zscore: whether to whiten the data
         - raw: whether to use "CellFlow" style - using only raw concepts
         """
@@ -400,17 +401,19 @@ class CBMFM_MetaTrainer:
         self.concept_key = concept_key
         self.raw = raw
         self.num_workers = num_workers
-        self.pca = pca
+        self.obsm_key = obsm_key
         self.z_score = z_score
 
         self.fm_mod_cfg = fm_mod_cfg
+
+        self.edit = edit
 
     def get_learned_concepts(self, adata_full):
         """Uses a trained scCBGM to generate learned concepts for all data."""
         print("Generating learned concepts from scCBGM...")
         
-        if(self.pca):
-            all_x = torch.tensor(adata_full.obsm['X_pca'], dtype=torch.float32).to('cuda')
+        if(self.obsm_key != 'X'):
+            all_x = torch.tensor(adata_full.obsm[self.obsm_key], dtype=torch.float32).to('cuda')
         else:
             all_x = torch.tensor(adata_full.X, dtype=torch.float32).to('cuda')
 
@@ -433,16 +436,16 @@ class CBMFM_MetaTrainer:
         """Trains and returns the CB-FM model using learned concepts."""
         print("Training CB-FM model with learned concepts...")
 
-        if(self.pca):
-            data_matrix = adata_train.obsm['X_pca']
+        if not self.raw:
+            self.fit_cbm_model(adata_train)
+            adata_train = self.get_learned_concepts(adata_train.copy()) 
+
+        if(self.obsm_key != 'X'):
+            data_matrix = adata_train.obsm[self.obsm_key]
         else:
             data_matrix = adata_train.X
             if(self.z_score):
                 data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization
-
-        if not self.raw:
-            self.fit_cbm_model(adata_train)
-            adata_train = self.get_learned_concepts(adata_train.copy()) 
 
         if self.raw:
             mod_cfg = hydra.utils.instantiate(self.fm_mod_cfg)
@@ -465,14 +468,20 @@ class CBMFM_MetaTrainer:
             self.fm_model.train_loop(
                 data=torch.from_numpy(data_matrix.astype(np.float32)),
                 concepts=torch.from_numpy(adata_train.obsm['scCBGM_concepts'].astype(np.float32)),
-                num_epochs=self.num_epochs, batch_size=self.batch_size, lr=self.lr,
+                num_epochs=self.num_epochs, 
+                batch_size=self.batch_size, 
+                lr=self.lr,
                 num_workers = self.num_workers
                 )
         return self.fm_model
 
     def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
         """Performs intervention using a trained learned-concept CB-FM model.
-        Concepts_to_flip: List of binary concepts to flip during intervention."""
+        Concepts_to_flip: List of binary concepts to flip during intervention.
+        
+        
+        edit: if True uses the encode/decode setup, otherwise just decodes.
+        """
 
         print("Performing intervention with CB-FM (learned)...")
 
@@ -487,61 +496,77 @@ class CBMFM_MetaTrainer:
             inter_concepts_known = c_known_inter.clone()
             
             inter_concepts_known[:, concept_to_intervene_idx] = 1 - torch.Tensor(adata_inter.obsm[self.concept_key].values)[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
-        
-        else:
-            c_intervene_on = torch.from_numpy(adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32))
-            inter_concepts = c_intervene_on.clone()
             
-            inter_concepts[:, concept_to_intervene_idx] = 1 - inter_concepts[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
+
+        if(self.obsm_key != 'X'):
+                x_inter = adata_inter.obsm[self.obsm_key]
+        else:
+            x_inter = adata_inter.X
+            if(self.z_score):
+                x_inter = (x_inter - adata_inter.var['mean'].to_numpy()[None, :]) / adata_inter.var['std'].to_numpy()[None, :]
 
         # Using raw concepts
         if self.raw:
-            with torch.no_grad():
+            init_concepts = adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)   
+            edit_concepts = init_concepts.copy()
+            edit_concepts[:, concept_to_intervene_idx] = 1 - edit_concepts[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
+
+            if self.edit:
+                inter_preds = self.fm_model.edit(
+                    x = torch.from_numpy(x_inter.astype(np.float32)).to('cuda'),
+                    c = torch.from_numpy(init_concepts).to('cuda'),
+                    c_prime = torch.from_numpy(edit_concepts).to('cuda'),
+                    t_edit = 0.0,
+                    n_steps = 1000,
+                    w_cfg_forward = 1.0,
+                    w_cfg_backward = 1.0,
+                    noise_add = 0.0)
+
+            else:
                 inter_preds = self.fm_model.decode(
-                    h=inter_concepts.to('cuda'),
-                    n_steps=1000,
-                )
+                    h=torch.from_numpy(edit_concepts).to('cuda'),
+                    n_steps = 1000,
+                    w_cfg = 1.0)
             inter_preds = inter_preds.detach().cpu().numpy()
 
         # Using CBM concepts
         else:
-            if self.pca:
-                x_inter = adata_inter.obsm['X_pca']
-            else:
-                x_inter = adata_inter.X
-                if(self.z_score):
-                    x_inter = (x_inter - adata_inter.var['mean'].to_numpy()[None, :]) / adata_inter.var['std'].to_numpy()[None, :]
 
             init_concepts = np.concatenate([c_known_inter, c_unknown_inter], axis=1)
             edit_concepts = np.concatenate([inter_concepts_known, c_unknown_inter], axis=1)
             
-            inter_preds = self.fm_model.edit(
-                x = torch.from_numpy(x_inter.astype(np.float32)).to('cuda'),
-                c = torch.from_numpy(init_concepts.astype(np.float32)).to('cuda'),
-                c_prime = torch.from_numpy(edit_concepts.astype(np.float32)).to('cuda'),
-                t_edit = 0.001,
+            if self.edit:
+                inter_preds = self.fm_model.edit(
+                    x = torch.from_numpy(x_inter.astype(np.float32)).to('cuda'),
+                    c = torch.from_numpy(init_concepts.astype(np.float32)).to('cuda'),
+                    c_prime = torch.from_numpy(edit_concepts.astype(np.float32)).to('cuda'),
+                    t_edit = 0.,
+                    n_steps = 1000,
+                    w_cfg_forward = 1.0,
+                    w_cfg_backward = 1.0,
+                    noise_add = 0.0)
+            else:
+                inter_preds = self.fm_model.decode(
+                h = torch.from_numpy(edit_concepts.astype(np.float32)).to('cuda'),
                 n_steps = 1000,
-                w_cfg_forward = 1.2,
-                w_cfg_backward = 1.0,
-                noise_add = 0.0)
-             
+                w_cfg = 1.0)
+            
             inter_preds = inter_preds.detach().cpu().numpy()
 
-        if(self.pca):
-            x_inter_preds = adata_inter.uns['pc_transform'].inverse_transform(inter_preds)
+        if(self.obsm_key != 'X'):
+            x_inter_preds = np.zeros_like(adata_inter.X)
         else:
             x_inter_preds = inter_preds
+            if(self.z_score):
+                x_inter_preds = (x_inter_preds * adata_inter.var['std'].to_numpy()[None, :]) + adata_inter.var['mean'].to_numpy()[None, :]
 
-        if(self.z_score):
-            x_inter_preds = (x_inter_preds * adata_inter.var['std'].to_numpy()[None, :]) + adata_inter.var['mean'].to_numpy()[None, :]
 
-
-        pred_adata = ad.AnnData(x_inter_preds, var=adata_inter.var)
+        pred_adata = adata_inter.copy()
+        pred_adata.X = x_inter_preds
         pred_adata.obs['ident'] = 'intervened on'
-        pred_adata.obs['cell_stim'] = hold_out_label + '*'
 
-        if self.pca:
-            pred_adata.obsm['X_pca'] = inter_preds
+        if(self.obsm_key != 'X'):
+            pred_adata.obsm[self.obsm_key] = inter_preds
 
         return pred_adata
     

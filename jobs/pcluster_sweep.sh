@@ -20,4 +20,4 @@ conda deactivate
 
 cd /homefs/home/debroue1/projects/conceptlab/scripts
 
-uv run wandb agent debroue1/conceptlab/oyr51sa3 
+uv run wandb agent debroue1/conceptlab/zyr96hdg # REPLACE WITH YOUR SWEEP PATH !!!!

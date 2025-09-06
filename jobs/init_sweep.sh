@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: ./launch_sweep.sh sweep.yaml
+# Usage: ./init_sweep.sh ../fm_config/sweeps/kang_cbm.yaml
 
 set -e  # stop on error
 

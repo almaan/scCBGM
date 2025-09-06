@@ -1,13 +1,13 @@
 _target_: conceptlab.models.cb_fm.CBMFM_MetaTrainer
-num_epochs: 1000
+num_epochs: 200
 batch_size: 128
 lr: 3e-4
-p_drop: 0.1
 raw: True
 concept_key: ${data.concept_key}
 num_workers: 4
-pca: False
+obsm_key: X_pca
 z_score: False
+edit: True
 fm_mod_cfg:
   hidden_dim: 1024
   latent_dim: 128

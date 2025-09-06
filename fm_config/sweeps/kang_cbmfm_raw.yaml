@@ -8,15 +8,17 @@ parameters:
     values: [13,42,1337,69]
   data/intervention_labels:
     values: 
-      - cd4
+      - cd4_cd25
+      - cd4_naive
       - nk
-      - bcells
+      - bcells_germinal
+      - bcells_memory
       - cd8_tcells
       - cd14_monocytes
       - dendritic_cells
       - fcgr3a_monocytes
       - megakaryocytes
-  model.pca:
+  model.edit:
     values:
       - True
       - False
