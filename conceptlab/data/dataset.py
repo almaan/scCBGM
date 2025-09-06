@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 class InterventionDataset:
-    def __init__(self, data_path, intervention_labels, concept_key, label_variable: Union[List,str], single_cell_preproc = True, log1p = True):
+    def __init__(self, data_path, intervention_labels, concept_key, mmd_label = None, single_cell_preproc = True, log1p = True):
         """
         Loads and preprocesses single cell data
         Inputs:
@@ -18,13 +18,21 @@ class InterventionDataset:
         - intervention_labels:
             - hold_out_label: label for the hold-out group (the ground truth to compare agaisnt)
             - mod_label: label for the group that we will modulate / intervene on.
-        - label_variable: name of the column in the anndata where the mod_label and hold_out_label are defined. If label_variable is a list, then we merge the columns 
-            to create a new label variable where each unique combination of the columns is a new label. Example if label_variable = ['treatment', 'cell_type'], we'll create a new column 'treatment_cell_type' where each element will be joined with '_'.
         - single_cell_preproc: whether to preprocess the cells using scanpy.
+        - mmd_label: label used to compute mmd ratios.
         """
         print("Loading and preprocessing data...")
-        
         print(intervention_labels)
+
+        self.concept_key = concept_key
+        self.hold_out_label = intervention_labels.hold_out_label
+        self.mod_label = intervention_labels.mod_label
+        self.concepts_to_flip = intervention_labels.concepts_to_flip
+        self.control_reference = intervention_labels.reference # The value of controls in the concepts to flip
+
+        self.label_variable = intervention_labels.label_variable
+        self.mmd_label = mmd_label
+
         adata = ad.read_h5ad(data_path)
 
         if single_cell_preproc:
@@ -34,16 +42,13 @@ class InterventionDataset:
         
         adata.X = adata.X.toarray()
 
-        if not isinstance(label_variable,str): # it's a list then
+        if not isinstance(self.label_variable,str): # it's a list then
             log.info("Creating a joint label variable")
-            adata.obs["_".join(label_variable)] = adata.obs[label_variable].agg("_".join, axis=1)
-            label_variable = "_".join(label_variable)
-
-        hold_out_label = intervention_labels.hold_out_label
-        mod_label = intervention_labels.mod_label
+            adata.obs["_".join(self.label_variable)] = adata.obs[self.label_variable].agg("_".join, axis=1)
+            self.label_variable = "_".join(self.label_variable)
 
         adata, adata_train, adata_test, adata_inter = split_data_for_counterfactuals(
-            adata, hold_out_label, mod_label, label_variable
+            adata, self.hold_out_label, self.mod_label, self.label_variable
         )
 
         adata.uns['pc_transform'] = PCA(n_components=128).fit(adata_train.X)
@@ -56,13 +61,6 @@ class InterventionDataset:
         self.adata_train = adata_train
         self.adata_test = adata_test
         self.adata_inter = adata_inter
-
-        self.concept_key = concept_key
-        self.hold_out_label = hold_out_label
-        self.concepts_to_flip = intervention_labels.concepts_to_flip
-        self.control_reference = intervention_labels.reference # The value of controls in the concepts to flip
-
-        self.label_variable = label_variable
 
     def get_anndatas(self):
         return self.adata, self.adata_train, self.adata_test, self.adata_inter

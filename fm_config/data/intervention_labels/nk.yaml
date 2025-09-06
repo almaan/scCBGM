@@ -1,5 +1,6 @@
 # @package intervention_labels
-hold_out_label: 'NK cells_stim'
-mod_label: 'NK cells_ctrl'
+label_variable: L2_stim # variable to select the train/inter/test groups
+hold_out_label: 'NK cell_stim'
+mod_label: 'NK cell_ctrl'
 concepts_to_flip: ["stim"]
 reference: [0] # reference for the concepts to flip (control)

@@ -44,7 +44,7 @@ def main(cfg: DictConfig):
         x_train = x_baseline,
         x_ivn = x_ivn,
         x_target = x_target,
-        labels_train = adata_train.obs[dataset.label_variable].values
+        labels_train = adata_train.obs[dataset.mmd_label].values
         )
     
     # The DE metric is only evaluated in gene space (reconstructions)

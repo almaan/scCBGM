@@ -1,4 +1,5 @@
 # @package intervention_labels
+label_variable: L2_stim # variable to select the train/inter/test groups
 hold_out_label: 'CD14+ Monocytes_stim'
 mod_label: 'CD14+ Monocytes_ctrl'
 concepts_to_flip: ["stim"]
