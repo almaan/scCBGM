@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 import math
 from typing import Optional
@@ -27,7 +28,7 @@ class ConditionEmbedding(nn.Module):
             torch.Tensor: The embedded condition vector, shape (batch_size, emb_dim).
         """
         c_emb = self.linear(c)
-        c_emb = c_emb / c_emb.norm(dim=-1, keepdim=True)  # normalize to be on hypersphere
+        #c_emb = c_emb / c_emb.norm(dim=-1, keepdim=True)  # normalize to be on hypersphere
         return c_emb
 
 
@@ -146,14 +147,9 @@ class FlowDecoder(nn.Module):
         )
 
         # --- Output Layer ---
-        self.output_layer = nn.Sequential(
-            nn.LayerNorm(emb_dim),
-            nn.Linear(emb_dim, self.x_dim)
-        )
-
-        final_linear_layer = self.output_layer[1]
-        nn.init.xavier_uniform_(final_linear_layer.weight, gain=0.01) 
-        nn.init.zeros_(final_linear_layer.bias)
+        self.output_layer = nn.Linear(emb_dim, self.x_dim)
+        nn.init.xavier_uniform_(self.output_layer.weight, gain=0.1) 
+        nn.init.zeros_(self.output_layer.bias)
 
     def forward(self, x_t: torch.Tensor, t: torch.Tensor, c: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
@@ -255,11 +251,14 @@ class DenseEncoder(nn.Module):
 
         self.output_layer = nn.Linear(self.hidden_dim, self.latent_dim)
 
+        self.normalize_to_hypersphere = (output_activation == 'hypersphere')
         if(output_activation == 'sigmoid'):
             self.output_layer_activation = nn.Sigmoid()
         elif(output_activation == 'relu'):
             self.output_layer_activation = nn.ReLU()
         else:
+            # The 'hypersphere' case will use nn.Identity() here, 
+            # as the normalization is a separate step.
             self.output_layer_activation = nn.Identity()
 
     def forward(self, x, **kwargs):
@@ -271,5 +270,9 @@ class DenseEncoder(nn.Module):
             h = layer(h)
         z = self.output_layer(h)
         z = self.output_layer_activation(z)
+
+        if self.normalize_to_hypersphere:
+            z = F.normalize(z, p=2, dim=1)
+
         return z
 

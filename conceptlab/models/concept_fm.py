@@ -37,13 +37,14 @@ class Concept_FM(nn.Module, ABC):
         self.n_layers = config.get("n_layers", 4)
         self.dropout = config.get("dropout", 0.1)
         self.p_uncond = config.get("p_uncond", 0.1)
+        self.unknown_activation = config.get("unknown_activation", "hypersphere")
 
-        # if(self.p_uncond > 0):
-        self.condition_embedder = ConditionEmbedding(c_dim=self.n_concepts + self.n_unknown, emb_dim=self.hidden_dim)
-        self.concept_emb_dim = self.hidden_dim
-        # else:
-        #     self.condition_embedder = nn.Identity()
-        #     self.concept_emb_dim = self.n_concepts + self.n_unknown
+        if(self.p_uncond > 0):
+            self.condition_embedder = ConditionEmbedding(c_dim=self.n_concepts + self.n_unknown, emb_dim=self.hidden_dim)
+            self.concept_emb_dim = self.hidden_dim
+        else:
+            self.condition_embedder = nn.Identity()
+            self.concept_emb_dim = self.n_concepts + self.n_unknown
 
         # Encoder
         self._encoder = _encoder(
@@ -71,7 +72,7 @@ class Concept_FM(nn.Module, ABC):
             latent_dim=self.n_unknown,
             n_layers=self.cb_layers,
             dropout=self.dropout,
-            output_activation='relu')
+            output_activation='hypersphere' if self.unknown_activation == 'hypersphere' else 'relu')
 
         # --- VARIATIONAL CHANGE 1: Add layers for mu and logvar ---
         # These new layers will map the concept vector 'h' to the parameters
@@ -95,7 +96,6 @@ class Concept_FM(nn.Module, ABC):
             dropout=self.dropout,
         )
 
-        self.dropout_layer = nn.Dropout(p=self.dropout)
 
         self.flow_hp = config.get("flow_hp", 1.0)
         self.concepts_hp = config.get("concepts_hp", 0.1)
@@ -266,22 +266,23 @@ class Concept_FM(nn.Module, ABC):
 
     def orthogonality_loss(self, c, u):
         batch_size = u.size(0)
-        u_mean = u.mean(dim=0, keepdim=True)
-        c_mean = c.mean(dim=0, keepdim=True)
-        u_centered = u - u_mean
-        c_centered = c - c_mean
+        # u_mean = u.mean(dim=0, keepdim=True)
+        # c_mean = c.mean(dim=0, keepdim=True)
+        c_centered = (c - self.known_concept_mean) / self.known_concept_std
+
+        if(self.unknown_activation == 'relu'):
+            u_mean = u.mean(dim=0, keepdim=True)
+            u_centered = u - u_mean
+        else:
+            u_centered = u
+
         cross_covariance = torch.matmul(u_centered.T, c_centered) / (batch_size - 1)
         loss = (cross_covariance**2).sum()
         return loss
     
     def kl_loss(self, mu, logvar):
-        """
-        Calculates the KL divergence between the learned distribution N(mu, sigma^2)
-        and a standard normal distribution N(0, I). This regularizes the latent space.
-        """
-        # Sum over the dimensions and average over the batch
-        kl_div = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
-        return kl_div.mean()
+        KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+        return KLD
     # --- End of Change ---
 
     def fm_loss(self, v_pred, v):
@@ -340,6 +341,9 @@ class Concept_FM(nn.Module, ABC):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device = device
         self.to(device)
+
+        self.known_concept_mean = concepts.mean(dim=0).to('cuda')
+        self.known_concept_std = concepts.std(dim=0).to('cuda') + 1e-6
 
         dataset = TensorDataset(data, concepts)
         data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers= num_workers)
