@@ -22,36 +22,28 @@ def main(cfg: DictConfig):
     model = hydra.utils.instantiate(cfg.model)
     
     adata, adata_train, adata_test, adata_inter =  dataset.get_anndatas()
-    
+
     model.train(adata_train.copy())
     adata_preds = model.predict_intervention(adata_inter.copy(), hold_out_label = dataset.hold_out_label, concepts_to_flip = dataset.concepts_to_flip)
 
     if cfg.model.obsm_key == "X_pca":
-        x_baseline = adata_train.obsm["X_pca"]
-        x_target = adata_test.obsm["X_pca"]
-        x_ivn = adata_preds.obsm["X_pca"]
-        
         x_baseline_rec = adata_train.X
         x_target_rec = adata_test.X
-        x_ivn_rec = adata_train.uns["pc_transform"].inverse_transform(x_ivn)
+        x_ivn_rec = adata_train.uns["pc_transform"].inverse_transform(adata_preds.obsm["X_pca"])
 
-    else:
-        x_baseline = adata_train.X
-        x_target = adata_test.X
-        x_ivn = adata_preds.X 
     
     mmd_score = clab.evaluation.interventions.evaluate_intervention_mmd_with_target(
-        x_train = x_baseline,
-        x_ivn = x_ivn,
-        x_target = x_target,
+        x_train = adata_train.obsm[cfg.model.obsm_key],
+        x_ivn = adata_preds.obsm[cfg.model.obsm_key],
+        x_target = adata_test.obsm[cfg.model.obsm_key],
         labels_train = adata_train.obs[dataset.mmd_label].values
         )
     
     # The DE metric is only evaluated in gene space (reconstructions)
     de_score = clab.evaluation.interventions.evaluate_intervention_DE_with_target(
-        x_train = x_baseline if cfg.model.obsm_key =="X" else x_baseline_rec,
-        x_ivn = x_ivn if cfg.model.obsm_key =="X" else x_ivn_rec,
-        x_target = x_target if cfg.model.obsm_key =="X" else x_target_rec,
+        x_train = adata_train.obsm[cfg.model.obsm_key] if cfg.model.obsm_key =="X" else x_baseline_rec,
+        x_ivn = adata_preds.obsm[cfg.model.obsm_key] if cfg.model.obsm_key =="X" else x_ivn_rec,
+        x_target = adata_test.obsm[cfg.model.obsm_key] if cfg.model.obsm_key =="X" else x_target_rec,
         genes_list = adata_train.var.index.tolist()
     ) 
     

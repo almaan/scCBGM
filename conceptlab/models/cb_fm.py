@@ -580,7 +580,7 @@ class ConceptFlow_MetaTrainer:
                  raw = False,
                  concept_key= "concepts",
                  num_workers = 0,
-                 pca: bool = False,
+                obsm_key: str = "X",
                  z_score: bool = False):
         """
         Class to train and predict interventions with a scCBMG-FM model
@@ -600,7 +600,7 @@ class ConceptFlow_MetaTrainer:
         self.concept_key = concept_key
         self.raw = raw
         self.num_workers = num_workers
-        self.pca = pca
+        self.obsm_key = obsm_key
         self.z_score = z_score
 
         self.mod_cfg = mod_cfg
@@ -609,8 +609,8 @@ class ConceptFlow_MetaTrainer:
         """Trains and returns the CB-FM model using learned concepts."""
         print("Training CB-FM model with learned concepts...")
 
-        if(self.pca):
-            data_matrix = adata_train.obsm['X_pca']
+        if(self.obsm_key != 'X'):
+            data_matrix = adata_train.obsm[self.obsm_key]
         else:
             data_matrix = adata_train.X
             if(self.z_score):
@@ -624,7 +624,8 @@ class ConceptFlow_MetaTrainer:
         self.fm_model.train_loop(
             data=torch.from_numpy(data_matrix.astype(np.float32)),
             concepts=torch.from_numpy(adata_train.obsm[self.concept_key].to_numpy().astype(np.float32)),
-            num_epochs=self.num_epochs, batch_size=self.batch_size, lr=self.lr,
+            num_epochs=self.num_epochs, 
+            batch_size=self.batch_size, lr=self.lr,
             num_workers = self.num_workers
             )
         return self.fm_model
@@ -634,45 +635,46 @@ class ConceptFlow_MetaTrainer:
         Concepts_to_flip: List of binary concepts to flip during intervention."""
 
         print("Performing intervention with CB-FM (learned)...")
+        if(self.obsm_key != 'X'):
+            x_intervene_on =  torch.tensor(adata_inter.obsm[self.obsm_key], dtype=torch.float32)
+        else:
+            x_intervene_on = torch.tensor(adata_inter.X, dtype=torch.float32)
+        c_intervene_on = adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)
 
         concept_to_intervene_idx = [idx for idx,c in enumerate(adata_inter.obsm[self.concept_key].columns) if c in concepts_to_flip]
 
-        if self.pca:
-            data_matrix = adata_inter.obsm['X_pca']
-        else:
-            data_matrix = adata_inter.X
-            if(self.z_score):
-                data_matrix = (data_matrix - adata_inter.var['mean'].to_numpy()[None, :]) / adata_inter.var['std'].to_numpy()[None, :]  # Z-score normalization
+        #x_intervene_on = torch.from_numpy(data_matrix)
+        #c_intervene_on = torch.from_numpy(adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32))
 
-        x_intervene_on = torch.from_numpy(data_matrix)
-        c_intervene_on = torch.from_numpy(adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32))
-
-        inter_concepts_known = c_intervene_on.clone()
-        inter_concepts_known[:, concept_to_intervene_idx] = 1 - torch.Tensor(adata_inter.obsm[self.concept_key].values)[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
+        #inter_concepts_known = c_intervene_on.clone()
+        #inter_concepts_known[:, concept_to_intervene_idx] = 1 - torch.Tensor(adata_inter.obsm[self.concept_key].values)[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
 
         mask = torch.zeros(c_intervene_on.shape, dtype=torch.float32)
         mask[:, concept_to_intervene_idx] = 1
+
+        inter_concepts = torch.tensor(c_intervene_on, dtype=torch.float32)
+        inter_concepts[:, concept_to_intervene_idx] = 1 - inter_concepts[:, concept_to_intervene_idx] # Set stim concept to 1
 
         #inter_concepts = torch.tensor(c_intervene_on, dtype=torch.float32)
         #inter_concepts[:, -1] = 1 # Set stim concept to 1
 
         with torch.no_grad():
-            inter_preds = self.fm_model.intervene(x_intervene_on.to('cuda'), mask=mask.to('cuda'), concepts=inter_concepts_known.to('cuda'))
+            inter_preds = self.fm_model.intervene(x_intervene_on.to('cuda'), mask=mask.to('cuda'), concepts=inter_concepts.to('cuda'))
 
         inter_preds = inter_preds.detach().cpu().numpy()
 
-        if(self.pca):
-            x_inter_preds = adata_inter.uns['pc_transform'].inverse_transform(inter_preds)
+        if(self.obsm_key != 'X'):
+            x_inter_preds = np.zeros_like(adata_inter.X)
         else:
             x_inter_preds = inter_preds
             if(self.z_score):
                 x_inter_preds = (x_inter_preds * adata_inter.var['std'].to_numpy()[None, :]) + adata_inter.var['mean'].to_numpy()[None, :]
 
-        pred_adata = ad.AnnData(x_inter_preds, var=adata_inter.var)
+        pred_adata = adata_inter.copy()
+        pred_adata.X = x_inter_preds
         pred_adata.obs['ident'] = 'intervened on'
-        pred_adata.obs['cell_stim'] = hold_out_label + '*'
 
-        if self.pca:
-            pred_adata.obsm['X_pca'] = inter_preds
+        if(self.obsm_key != 'X'):
+            pred_adata.obsm[self.obsm_key] = inter_preds
 
         return pred_adata
