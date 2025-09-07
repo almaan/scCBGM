@@ -7,7 +7,7 @@ authors = [
     {name = "Aya Ismail"}
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "lightning",
     "torch",
@@ -36,7 +36,7 @@ dependencies = [
     "pot>=0.9.5",
     "jupyter>=1.1.1",
     "rpy2>=3.6.2",
-    "scvi-tools>=1.3.3",
+    "scvi-tools",
 ]
 
 [project.optional-dependencies]
@@ -59,4 +59,5 @@ explicit = true
 [tool.uv.sources]
 torch = [{index = "pytorch-cu129"}]
 torchvision = [{index = "pytorch-cu129"}]
+scvi-tools = { git = "ssh://git@ssh.github.com:443/edebrouwer/scvi-tools.git" }
 

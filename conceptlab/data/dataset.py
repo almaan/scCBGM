@@ -36,6 +36,7 @@ class InterventionDataset:
         adata = ad.read_h5ad(data_path)
 
         if single_cell_preproc:
+            adata.layers["og"] = adata.X.copy()  # preserve counts
             sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
             sc.pp.log1p(adata)
             sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
@@ -64,3 +65,9 @@ class InterventionDataset:
 
     def get_anndatas(self):
         return self.adata, self.adata_train, self.adata_test, self.adata_inter
+
+    def normalize_from_og(self, adata):
+        adata.X = adata.layers["og"]
+        sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
+        sc.pp.log1p(adata)
+        sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
