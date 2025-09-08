@@ -67,7 +67,12 @@ class InterventionDataset:
         return self.adata, self.adata_train, self.adata_test, self.adata_inter
 
     def normalize_from_og(self, adata):
+        """
+        When working on count or original data space,
+        the predictions have to be mapped back to the normalized or PCA space.
+        """
         adata.X = adata.layers["og"]
         sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
         sc.pp.log1p(adata)
         sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
+        adata.obsm['X_pca'] = adata.uns['pc_transform'].transform(adata.X)
