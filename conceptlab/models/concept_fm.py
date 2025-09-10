@@ -114,7 +114,7 @@ class Concept_FM(nn.Module, ABC):
             self.concept_loss = self._hard_concept_loss
             self.concept_transform = sigmoid
 
-        print(self)
+        # print(self)
 
     @property   
     def has_concepts(self):
@@ -274,7 +274,8 @@ class Concept_FM(nn.Module, ABC):
             u_mean = u.mean(dim=0, keepdim=True)
             u_centered = u - u_mean
         else:
-            u_centered = u
+            u_mean = u.mean(dim=0, keepdim=True)
+            u_centered = u - u_mean
 
         cross_covariance = torch.matmul(u_centered.T, c_centered) / (batch_size - 1)
         loss = (cross_covariance**2).sum()
@@ -347,7 +348,9 @@ class Concept_FM(nn.Module, ABC):
 
         self.train()
         pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=150)
-     
+
+        self.losses = []
+
         for epoch in pbar:
             self.train()
             total_loss = 0.0
@@ -435,7 +438,9 @@ class Concept_FM(nn.Module, ABC):
                 "concept_f1": f"{f1_score:.3e}", # Display F1 score
             })
             # --- End of Change ---
+            self.losses.append(avg_loss)
              
+             # Log to wandb
             scheduler.step()
 
         self.eval()

@@ -159,9 +159,10 @@ class CB_VAE_FM(BaseCBVAE):
     def loss_function(self, x, concepts, h, mu, logvar, pred_concept, unknown, **kwargs):
         loss_dict = {}
 
+        loss_dict["Total_loss"] = 0
         # --- Flow Matching Loss Calculation ---
         x1 = x # Target is the input data
-        x0 = self._decoder.get_x0(h)
+        x0 =torch.rand_like(x) #self._decoder.get_x0(h)
         
         # 1. Sample time t
         t = torch.rand(x.size(0), 1, device=x.device)
@@ -176,7 +177,7 @@ class CB_VAE_FM(BaseCBVAE):
         # 4. Calculate FM loss (MSE)
         fm_loss = self.fm_loss(pred_v, ut)
         loss_dict["fm_loss"] = fm_loss
-        loss_dict["Total_loss"] = fm_loss
+        loss_dict["Total_loss"] += fm_loss
         # --- End of Flow Matching Loss ---
         
         KLD = self.KL_loss(mu, logvar)
@@ -212,6 +213,10 @@ class CB_VAE_FM(BaseCBVAE):
             total_loss = 0.0
             total_fm_loss = 0.0
             
+            epoch_tp = 0.0
+            epoch_fp = 0.0
+            epoch_fn = 0.0
+
             for x_batch, concepts_batch in data_loader:
                 x_batch = x_batch.to(device)
                 concepts_batch = concepts_batch.to(device)
@@ -230,13 +235,33 @@ class CB_VAE_FM(BaseCBVAE):
                 
                 total_loss += loss.item()
                 total_fm_loss += loss_dict["fm_loss"].item()
-            
+
+                with torch.no_grad():
+                    pred_concepts = out["pred_concept"]
+                    predicted_labels = (pred_concepts > 0.5).float()
+                    true_labels = concepts_batch
+                    
+                    # True Positives: predicted is 1 and true is 1
+                    epoch_tp += (predicted_labels * true_labels).sum().item()
+                    # False Positives: predicted is 1 and true is 0
+                    epoch_fp += (predicted_labels * (1 - true_labels)).sum().item()
+                    # False Negatives: predicted is 0 and true is 1
+                    epoch_fn += ((1 - predicted_labels) * true_labels).sum().item()
+                # --- End of Change ---
+
             avg_loss = total_loss / len(data_loader)
             avg_fm_loss = total_fm_loss / len(data_loader)
             
+                        # --- CHANGE: Calculate epoch-level F1 score and update progress bar ---
+            epsilon = 1e-7 # To avoid division by zero
+            precision = epoch_tp / (epoch_tp + epoch_fp + epsilon)
+            recall = epoch_tp / (epoch_tp + epoch_fn + epsilon)
+            f1_score = 2 * (precision * recall) / (precision + recall + epsilon)
+
             pbar.set_postfix({
                 "avg_total_loss": f"{avg_loss:.3e}",
                 "avg_fm_loss": f"{avg_fm_loss:.3e}",
+                "concept_f1": f"{f1_score:.4f}", # Display F1 score
                 "lr": f"{scheduler.get_last_lr()[0]:.5e}"
             })
             scheduler.step()
