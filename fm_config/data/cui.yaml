@@ -4,6 +4,6 @@ defaults:
 _target_: conceptlab.data.dataset.InterventionDataset
 data_path: /braid/havivd/immune_dictionary/lig_seurat_with_concepts.h5ad
 concept_key: concepts
-label_variable: ["celltype","sample"]
 intervention_labels: ${intervention_labels}
 single_cell_preproc: false
+target_sum: 0 # target sum for normalization (target_sum = np.median(adata.X.sum(axis=1)) if isinstance(adata.X, np.ndarray) else np.median(adata.X.toarray().sum(axis=1)))

@@ -26,9 +26,6 @@ def main(cfg: DictConfig):
     model.train(adata_train.copy())
     adata_preds = model.predict_intervention(adata_inter.copy(), hold_out_label = dataset.hold_out_label, concepts_to_flip = dataset.concepts_to_flip)
 
-    # if the preditions were done in count domain and we need to map back to the original domain.
-    if cfg.model.normalize_from_og:
-        dataset.normalize_from_og(adata_preds)
 
     if cfg.model.obsm_key == "X_pca":
         x_baseline_rec = adata_train.X

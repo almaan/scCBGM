@@ -6,3 +6,4 @@ data_path: /braid/havivd/scgen/kang_scimilarity_v3_with_concepts.h5ad
 concept_key: concepts
 intervention_labels: ${intervention_labels}
 mmd_label: "cell_stim"
+target_sum: 1214 # target sum for normalization (target_sum = np.median(adata.X.sum(axis=1)) if isinstance(adata.X, np.ndarray) else np.median(adata.X.toarray().sum(axis=1)))

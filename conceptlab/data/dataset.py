@@ -9,8 +9,17 @@ from sklearn.decomposition import PCA
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
+
+def normalize_sc_data(adata, target_sum, variable_genes = True):
+    #target_sum = np.median(adata.X.sum(axis=1)) if isinstance(adata.X, np.ndarray) else np.median(adata.X.toarray().sum(axis=1))
+    sc.pp.normalize_total(adata, target_sum=target_sum)
+    sc.pp.log1p(adata)
+    if variable_genes:
+        sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
+    return adata
+
 class InterventionDataset:
-    def __init__(self, data_path, intervention_labels, concept_key, mmd_label = None, single_cell_preproc = True, log1p = True):
+    def __init__(self, data_path, intervention_labels, concept_key, mmd_label = None, single_cell_preproc = True, target_sum = 1000 ):
         """
         Loads and preprocesses single cell data
         Inputs:
@@ -36,12 +45,13 @@ class InterventionDataset:
         adata = ad.read_h5ad(data_path)
 
         if single_cell_preproc:
-            adata.layers["og"] = adata.X.copy()  # preserve counts
-            sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
+            sc.pp.normalize_total(adata, target_sum=target_sum)
+            adata.layers["og"] = adata.X.copy()  # preserve counts (after normalization)
             sc.pp.log1p(adata)
             sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
-        
-        adata.X = adata.X.toarray()
+
+        if not isinstance(adata.X, np.ndarray):
+            adata.X = adata.X.toarray()
 
         if not isinstance(self.label_variable,str): # it's a list then
             log.info("Creating a joint label variable")
@@ -65,14 +75,3 @@ class InterventionDataset:
 
     def get_anndatas(self):
         return self.adata, self.adata_train, self.adata_test, self.adata_inter
-
-    def normalize_from_og(self, adata):
-        """
-        When working on count or original data space,
-        the predictions have to be mapped back to the normalized or PCA space.
-        """
-        adata.X = adata.layers["og"]
-        sc.pp.normalize_total(adata, target_sum=np.median(adata.X.toarray().sum(axis=1)))
-        sc.pp.log1p(adata)
-        sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
-        adata.obsm['X_pca'] = adata.uns['pc_transform'].transform(adata.X)
