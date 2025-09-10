@@ -40,6 +40,7 @@ def main(cfg: DictConfig):
         labels_train = adata_train.obs[dataset.mmd_label].values
         )
     
+    
     # The DE metric is only evaluated in gene space (reconstructions)
     de_score = clab.evaluation.interventions.evaluate_intervention_DE_with_target(
         x_train = adata_train.X if cfg.model.obsm_key =="X" else x_baseline_rec,
@@ -47,10 +48,17 @@ def main(cfg: DictConfig):
         x_target = adata_test.X if cfg.model.obsm_key =="X" else x_target_rec,
         genes_list = adata_train.var.index.tolist()
     ) 
-    
-    print(mmd_score)
-    print(de_score)
+
+    emd_score = clab.evaluation.interventions.evaluate_intervention_emd_with_target(
+        x_train = adata_train.obsm[cfg.model.obsm_key] if cfg.model.obsm_key !="X" else adata_train.X,
+        x_ivn = adata_preds.obsm[cfg.model.obsm_key] if cfg.model.obsm_key !="X" else adata_preds.X,
+        x_target = adata_test.obsm[cfg.model.obsm_key] if cfg.model.obsm_key !="X" else adata_test.X,
+        labels_train = adata_train.obs[dataset.mmd_label].values
+    )
+
     for k, v in mmd_score.items():
+        wandb.log({k: v})
+    for k, v in emd_score.items():
         wandb.log({k: v})
     for k, v in de_score.items():
         wandb.log({k: v})

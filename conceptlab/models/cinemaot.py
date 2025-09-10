@@ -2,11 +2,17 @@ import pertpy as pt
 import scanpy as sc
 
 class CinemaOT:
-    def __init__(self, thresh, eps, concept_key):
+    def __init__(self, 
+            thresh: float,
+             eps: float,
+              concept_key: str,
+              obsm_key: str = "X" # for consistency with other models (e.g. in evaluation)
+              ):
         self.thresh = thresh
         self.eps = eps
 
         self.concept_key = concept_key
+        self.obsm_key = obsm_key
 
     def train(self,adata_train):
         self.adata_train = adata_train
@@ -53,22 +59,11 @@ class CinemaOT:
 
         ot_map = de.obsm["ot"] # treatment vs controls
 
-        #adata_control_mask = 1
-        #adata_treated_mask = 1
-        #for k,v in control_signature.items():
-        #    adata_control_mask *= (adata_cat.obsm[self.concept_key][k].values == v) # defining the control group
-        #    adata_treated_mask *= (adata_cat.obsm[self.concept_key][k].values == 1-v) #defining the treated group
 
-        #adata_control = adata_cat[adata_cat.obsm[self.concept_key][concepts_to_flip].values == 0]
-        #adata_treated = adata_cat[adata_cat.obs[self.concept_key][concepts_to_flip].values == 1]
         adata_control = adata_t_not[adata_t_not.obs["non_treated"]==1]
         adata_treated = adata_t_not[adata_t_not.obs["treated"]==1]
 
         test_controls_idx = (adata_control.obs["split_col"].values == "int") & (adata_control.obs["non_treated"]== 1)
-        #for k,v in control_signature.items():
-        #    test_controls_idx *= (adata_control.obsm[self.concept_key][k].values == v)
-
-        #test_controls_idx = (adata_control.obs["split_col"].values == "int") & (adata_control.obs["stim"].values == 0)
 
         ot_map_test = ot_map[:,test_controls_idx].T
         ot_map_test /= ot_map_test.sum(1).mean()
@@ -80,5 +75,8 @@ class CinemaOT:
 
         adata_test_predicted.obs['ident'] = 'intervened on'
         adata_test_predicted.obs['cell_stim'] = hold_out_label + '*'
+
+        # Cinema OT works in count space - we compute PCA after prediction for consistency with other methods
+        adata_test_predicted.obsm['X_pca'] = adata_inter.uns['pc_transform'].transform(adata_test_predicted.X)
 
         return adata_test_predicted

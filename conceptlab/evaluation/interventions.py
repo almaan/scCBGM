@@ -476,9 +476,9 @@ def evaluate_intervention_emd_with_target(
 
     ivn_score = met.emd(x_target, x_ivn)
 
-    mmd_ratio = ivn_score / (min_train_score + 1e-8)
+    emd_ratio = ivn_score / (min_train_score + 1e-8)
 
-    score = dict(mmd_ratio=mmd_ratio, pre_computed_emd_train=min_train_score)
+    score = dict(emd_ratio=emd_ratio, pre_computed_emd_train=min_train_score)
 
     return score
 

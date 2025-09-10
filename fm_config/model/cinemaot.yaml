@@ -2,3 +2,4 @@ _target_: conceptlab.models.cinemaot.CinemaOT
 thresh: 0.5
 eps: 0.001
 concept_key: ${data.concept_key}
+obsm_key: X_pca #not used in CinemaOT - would always work on (normalized - log1p) count space.
