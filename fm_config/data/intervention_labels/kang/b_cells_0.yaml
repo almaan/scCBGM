@@ -1,0 +1,6 @@
+# @package intervention_labels
+label_variable: L2_stim # variable to select the train/inter/test groups
+hold_out_label: 'B cells_0_stim'
+mod_label: 'B cells_0_ctrl'
+concepts_to_flip: ["stim"]
+reference: [0] # reference for the concepts to flip

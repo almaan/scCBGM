@@ -1,0 +1,5 @@
+# @package intervention_labels
+hold_out_label: 'cDC1_TNFa'
+mod_label: 'cDC1_PBS'
+concepts_to_flip: ["PBS","TNFa"] #concepts that should be flipped in the intervention prediction
+reference: [1,0] # reference for the concepts to flip
