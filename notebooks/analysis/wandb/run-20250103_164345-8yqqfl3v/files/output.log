@@ -1,6 +1,0 @@
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-`Trainer.fit` stopped: `max_epochs=200` reached.
-/gpfs/scratchfs01/site/u/andera29/micromamba/envs/conceptlab/lib/python3.11/site-packages/anndata/_core/aligned_df.py:68: ImplicitModificationWarning: Transforming to str index.
-  warnings.warn("Transforming to str index.", ImplicitModificationWarning)
-/tmp/ipykernel_2467756/4073372265.py:60: UserWarning: This figure was using a layout engine that is incompatible with subplots_adjust and/or tight_layout; not calling subplots_adjust.
-  plt.subplots_adjust(wspace=0.1, hspace=0.1)  # Reduce horizontal and vertical spacing
