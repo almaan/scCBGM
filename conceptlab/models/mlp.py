@@ -85,6 +85,9 @@ class MLPBlock(nn.Module):
         self.activation = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
 
+        nn.init.zeros_(self.linear.bias)
+
+
     def forward(self, x: torch.Tensor, c_emb: torch.Tensor, t_emb: torch.Tensor) -> torch.Tensor:
         """
         Forward pass for the MLP block.
@@ -205,6 +208,8 @@ class FeedForwardBlock(nn.Module):
         self.activation = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
 
+        nn.init.zeros_(self.linear.bias)
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass for the MLP block.
