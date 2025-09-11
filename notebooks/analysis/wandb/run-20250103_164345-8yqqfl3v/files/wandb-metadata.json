@@ -1,0 +1,41 @@
+{
+  "os":  "Linux-4.18.0-372.75.1.el8_6.x86_64-x86_64-with-glibc2.28",
+  "python":  "3.11.9",
+  "startedAt":  "2025-01-04T00:43:45.995236Z",
+  "program":  "analysis/kang_zero_shot_CD4T_cell_example.ipynb",
+  "git":  {
+    "remote":  "git@github.com:almaan/conceptlab.git",
+    "commit":  "edfaa780e0d128e71134e21abb433319d9ff7b8c"
+  },
+  "email":  "andersson.alma@gene.com",
+  "root":  ".",
+  "host":  "sc1ns023is13",
+  "username":  "andera29",
+  "executable":  "/gpfs/scratchfs01/site/u/andera29/micromamba/envs/conceptlab/bin/python",
+  "cpu_count":  96,
+  "cpu_count_logical":  96,
+  "gpu":  "[NVIDIA A100-SXM4-80GB]",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "429287014400",
+      "used":  "22203015168"
+    }
+  },
+  "memory":  {
+    "total":  "1081914601472"
+  },
+  "cpu":  {
+    "count":  96,
+    "countLogical":  96
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA A100-SXM4-80GB",
+      "memoryTotal":  "85899345920",
+      "cudaCores":  6912,
+      "architecture":  "Ampere"
+    }
+  ],
+  "cudaVersion":  "12.1"
+}

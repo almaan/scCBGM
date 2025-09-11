@@ -1,0 +1,31 @@
+{
+  "os":  "Linux-4.18.0-372.75.1.el8_6.x86_64-x86_64-with-glibc2.28",
+  "python":  "3.11.9",
+  "startedAt":  "2025-01-31T00:02:26.265104Z",
+  "program":  "kang_zero_shot_CD4T_cell_example.ipynb",
+  "git":  {
+    "remote":  "git@github.com:almaan/conceptlab.git",
+    "commit":  "b56d58bdcc7e376e6b2de4475414866add010250"
+  },
+  "email":  "andersson.alma@gene.com",
+  "root":  ".",
+  "host":  "sc1nc001is01",
+  "username":  "andera29",
+  "executable":  "/gpfs/scratchfs01/site/u/andera29/micromamba/envs/conceptlab/bin/python",
+  "codePathLocal":  "kang_zero_shot_CD4T_cell_example.ipynb",
+  "cpu_count":  96,
+  "cpu_count_logical":  96,
+  "disk":  {
+    "/":  {
+      "total":  "429287014400",
+      "used":  "87907749888"
+    }
+  },
+  "memory":  {
+    "total":  "809932513280"
+  },
+  "cpu":  {
+    "count":  96,
+    "countLogical":  96
+  }
+}

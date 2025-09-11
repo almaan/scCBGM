@@ -1,0 +1,169 @@
+2025-01-30 16:02:26,262 INFO    MainThread:2314637 [wandb_setup.py:_flush():79] Current SDK version is 0.18.3
+2025-01-30 16:02:26,262 INFO    MainThread:2314637 [wandb_setup.py:_flush():79] Configure stats pid to 2314637
+2025-01-30 16:02:26,262 INFO    MainThread:2314637 [wandb_setup.py:_flush():79] Loading settings from /home/andera29/.config/wandb/settings
+2025-01-30 16:02:26,262 INFO    MainThread:2314637 [wandb_setup.py:_flush():79] Loading settings from /gstore/data/resbioai/andera29/cbm/conceptlab/notebooks/analysis/wandb/settings
+2025-01-30 16:02:26,262 WARNING MainThread:2314637 [wandb_setup.py:_flush():79] Unknown environment variable: WANDB_CACHE_DIR
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_setup.py:_flush():79] Loading settings from environment variables: {}
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_setup.py:_flush():79] Applying setup settings: {'mode': None, '_disable_service': None}
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_setup.py:_flush():79] Inferring run settings from compute environment: {'program': '<python with no main file>'}
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_setup.py:_flush():79] Applying login settings: {}
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_init.py:_log_setup():532] Logging user logs to ./wandb/run-20250130_160226-7tdm1izs/logs/debug.log
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_init.py:_log_setup():533] Logging internal logs to ./wandb/run-20250130_160226-7tdm1izs/logs/debug-internal.log
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_init.py:_jupyter_setup():478] configuring jupyter hooks <wandb.sdk.wandb_init._WandbInit object at 0x7f00b03d1410>
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_init.py:init():617] calling init triggers
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_init.py:init():624] wandb.init called with sweep_config: {}
+config: {}
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_init.py:init():667] starting backend
+2025-01-30 16:02:26,263 INFO    MainThread:2314637 [wandb_init.py:init():671] sending inform_init request
+2025-01-30 16:02:26,264 INFO    MainThread:2314637 [backend.py:_multiprocessing_setup():104] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2025-01-30 16:02:26,264 INFO    MainThread:2314637 [wandb_init.py:init():684] backend started and connected
+2025-01-30 16:02:26,270 INFO    MainThread:2314637 [wandb_run.py:_label_probe_notebook():1346] probe notebook
+2025-01-30 16:02:26,271 INFO    MainThread:2314637 [wandb_init.py:init():779] updated telemetry
+2025-01-30 16:02:26,323 INFO    MainThread:2314637 [wandb_init.py:init():812] communicating run to backend with 90.0 second timeout
+2025-01-30 16:02:26,616 INFO    MainThread:2314637 [wandb_init.py:init():863] starting run threads in backend
+2025-01-30 16:02:26,820 INFO    MainThread:2314637 [wandb_run.py:_console_start():2465] atexit reg
+2025-01-30 16:02:26,820 INFO    MainThread:2314637 [wandb_run.py:_redirect():2313] redirect: wrap_raw
+2025-01-30 16:02:26,821 INFO    MainThread:2314637 [wandb_run.py:_redirect():2378] Wrapping output streams.
+2025-01-30 16:02:26,821 INFO    MainThread:2314637 [wandb_run.py:_redirect():2403] Redirects installed.
+2025-01-30 16:02:26,842 INFO    MainThread:2314637 [wandb_init.py:init():907] run started, returning control to user process
+2025-01-30 16:02:28,250 INFO    MainThread:2314637 [wandb_run.py:_config_callback():1394] config_cb None None {'config': "{'has_cbm': True, 'lr': 0.0005, 'hidden_dim': 256, 'beta': 1e-05, 'input_dim': 9224, 'latent_dim': 128, 'n_concepts': 9, 'min_bottleneck_size': 128, 'independent_training': True, 'concepts_hp': 0.005, 'orthogonality_hp': 0.2, 'use_soft_concepts': False}", '_encoder': 'DefaultEncoderBlock', '_decoder': 'SkipDecoderBlock', 'orthogonality_loss': 'cross_covariance_loss'}
+2025-01-30 16:02:42,931 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:43,183 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:43,184 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:53,916 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:53,918 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:54,056 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:54,056 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:54,130 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:54,131 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:54,272 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:54,272 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:54,335 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:54,336 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:54,471 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:54,471 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:54,531 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:54,532 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:54,667 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:54,667 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:54,728 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:55,183 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:55,314 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:55,314 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:55,381 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:55,417 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:55,557 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:55,557 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:55,627 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:55,630 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:55,770 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:55,770 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:55,830 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:55,833 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:55,971 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:55,971 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:56,031 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:56,034 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:56,168 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:56,168 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:56,228 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:56,294 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:56,427 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:56,427 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:56,493 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:56,733 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:56,874 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:56,874 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:56,943 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:57,266 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:57,396 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:57,396 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:57,459 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:57,460 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:57,594 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:57,594 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:57,660 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:57,661 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:57,792 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:57,793 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:57,853 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:58,738 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:59,063 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:59,063 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:59,134 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:59,137 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:59,274 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:59,274 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:59,342 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:02:59,393 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:02:59,543 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:02:59,543 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:02:59,613 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:03:08,343 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:03:08,574 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:03:08,574 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:03:08,649 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:03:08,653 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:03:08,792 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:03:08,792 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:03:08,854 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:03:08,857 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:03:08,989 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:03:08,989 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:03:09,063 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:03:09,072 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:03:09,218 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:03:09,218 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:03:09,286 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:03:09,288 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:03:09,422 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:03:09,422 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:03:09,488 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:03:09,867 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:03:10,002 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:03:10,003 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:03:10,087 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:03:10,090 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:03:10,235 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:03:10,235 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:03:10,321 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:06:58,604 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:06:58,764 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:06:58,765 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:06:58,867 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:06:58,874 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:06:59,009 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:06:59,009 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:06:59,076 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:06:59,078 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:06:59,206 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:06:59,206 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:06:59,275 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:07:01,962 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:07:02,100 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:07:02,100 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:17:59,491 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:18:02,095 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:18:02,266 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:18:02,266 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:18:34,830 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:18:34,832 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:18:35,000 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:18:35,000 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:18:39,235 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:18:41,960 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:18:42,113 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:18:42,113 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:19:20,830 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:19:20,833 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:19:20,970 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:19:20,971 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:19:26,436 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:19:26,439 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:19:26,579 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:19:26,579 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:19:35,608 INFO    MainThread:2314637 [wandb_init.py:_resume_backend():448] resuming backend
+2025-01-30 16:19:35,611 INFO    MainThread:2314637 [jupyter.py:_save_ipynb():398] looking for notebook: kang_zero_shot_CD4T_cell_example.ipynb
+2025-01-30 16:19:35,749 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():441] saved code: <Artifact source-zero_shot_demo_002-kang_zero_shot_CD4T_cell_example.ipynb>
+2025-01-30 16:19:35,749 INFO    MainThread:2314637 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-30 16:19:44,480 WARNING MsgRouterThr:2314637 [router.py:message_loop():77] message_loop has been closed
