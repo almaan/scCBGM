@@ -5,7 +5,7 @@ import numpy as np
 def split_data_for_counterfactuals(adata, hold_out_label, mod_label, label_variable, p_intervention=0.2, subsample_control_int = False):
     """Splits data into train, intervention, and ground truth sets."""
     print("Splitting data for counterfactual experiment...")
-    
+
     labels = adata.obs[label_variable]
     is_test = (labels == hold_out_label)
     is_inter_pool = (labels == mod_label)

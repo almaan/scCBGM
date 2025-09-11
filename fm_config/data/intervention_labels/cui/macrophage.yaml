@@ -1,0 +1,8 @@
+# @package intervention_labels
+label_variable: L2_stim # variable to select the train/inter/test groups
+hold_out_label: 'Macrophage_M-CSF'
+mod_label: 'Macrophage_PBS'
+concepts_to_flip: ["PBS","M-CSF"]
+reference: [1,0] # reference for the concepts to flip
+
+

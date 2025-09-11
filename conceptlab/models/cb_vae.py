@@ -426,15 +426,6 @@ class CBM_MetaTrainer:
         
         self.model = model
 
-        #data_module = clab.data.dataloader.GeneExpressionDataModule(
-        #    adata_train, add_concepts=True, concept_key=self.concept_key, batch_size=512, normalize=False, num_workers=self.num_workers
-        #)
-
-        #trainer = pl.Trainer(max_epochs=self.max_epochs, log_every_n_steps = self.log_every_n_steps, accelerator='auto')
-        #trainer.fit(model, data_module)
-
-        #self.model = model.to("cpu").eval()
-
         return self.model
 
     def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
@@ -457,7 +448,7 @@ class CBM_MetaTrainer:
 
         # Define the intervention by creating a mask and new concept values
         mask = torch.zeros(c_intervene_on.shape, dtype=torch.float32)
-        mask[:, concept_to_intervene_idx] = 1  # Intervene on the last concept (stim)
+        mask[:, concept_to_intervene_idx] = 1 
 
         inter_concepts = torch.tensor(c_intervene_on, dtype=torch.float32)
         inter_concepts[:, concept_to_intervene_idx] = 1 - inter_concepts[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.

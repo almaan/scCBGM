@@ -1,0 +1,8 @@
+# @package intervention_labels
+label_variable: L2_stim # variable to select the train/inter/test groups
+hold_out_label: 'T_cell_CD4_TGF-beta-1'
+mod_label: 'T_cell_CD4_PBS'
+concepts_to_flip: ["PBS","TGF-beta-1"]
+reference: [1,0] # reference for the concepts to flip
+
+
