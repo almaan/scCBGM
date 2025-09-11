@@ -33,6 +33,7 @@ class OmicsDataGenerator(DataGenerator):
         p_Q="p_tissue",
         p_T="p_celltype_in_tissue",
         p_C="p_concept_in_celltype",
+        eps_mat="noise",
         exog_mat="exogenous_noise",
         cov="concept_covariance",
     )
@@ -106,6 +107,8 @@ class OmicsDataGenerator(DataGenerator):
         L_mat = np.zeros(N)
         P_mat = np.zeros((N, C))
 
+        eps_mat = np.zeros((N, F))
+
         sample_exog = exog_noise is None
         exog_mat = np.zeros((N, F)) if exog_noise is None else exog_noise
 
@@ -132,7 +135,7 @@ class OmicsDataGenerator(DataGenerator):
             # get library size
             l_n = rng.normal(0, std_l[b_n])
             # get noise
-            eps_n = rng.normal(0, std_noise)
+            eps_n = rng.normal(0, std_noise, size=F)
             # log lambda
             log_lambda = (
                 ws
@@ -156,6 +159,7 @@ class OmicsDataGenerator(DataGenerator):
             C_mat[n] = v_n
             T_mat[n] = t_n
             L_mat[n] = l_n
+            eps_mat[n] = eps_n
 
         return {
             "X_mat": X_mat,
@@ -165,6 +169,7 @@ class OmicsDataGenerator(DataGenerator):
             "T_mat": T_mat,
             "L_mat": L_mat,
             "P_mat": P_mat,
+            "eps_mat": eps_mat,
             "exog_mat": exog_mat,
         }
 
@@ -178,6 +183,7 @@ class OmicsDataGenerator(DataGenerator):
         B_mat: np.ndarray,
         L_mat: np.ndarray,
         P_mat: np.ndarray,
+        eps_mat: np.ndarray,
         gamma: np.ndarray,
         omega: np.ndarray,
         tau: np.ndarray,
@@ -239,8 +245,9 @@ class OmicsDataGenerator(DataGenerator):
             cls.params_key["p_T"]: (("tissue", "celltype"), p_T),
             cls.params_key["p_C"]: (("celltype", "concept"), p_C),
             cls.params_key["ws"]: (("var"), ws),
+            cls.params_key["eps_mat"]: (("obs", "var"), eps_mat),
             cls.params_key["exog_mat"]: (("obs", "var"), exog_mat),
-            "bernoulli_prob": (("obs", "concepts"), P_mat),
+            "bernoulli_prob": (("obs", "concept"), P_mat),
         }
 
         # create xarray dataset
@@ -490,11 +497,9 @@ class OmicsDataGenerator(DataGenerator):
             b_n = dataset.batches.to_dataframe().loc[obs].values[0]
 
             if isinstance(concepts, pd.DataFrame):
-                v_n = concepts.loc[concept, :]
+                v_n = concepts.loc[obs, :].values
             elif isinstance(concepts, np.ndarray):
                 v_n = concepts[k, :]
-
-            eps_n = np.random.normal(0, std_noise)
 
             # log lambda
             log_lambda = (
@@ -504,7 +509,7 @@ class OmicsDataGenerator(DataGenerator):
                 + params["gamma"].loc[b_n].values.flatten()
                 + params["tau"].loc[t_n].values.flatten()
                 + libsize.loc[obs, :].values.flatten()
-                + eps_n
+                + params["eps_mat"].loc[obs].values.flatten()
             )
             # sample gene expression
 
