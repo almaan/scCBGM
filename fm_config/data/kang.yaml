@@ -1,9 +1,9 @@
 defaults:
-  - intervention_labels: cd4
+  - intervention_labels: kang/b_cells_0
 
 _target_: conceptlab.data.dataset.InterventionDataset
-data_path: /braid/havivd/scgen/kang_scimilarity_v3_with_concepts.h5ad 
+data_path: /braid/havivd/scgen/kang_scimilarity_v4_with_concepts_processed.h5ad 
 concept_key: concepts
 intervention_labels: ${intervention_labels}
-mmd_label: "cell_stim"
+mmd_label: "L1_stim"
 target_sum: 1214 # target sum for normalization (target_sum = np.median(adata.X.sum(axis=1)) if isinstance(adata.X, np.ndarray) else np.median(adata.X.toarray().sum(axis=1)))

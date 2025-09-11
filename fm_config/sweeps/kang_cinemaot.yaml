@@ -8,16 +8,20 @@ parameters:
     values: [13,42,1337,69]
   data/intervention_labels:
     values: 
-      - cd4_cd25
-      - cd4_naive
-      - nk
-      - bcells_germinal
-      - bcells_memory
-      - cd8_tcells
-      - cd14_monocytes
-      - dendritic_cells
-      - fcgr3a_monocytes
-      - megakaryocytes
+    - kang/b_cells_0
+    - kang/b_cells_1
+    - kang/cd4_0
+    - kang/cd4_1
+    - kang/cd4_2
+    - kang/cd8_0
+    - kang/cd8_1
+    - kang/cd14_0
+    - kang/cd14_1
+    - kang/dendritic_0
+    - kang/dendritic_1
+    - kang/fcgr3a_0
+    - kang/fcgr3a_1
+    - kang/nk_0
 command:
   - uv
   - run
