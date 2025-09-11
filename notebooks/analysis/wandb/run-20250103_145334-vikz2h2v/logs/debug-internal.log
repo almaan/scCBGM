@@ -1,0 +1,24 @@
+{"time":"2025-01-03T14:53:34.099157739-08:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2025-01-03T14:53:34.100019677-08:00","level":"INFO","msg":"created symlink","path":"wandb/run-20250103_145334-vikz2h2v/logs/debug-core.log"}
+{"time":"2025-01-03T14:53:34.100825611-08:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2025-01-03T14:53:34.122880374-08:00","level":"INFO","msg":"created new stream","id":"vikz2h2v"}
+{"time":"2025-01-03T14:53:34.122925279-08:00","level":"INFO","msg":"stream: started","id":"vikz2h2v"}
+{"time":"2025-01-03T14:53:34.122939239-08:00","level":"INFO","msg":"handler: started","stream_id":{"value":"vikz2h2v"}}
+{"time":"2025-01-03T14:53:34.122969908-08:00","level":"INFO","msg":"sender: started","stream_id":{"value":"vikz2h2v"}}
+{"time":"2025-01-03T14:53:34.12297209-08:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"vikz2h2v"}}
+{"time":"2025-01-03T14:53:34.377067476-08:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2025-01-03T14:53:34.378377177-08:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-01-03T14:53:34.378404451-08:00","level":"WARN","msg":"handleCodeSave: program relative path is empty"}
+{"time":"2025-01-03T14:53:34.378613967-08:00","level":"ERROR","msg":"git repo not found","error":"repository does not exist"}
+{"time":"2025-01-03T14:53:35.489382332-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T14:56:02.833407362-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T14:56:03.653952384-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T14:56:20.087765723-08:00","level":"INFO","msg":"stream: closing","id":"vikz2h2v"}
+{"time":"2025-01-03T14:56:20.087832757-08:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-01-03T14:56:20.087869214-08:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-01-03T14:56:20.168654054-08:00","level":"ERROR","msg":"sender: sendDefer: failed to build job artifact","error":"Rel: can't make /gstore/data/resbioai/andera29/cbm/conceptlab/notebooks relative to ."}
+{"time":"2025-01-03T14:56:20.447859-08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-01-03T14:56:20.555775687-08:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"vikz2h2v"}}
+{"time":"2025-01-03T14:56:20.555812315-08:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"vikz2h2v"}}
+{"time":"2025-01-03T14:56:20.555831972-08:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"vikz2h2v"}}
+{"time":"2025-01-03T14:56:20.556010905-08:00","level":"INFO","msg":"stream: closed","id":"vikz2h2v"}

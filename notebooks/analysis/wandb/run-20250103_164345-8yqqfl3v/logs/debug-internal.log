@@ -1,0 +1,48 @@
+{"time":"2025-01-03T16:43:46.00050129-08:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2025-01-03T16:43:46.001448773-08:00","level":"INFO","msg":"created symlink","path":"wandb/run-20250103_164345-8yqqfl3v/logs/debug-core.log"}
+{"time":"2025-01-03T16:43:46.003543722-08:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2025-01-03T16:43:46.041709642-08:00","level":"INFO","msg":"created new stream","id":"8yqqfl3v"}
+{"time":"2025-01-03T16:43:46.041759525-08:00","level":"INFO","msg":"stream: started","id":"8yqqfl3v"}
+{"time":"2025-01-03T16:43:46.04178935-08:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"8yqqfl3v"}}
+{"time":"2025-01-03T16:43:46.041816611-08:00","level":"INFO","msg":"sender: started","stream_id":{"value":"8yqqfl3v"}}
+{"time":"2025-01-03T16:43:46.041809919-08:00","level":"INFO","msg":"handler: started","stream_id":{"value":"8yqqfl3v"}}
+{"time":"2025-01-03T16:43:46.347168138-08:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2025-01-03T16:43:46.349946928-08:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-01-03T16:43:46.349978257-08:00","level":"WARN","msg":"handleCodeSave: program relative path is empty"}
+{"time":"2025-01-03T16:43:46.350343857-08:00","level":"ERROR","msg":"git repo not found","error":"repository does not exist"}
+{"time":"2025-01-03T16:45:40.143192755-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:40.218420561-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:40.220753402-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:40.270581153-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:40.291406165-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:40.339780561-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:40.920552077-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:40.971667023-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:40.989808512-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:41.03591061-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:41.072471553-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:41.117999192-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:41.123621064-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:41.169758828-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:41.170765632-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:41.214952055-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:41.469612003-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:41.520543438-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:45:41.521504035-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:45:41.570165256-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:47:09.089666961-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:47:09.167311875-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:47:09.170368042-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:47:09.22001668-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:47:09.235887252-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T16:47:09.286511285-08:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-01-03T16:47:12.171991777-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T17:12:31.845434306-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/graphql"}
+{"time":"2025-01-03T19:12:31.66300226-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/graphql"}
+{"time":"2025-01-04T01:10:17.291974551-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/files/andera29/zero_shot_demo_002/8yqqfl3v/file_stream"}
+{"time":"2025-01-04T01:10:17.294729089-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/graphql"}
+{"time":"2025-01-04T09:00:31.964075189-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/graphql"}
+{"time":"2025-01-05T11:10:18.913472017-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/graphql"}
+{"time":"2025-01-05T11:10:18.926467922-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/files/andera29/zero_shot_demo_002/8yqqfl3v/file_stream"}
+{"time":"2025-01-05T19:13:03.688853467-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/graphql"}
+{"time":"2025-01-06T15:13:50.493029865-08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://genentech.wandb.io/files/andera29/zero_shot_demo_002/8yqqfl3v/file_stream"}

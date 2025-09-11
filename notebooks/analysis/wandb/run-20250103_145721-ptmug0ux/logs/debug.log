@@ -1,0 +1,33 @@
+2025-01-03 14:57:21,799 INFO    MainThread:792539 [wandb_setup.py:_flush():79] Current SDK version is 0.18.3
+2025-01-03 14:57:21,800 INFO    MainThread:792539 [wandb_setup.py:_flush():79] Configure stats pid to 792539
+2025-01-03 14:57:21,800 INFO    MainThread:792539 [wandb_setup.py:_flush():79] Loading settings from /home/andera29/.config/wandb/settings
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_setup.py:_flush():79] Loading settings from /gstore/data/resbioai/andera29/cbm/conceptlab/notebooks/analysis/wandb/settings
+2025-01-03 14:57:21,801 WARNING MainThread:792539 [wandb_setup.py:_flush():79] Unknown environment variable: WANDB_CACHE_DIR
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_setup.py:_flush():79] Loading settings from environment variables: {}
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_setup.py:_flush():79] Applying setup settings: {'mode': None, '_disable_service': None}
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_setup.py:_flush():79] Inferring run settings from compute environment: {'program': '<python with no main file>'}
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_setup.py:_flush():79] Applying login settings: {}
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_init.py:_log_setup():532] Logging user logs to ./wandb/run-20250103_145721-ptmug0ux/logs/debug.log
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_init.py:_log_setup():533] Logging internal logs to ./wandb/run-20250103_145721-ptmug0ux/logs/debug-internal.log
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_init.py:_jupyter_setup():478] configuring jupyter hooks <wandb.sdk.wandb_init._WandbInit object at 0x1453bbc44fd0>
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_init.py:init():617] calling init triggers
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_init.py:init():624] wandb.init called with sweep_config: {}
+config: {}
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_init.py:init():667] starting backend
+2025-01-03 14:57:21,801 INFO    MainThread:792539 [wandb_init.py:init():671] sending inform_init request
+2025-01-03 14:57:21,802 INFO    MainThread:792539 [backend.py:_multiprocessing_setup():104] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2025-01-03 14:57:21,802 INFO    MainThread:792539 [wandb_init.py:init():684] backend started and connected
+2025-01-03 14:57:21,808 INFO    MainThread:792539 [wandb_run.py:_label_probe_notebook():1346] probe notebook
+2025-01-03 14:57:21,808 INFO    MainThread:792539 [wandb_run.py:_label_probe_notebook():1356] Unable to probe notebook: 'NoneType' object has no attribute 'get'
+2025-01-03 14:57:21,808 INFO    MainThread:792539 [wandb_init.py:init():779] updated telemetry
+2025-01-03 14:57:21,821 INFO    MainThread:792539 [wandb_init.py:init():812] communicating run to backend with 90.0 second timeout
+2025-01-03 14:57:22,029 INFO    MainThread:792539 [wandb_init.py:init():863] starting run threads in backend
+2025-01-03 14:57:22,237 INFO    MainThread:792539 [wandb_run.py:_console_start():2465] atexit reg
+2025-01-03 14:57:22,237 INFO    MainThread:792539 [wandb_run.py:_redirect():2313] redirect: wrap_raw
+2025-01-03 14:57:22,237 INFO    MainThread:792539 [wandb_run.py:_redirect():2378] Wrapping output streams.
+2025-01-03 14:57:22,237 INFO    MainThread:792539 [wandb_run.py:_redirect():2403] Redirects installed.
+2025-01-03 14:57:22,238 INFO    MainThread:792539 [wandb_init.py:init():907] run started, returning control to user process
+2025-01-03 14:57:22,593 INFO    MainThread:792539 [wandb_run.py:_config_callback():1394] config_cb None None {'config': "{'has_cbm': True, 'lr': 0.0005, 'hidden_dim': 256, 'beta': 1e-05, 'input_dim': 9224, 'latent_dim': 128, 'n_concepts': 9, 'min_bottleneck_size': 128, 'independent_training': True, 'concepts_hp': 0.005, 'orthogonality_hp': 0.2, 'use_soft_concepts': False}", '_encoder': 'DefaultEncoderBlock', '_decoder': 'SkipDecoderBlock'}
+2025-01-03 14:57:23,462 INFO    MainThread:792539 [jupyter.py:_save_ipynb():398] looking for notebook: analysis/figure1_kang_zero_shot.ipynb
+2025-01-03 14:57:23,462 INFO    MainThread:792539 [wandb_init.py:_pause_backend():443] pausing backend
+2025-01-03 15:01:29,485 WARNING MsgRouterThr:792539 [router.py:message_loop():77] message_loop has been closed

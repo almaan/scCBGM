@@ -1,0 +1,22 @@
+{"time":"2025-01-03T14:57:21.804791698-08:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2025-01-03T14:57:21.806292398-08:00","level":"INFO","msg":"created symlink","path":"wandb/run-20250103_145721-ptmug0ux/logs/debug-core.log"}
+{"time":"2025-01-03T14:57:21.807230954-08:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2025-01-03T14:57:21.826028308-08:00","level":"INFO","msg":"created new stream","id":"ptmug0ux"}
+{"time":"2025-01-03T14:57:21.826068454-08:00","level":"INFO","msg":"stream: started","id":"ptmug0ux"}
+{"time":"2025-01-03T14:57:21.82607825-08:00","level":"INFO","msg":"handler: started","stream_id":{"value":"ptmug0ux"}}
+{"time":"2025-01-03T14:57:21.826092811-08:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"ptmug0ux"}}
+{"time":"2025-01-03T14:57:21.826090554-08:00","level":"INFO","msg":"sender: started","stream_id":{"value":"ptmug0ux"}}
+{"time":"2025-01-03T14:57:22.032717647-08:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2025-01-03T14:57:22.034171512-08:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-01-03T14:57:22.034193757-08:00","level":"WARN","msg":"handleCodeSave: program relative path is empty"}
+{"time":"2025-01-03T14:57:22.03438535-08:00","level":"ERROR","msg":"git repo not found","error":"repository does not exist"}
+{"time":"2025-01-03T14:57:23.462663178-08:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-01-03T15:01:29.484808336-08:00","level":"INFO","msg":"stream: closing","id":"ptmug0ux"}
+{"time":"2025-01-03T15:01:29.484920574-08:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-01-03T15:01:29.484995407-08:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-01-03T15:01:29.532893212-08:00","level":"ERROR","msg":"sender: sendDefer: failed to build job artifact","error":"Rel: can't make /gstore/data/resbioai/andera29/cbm/conceptlab/notebooks relative to ."}
+{"time":"2025-01-03T15:01:29.739099142-08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-01-03T15:01:29.849204082-08:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"ptmug0ux"}}
+{"time":"2025-01-03T15:01:29.849234998-08:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"ptmug0ux"}}
+{"time":"2025-01-03T15:01:29.849263198-08:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"ptmug0ux"}}
+{"time":"2025-01-03T15:01:29.849467062-08:00","level":"INFO","msg":"stream: closed","id":"ptmug0ux"}
