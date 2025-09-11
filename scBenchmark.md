@@ -4,17 +4,18 @@ All the configs are in `fm_config` and wandb sweeps are in `fm_config/sweep`
 
 The main script for launching all experiments is `scripts/benchmark_scdata.py`
 
-Basically it needs a model and a dataset.
+The two main required components of the config are a model and a dataset.
+
+Right now we have Kang and Cui Datasets configs.
 
 Each model should have a `train()` and a `predict_intervention()` function.
-
 
 See an example in `conceptlab/models/cb_fm.py` with the class `CBMFM_MetaTrainer`
 
 
 ## Launching a sweep:
 
-Go in `jobs/wandb` and run:
+Go in `/jobs` and run:
 
 `./init_sweep.sh ../fm_config/sweeps/kang_cbm.yaml`
 
@@ -33,3 +34,7 @@ Copy paste the sweep path in `pcluster_sweep.sh` and run it !
 `sbatch pclsuter_sweep.sh`
 
 Check your results in wandb !
+
+## Results aggregation and plots
+
+An example of results aggregation (that pulls sweeps from wandb and plots them) is given in `/notebooks/analysis/results_aggregation.ipynb`
