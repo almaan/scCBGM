@@ -5,7 +5,6 @@ __pycache__/
 *.pyd
 *.csv
 *.ckpt
-*.yaml
 
 # Virtual environment
 venv/
