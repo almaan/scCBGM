@@ -29,8 +29,8 @@ The output should look like:
 
 ```
 Launching sweep from config: ../fm_config/sweeps/kang_cbmfm_raw.yaml
-Project: conceptlab | Entity: debroue1
-✅ Created sweep: andera29/conceptlab_new/idqe1p2q
+Project: conceptlab | Entity: andera29
+✅ Created sweep: andera29/conceptlab/idqe1p2q
 ```
 
 Copy paste the sweep path in `pcluster_sweep.sh` and run it !
