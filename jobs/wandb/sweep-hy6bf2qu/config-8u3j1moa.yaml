@@ -1,0 +1,8 @@
+wandb_version: 1
+
+data/intervention_labels:
+  value: synthetic_1/concept_0
+model:
+  value: cbm
+seed:
+  value: 42

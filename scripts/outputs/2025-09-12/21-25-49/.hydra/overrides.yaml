@@ -1,0 +1,4 @@
+- data/intervention_labels=synthetic_1/concept_0
+- model=cbm
+- seed=13
+- wandb.project=conceptlab

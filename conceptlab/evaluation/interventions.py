@@ -16,10 +16,11 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-import sklearn.neighbors    
+import sklearn.neighbors
 import torch
 import wandb
 from scipy.stats import spearmanr, pearsonr
+
 
 class DistributionShift(EvaluationClass):
     """
@@ -454,6 +455,7 @@ def intervene(
 
     return x_ivn
 
+
 def evaluate_intervention_emd_with_target(
     x_train,
     x_ivn,
@@ -482,15 +484,54 @@ def evaluate_intervention_emd_with_target(
 
     return score
 
+
+def evaluate_intervention_cell_level_mse(
+    adata_ivn_pred,  # Taking the unstimulated data and changing the stimulation concept to 1 and see what it predicts.
+    adata_inv_true,  # Stimulated data with stimulation of interest.
+    align_on: str = "original_index",
+) -> Dict[str, Any]:
+
+    # check dimensions
+    if adata_ivn_pred.shape[0] != adata_ivn_true.shape[0]:
+        raise ValueError(
+            "adata_ivn_pred and adata_inv_true must have the same number of samples."
+        )
+
+    if adata_ivn_pred.shape[1] != adata_ivn_true.shape[1]:
+        raise ValueError(
+            "adata_ivn_pred and adata_inv_true must have the same number of features."
+        )
+
+    if (align_on in adata_ivn_pred.obs.columns) and (
+        align_on in adata_ivn_true.obs.columns
+    ):
+        # align based on original_index
+        adata_ivn_pred = adata_ivn_pred[
+            adata_ivn_pred.obs[align_on].isin(adata_ivn_true.obs[align_on])
+        ].copy()
+        adata_ivn_true = adata_ivn_true[
+            adata_ivn_true.obs[align_on].isin(adata_ivn_pred.obs[align_on])
+        ].copy()
+
+        adata_ivn_pred = adata_ivn_pred[adata_ivn_pred.obs[align_on].argsort()].copy()
+        adata_ivn_true = adata_ivn_true[adata_ivn_true.obs[align_on].argsort()].copy()
+
+    mse = np.mean((adata_ivn_pred.X - adata_ivn_true.X) ** 2)
+
+    score = dict(cell_level_mse=mse)
+
+    return score
+
+
 def evaluate_intervention_mmd_with_target(
-    x_train, #All unstimulated data + and everything stim except your stimulation of interest.
-    x_ivn, # Taking the unstimulated data and changing the stimulation concept to 1 and see what it predicts.
-    x_target, # Stimulated data with stimulation of interest.
-    labels_train, # Cell type + stimulation
+    x_train,  # All unstimulated data + and everything stim except your stimulation of interest.
+    x_ivn,  # Taking the unstimulated data and changing the stimulation concept to 1 and see what it predicts.
+    x_target,  # Stimulated data with stimulation of interest.
+    labels_train,  # Cell type + stimulation
     pre_computed_mmd_train=None,
 ) -> Dict[str, Any]:
 
-    gamma = 1/x_train.shape[-1]
+    gamma = 1 / x_train.shape[-1]
 
     if pre_computed_mmd_train is None:
         source = np.unique(labels_train)
@@ -538,11 +579,12 @@ def evaluate_intervention_r2_with_target(
 
     return score
 
+
 def evaluate_intervention_DE_with_target(
-        x_train,
-        x_ivn,
-        x_target,
-        genes_list,
+    x_train,
+    x_ivn,
+    x_target,
+    genes_list,
 ) -> Dict[str, Any]:
     """
     Computes the recall for significantly up and down-regulated genes as obtained with the true treated population and the predicted one.
@@ -561,48 +603,72 @@ def evaluate_intervention_DE_with_target(
         recall_negs: recall for downregulated genes (# correctly predicted downregulated DE genes / # true downregulated DE genes)
     """
 
-
-    adata_train = ad.AnnData(X=x_train, var=pd.DataFrame(index=genes_list), obs = pd.DataFrame({"treated": ["FALSE"] * len(x_train)}))
-    adata_ivn = ad.AnnData(X=x_ivn, var=pd.DataFrame(index=genes_list), obs = pd.DataFrame({"treated": ["TRUE"] * len(x_ivn)}))
-    adata_target = ad.AnnData(X=x_target, var=pd.DataFrame(index=genes_list), obs = pd.DataFrame({"treated": ["TRUE"] * len(x_target)}))
+    adata_train = ad.AnnData(
+        X=x_train,
+        var=pd.DataFrame(index=genes_list),
+        obs=pd.DataFrame({"treated": ["FALSE"] * len(x_train)}),
+    )
+    adata_ivn = ad.AnnData(
+        X=x_ivn,
+        var=pd.DataFrame(index=genes_list),
+        obs=pd.DataFrame({"treated": ["TRUE"] * len(x_ivn)}),
+    )
+    adata_target = ad.AnnData(
+        X=x_target,
+        var=pd.DataFrame(index=genes_list),
+        obs=pd.DataFrame({"treated": ["TRUE"] * len(x_target)}),
+    )
 
     adata_train.obs_names = [f"train_{x}" for x in adata_train.obs_names]
     adata_target.obs_names = [f"target_{x}" for x in adata_target.obs_names]
     adata_ivn.obs_names = [f"ivn_{x}" for x in adata_ivn.obs_names]
-    
-    adata_true = ad.concat([adata_train,adata_target])
+
+    adata_true = ad.concat([adata_train, adata_target])
     adata_pred = ad.concat([adata_train, adata_ivn])
-    
+
     adata_true.obs["treated"] = adata_true.obs["treated"].astype("category")
     adata_pred.obs["treated"] = adata_pred.obs["treated"].astype("category")
 
     # Run DE: A vs B (two-sided Wilcoxon)
-    sc.tl.rank_genes_groups(adata_true, groupby="treated", method="wilcoxon", use_raw=False)
-    sc.tl.rank_genes_groups(adata_pred, groupby="treated", method="wilcoxon", use_raw=False)
-
+    sc.tl.rank_genes_groups(
+        adata_true, groupby="treated", method="wilcoxon", use_raw=False
+    )
+    sc.tl.rank_genes_groups(
+        adata_pred, groupby="treated", method="wilcoxon", use_raw=False
+    )
 
     # Export tidy table for group Treated vs Untreated
     def scanpy_de_to_df(adata, group="B"):
-        keys = ["names","scores","pvals","pvals_adj","logfoldchanges"]
+        keys = ["names", "scores", "pvals", "pvals_adj", "logfoldchanges"]
         cols = {k: adata.uns["rank_genes_groups"][k][group] for k in keys}
         return pd.DataFrame(cols)
 
     res_true = scanpy_de_to_df(adata_true, group="TRUE")
     res_pred = scanpy_de_to_df(adata_pred, group="TRUE")
 
-    true_pos = res_true.loc[(res_true["pvals_adj"] < 0.001) & (res_true["logfoldchanges"]>0), "names"].values
-    true_negs = res_true.loc[(res_true["pvals_adj"] < 0.001) & (res_true["logfoldchanges"]<0), "names"].values
+    true_pos = res_true.loc[
+        (res_true["pvals_adj"] < 0.001) & (res_true["logfoldchanges"] > 0), "names"
+    ].values
+    true_negs = res_true.loc[
+        (res_true["pvals_adj"] < 0.001) & (res_true["logfoldchanges"] < 0), "names"
+    ].values
 
-    pred_pos = res_pred.loc[(res_pred["pvals_adj"] < 0.05) & (res_pred["logfoldchanges"]>0), "names"].values
-    pred_negs = res_pred.loc[(res_pred["pvals_adj"] < 0.05) & (res_pred["logfoldchanges"]<0), "names"].values
+    pred_pos = res_pred.loc[
+        (res_pred["pvals_adj"] < 0.05) & (res_pred["logfoldchanges"] > 0), "names"
+    ].values
+    pred_negs = res_pred.loc[
+        (res_pred["pvals_adj"] < 0.05) & (res_pred["logfoldchanges"] < 0), "names"
+    ].values
 
-    #recall pos and negative genes
+    # recall pos and negative genes
     recall_pos = len(set(true_pos) & set(pred_pos)) / (len(true_pos) + 1e-8)
     recall_negs = len(set(true_negs) & set(pred_negs)) / (len(true_negs) + 1e-8)
 
     score = dict(recall_pos=recall_pos, recall_negs=recall_negs)
 
     return score
+
+
 def evaluate_intervention_knn_with_target(
     x_train,
     x_ivn,
@@ -610,36 +676,39 @@ def evaluate_intervention_knn_with_target(
     labels_train,
 ) -> float:
 
-
-    total_labels = np.concatenate([labels_train, 
-                                  ['target'] * x_target.shape[0]], axis = 0)
-    x_total = np.concatenate([x_train, x_target], axis = 0)
-    knn = sklearn.neighbors.KNeighborsClassifier(n_neighbors=1).fit(x_total, total_labels)
+    total_labels = np.concatenate(
+        [labels_train, ["target"] * x_target.shape[0]], axis=0
+    )
+    x_total = np.concatenate([x_train, x_target], axis=0)
+    knn = sklearn.neighbors.KNeighborsClassifier(n_neighbors=1).fit(
+        x_total, total_labels
+    )
 
     predict_ivn = knn.predict(x_ivn)
-    
-    score = np.mean(predict_ivn == 'target')
+
+    score = np.mean(predict_ivn == "target")
     return score
 
 
-def evaluate_intervention_1nn_acc_with_target(
-    x_ivn,
-    x_target,
-    **kwargs
-) -> float:
-    
+def evaluate_intervention_1nn_acc_with_target(x_ivn, x_target, **kwargs) -> float:
+
     x_ivn = np.asarray(x_ivn.copy())
     x_target = np.asarray(x_target.copy())
 
-
     print("subsampling to match sizes...")
-    
-    if(x_ivn.shape[0] < x_target.shape[0]):
-        x_target = x_target[np.random.choice(np.arange(x_target.shape[0]), x_ivn.shape[0], replace=False)]
-    elif(x_ivn.shape[0] > x_target.shape[0]):
-        x_ivn = x_ivn[np.random.choice(np.arange(x_ivn.shape[0]), x_target.shape[0], replace=False)]
 
-
+    if x_ivn.shape[0] < x_target.shape[0]:
+        x_target = x_target[
+            np.random.choice(
+                np.arange(x_target.shape[0]), x_ivn.shape[0], replace=False
+            )
+        ]
+    elif x_ivn.shape[0] > x_target.shape[0]:
+        x_ivn = x_ivn[
+            np.random.choice(
+                np.arange(x_ivn.shape[0]), x_target.shape[0], replace=False
+            )
+        ]
 
     x_concat = np.concatenate([x_ivn, x_target], axis=0)
     label_concat = np.asarray([0] * x_ivn.shape[0] + [1] * x_target.shape[0])
@@ -651,9 +720,10 @@ def evaluate_intervention_1nn_acc_with_target(
 
     print("calculating 1NN acc...")
 
-    nn_acc = np.mean((label_concat[nn_ind] == label_concat)[:x_ivn.shape[0]])
+    nn_acc = np.mean((label_concat[nn_ind] == label_concat)[: x_ivn.shape[0]])
 
     return nn_acc
+
 
 def evaluate_intervention_cosine_with_target(
     x_train,
@@ -663,11 +733,15 @@ def evaluate_intervention_cosine_with_target(
     pre_computed_mmd_train=None,
 ) -> float:
 
-    x_train_means = [x_train[labels_train == s].mean(0) for s in np.unique(labels_train)]
+    x_train_means = [
+        x_train[labels_train == s].mean(0) for s in np.unique(labels_train)
+    ]
     x_ivn_mean = x_ivn.mean(0)
     x_target_mean = x_target.mean(0)
 
-    train_target_cosine_sim_max = np.max([met.cosine_sim(x_train_mean, x_target_mean) for x_train_mean in x_train_means])
+    train_target_cosine_sim_max = np.max(
+        [met.cosine_sim(x_train_mean, x_target_mean) for x_train_mean in x_train_means]
+    )
     ivn_target_cosine_sim = met.cosine_sim(x_ivn_mean, x_target_mean)
 
-    return ivn_target_cosine_sim/train_target_cosine_sim_max
+    return ivn_target_cosine_sim / train_target_cosine_sim_max
