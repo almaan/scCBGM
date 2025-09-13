@@ -1,0 +1,7 @@
+# @package intervention_labels
+label_variable: 'concept_2_split'
+hold_out_label: 'hold_out'
+mod_label: 'modify'
+drop_label: 'drop'
+concepts_to_flip: ["concept_2"]
+reference: [0] # reference for the concepts to flip
