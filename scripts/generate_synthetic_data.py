@@ -37,6 +37,7 @@ def main():
 
     args = ArgParser().parse_args()
 
+    print("Generate base dataset - this might take a while... :hourglass:")
     dataset = clab.datagen.omics.OmicsDataGenerator.generate(**args.as_dict())
 
     X = dataset.data.to_pandas()
@@ -46,8 +47,11 @@ def main():
     Cs = []
     split_cols = []
 
+    print("Start Generating counterfactuals... :zap:")
+
     for concept_name in C.columns:
-        print(concept_name)
+
+        print("Rendering counterfactuals for concept: {}".format(concept_name))
 
         is_off = np.where(C[concept_name].values == 0)[0]
         is_active = np.where(C[concept_name].values == 1)[0]
@@ -80,6 +84,8 @@ def main():
         Xs.append(X_new)
         Cs.append(C_new)
 
+    print("Merging and formatting generated data :link:")
+
     Xs_df = pd.concat(Xs, axis=0)
     Xs_df.fillna("drop", inplace=True)
     Xs_df = pd.concat([X, Xs_df])
@@ -96,12 +102,16 @@ def main():
     Xs_df.index = obs.index
     Cs_df.index = obs.index
 
+    Print("Creating anndata")
     adata = ad.AnnData(Xs_df, obs=obs, var=pd.DataFrame([], index=Xs_df.columns))
     adata.obsm["concepts"] = Cs_df
 
     filename = (
         args.filename if args.filename.endswith(".h5ad") else args.filename + ".h5ad"
     )
+
+    print("Saved synthetic dataset to {}/{}".format(args.out_dir, filename))
+
     adata.write_h5ad("{}/{}".format(args.out_dir, filename))
 
 

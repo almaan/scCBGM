@@ -40,65 +40,67 @@ def main(cfg: DictConfig):
 
     score_dict = {}
 
-    mmd_score = clab.evaluation.interventions.evaluate_intervention_mmd_with_target(
-        x_train=(
-            adata_train.obsm[cfg.model.obsm_key]
-            if cfg.model.obsm_key != "X"
-            else adata_train.X
-        ),
-        x_ivn=(
-            adata_preds.obsm[cfg.model.obsm_key]
-            if cfg.model.obsm_key != "X"
-            else adata_preds.X
-        ),
-        x_target=(
-            adata_test.obsm[cfg.model.obsm_key]
-            if cfg.model.obsm_key != "X"
-            else adata_test.X
-        ),
-        labels_train=adata_train.obs[dataset.mmd_label].values,
-    )
-
-    score_dict.update(mmd_score)
-
-    # The DE metric is only evaluated in gene space (reconstructions)
-    de_score = clab.evaluation.interventions.evaluate_intervention_DE_with_target(
-        x_train=adata_train.X if cfg.model.obsm_key == "X" else x_baseline_rec,
-        x_ivn=adata_preds.X if cfg.model.obsm_key == "X" else x_ivn_rec,
-        x_target=adata_test.X if cfg.model.obsm_key == "X" else x_target_rec,
-        genes_list=adata_train.var.index.tolist(),
-    )
-
-    score_dict.update(de_score)
-
-    emd_score = clab.evaluation.interventions.evaluate_intervention_emd_with_target(
-        x_train=(
-            adata_train.obsm[cfg.model.obsm_key]
-            if cfg.model.obsm_key != "X"
-            else adata_train.X
-        ),
-        x_ivn=(
-            adata_preds.obsm[cfg.model.obsm_key]
-            if cfg.model.obsm_key != "X"
-            else adata_preds.X
-        ),
-        x_target=(
-            adata_test.obsm[cfg.model.obsm_key]
-            if cfg.model.obsm_key != "X"
-            else adata_test.X
-        ),
-        labels_train=adata_train.obs[dataset.mmd_label].values,
-    )
-
-    score_dict.update(emd_score)
-
     if dataset.supports_cell_level_evaluation:
         mse_score = clab.evaluation.interventions.evaluate_intervention_cell_level_mse(
-            x_ivn_pred=adata_preds,
-            x_ivn_true=adata_target,
+            adata_ivn_pred=adata_preds,
+            adata_ivn_true=adata_test,
         )
 
         score_dict.update(mse_score)
+
+    else:
+
+        mmd_score = clab.evaluation.interventions.evaluate_intervention_mmd_with_target(
+            x_train=(
+                adata_train.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_train.X
+            ),
+            x_ivn=(
+                adata_preds.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_preds.X
+            ),
+            x_target=(
+                adata_test.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_test.X
+            ),
+            labels_train=adata_train.obs[dataset.mmd_label].values,
+        )
+
+        score_dict.update(mmd_score)
+
+        # The DE metric is only evaluated in gene space (reconstructions)
+        de_score = clab.evaluation.interventions.evaluate_intervention_DE_with_target(
+            x_train=adata_train.X if cfg.model.obsm_key == "X" else x_baseline_rec,
+            x_ivn=adata_preds.X if cfg.model.obsm_key == "X" else x_ivn_rec,
+            x_target=adata_test.X if cfg.model.obsm_key == "X" else x_target_rec,
+            genes_list=adata_train.var.index.tolist(),
+        )
+
+        score_dict.update(de_score)
+
+        emd_score = clab.evaluation.interventions.evaluate_intervention_emd_with_target(
+            x_train=(
+                adata_train.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_train.X
+            ),
+            x_ivn=(
+                adata_preds.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_preds.X
+            ),
+            x_target=(
+                adata_test.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_test.X
+            ),
+            labels_train=adata_train.obs[dataset.mmd_label].values,
+        )
+
+        score_dict.update(emd_score)
 
     for k, v in score_dict.items():
         wandb.log({k: v})

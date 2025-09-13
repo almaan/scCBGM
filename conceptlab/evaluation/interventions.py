@@ -487,8 +487,8 @@ def evaluate_intervention_emd_with_target(
 
 def evaluate_intervention_cell_level_mse(
     adata_ivn_pred,  # Taking the unstimulated data and changing the stimulation concept to 1 and see what it predicts.
-    adata_inv_true,  # Stimulated data with stimulation of interest.
-    align_on: str = "original_index",
+    adata_ivn_true,  # Stimulated data with stimulation of interest.
+    align_on: str | None = None,
 ) -> Dict[str, Any]:
 
     # check dimensions
@@ -502,9 +502,7 @@ def evaluate_intervention_cell_level_mse(
             "adata_ivn_pred and adata_inv_true must have the same number of features."
         )
 
-    if (align_on in adata_ivn_pred.obs.columns) and (
-        align_on in adata_ivn_true.obs.columns
-    ):
+    if align_on is not None:
         # align based on original_index
         adata_ivn_pred = adata_ivn_pred[
             adata_ivn_pred.obs[align_on].isin(adata_ivn_true.obs[align_on])

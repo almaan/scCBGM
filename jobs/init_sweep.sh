@@ -29,17 +29,19 @@ echo "Project: $PROJECT | Entity: $ENTITY"
 
 # Step 1: Create the sweep, capture sweep ID
 
-SWEEP_PATH="$(
-  "${runner[@]}" wandb sweep -p "$PROJECT" -e "$ENTITY" "$CONFIG" 2>&1 |
-    grep -oE "${ENTITY}/${PROJECT}/sweeps/[a-z0-9]+" | head -n1
-)"
 
-SWEEP_ID="${SWEEP_PATH/\/sweeps/}"   # remove the /sweeps segment
+SWEEP_PATH="$( "${runner[@]}" wandb sweep -p "$PROJECT" -e "$ENTITY" "$CONFIG" 2>&1 | grep -oE "${ENTITY}/${PROJECT}/sweeps/[a-z0-9]+" | head -n1 )"
 
-if [ -z "$SWEEP_ID" ]; then
+# Extract sweep ID cleanly from SWEEP_PATH
+if [[ -n "$SWEEP_PATH" ]]; then
+  base="${SWEEP_PATH%/sweeps/*}"   # entity/project
+  id="${SWEEP_PATH##*/}"           # sweep ID
+  SWEEP_ID="$base/$id"             # entity/project/<id>
+else
   echo "❌ Failed to extract sweep ID"
   exit 1
 fi
+
 
 echo "✅ Created sweep: $SWEEP_ID"
 

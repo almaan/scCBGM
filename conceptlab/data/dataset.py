@@ -28,6 +28,7 @@ class InterventionDataset:
         single_cell_preproc=True,
         target_sum=1000,
         supports_cell_level_evaluation=False,
+        align_on: str | None = None,
     ):
         """
         Loads and preprocesses single cell data
@@ -55,12 +56,14 @@ class InterventionDataset:
         self.mmd_label = mmd_label
 
         self.supports_cell_level_evaluation = supports_cell_level_evaluation
+        self.align_on = align_on
 
         adata = ad.read_h5ad(data_path)
 
         if self.drop_label is not None:
             drop_ix = adata.obs[self.label_variable].values == self.drop_label
             adata = adata[~drop_ix].copy()
+            print(f"Dropped {sum(drop_ix)} cells.")
 
         if single_cell_preproc:
             sc.pp.normalize_total(adata, target_sum=target_sum)

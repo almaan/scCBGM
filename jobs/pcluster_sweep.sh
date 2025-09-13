@@ -9,8 +9,12 @@
 #SBATCH --account owner_gred_braid_gpu
 #SBATCH --mem=64G
 #SBATCH --time=10:00:00
-#SBATCH --output=/gstore/data/resbioai/andera29/cbm/conceptlab/logs/%x_%j.out
-#SBATCH --error=/gstore/data/resbioai/andera29/cbm/conceptlab/logs/%x_%j.err
+#SBATCH --output=/tmp/slurm_placeholder.out
+#SBATCH --error=/tmp/slurm_placeholder.err
+
+
+exec >"$ROOT_DIR/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" \
+     2>"$ROOT_DIR/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.err"
 
 # it can be useful to know what node the job ran on
 hostname
