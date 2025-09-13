@@ -21,6 +21,8 @@ parameters:
     values:
       - True
       - False
+  model.cbm_mod.cbm_config.concepts_hp:
+    value: 0.1
 command:
   - uv
   - run

@@ -1,9 +1,11 @@
-name: CBM_Cui
+name: scGEN_Cui
 program: benchmark_scdata.py
 method: grid
 parameters:
   model:
-    value: cbm
+    value: scgen
+  model.lr:
+    value: 1e-5
   seed:
     values: [13,42,1337,69]
   data:
@@ -17,8 +19,6 @@ parameters:
     - cui/macrophage
     - cui/cdc2
     - cui/langerhans
-  model.cbm_config.concepts_hp:
-    value: 0.1
 command:
   - uv
   - run

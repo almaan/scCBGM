@@ -10,16 +10,16 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 
-def normalize_sc_data(adata, target_sum, variable_genes = True):
+#def normalize_sc_data(adata, target_sum, variable_genes = True):
     #target_sum = np.median(adata.X.sum(axis=1)) if isinstance(adata.X, np.ndarray) else np.median(adata.X.toarray().sum(axis=1))
-    sc.pp.normalize_total(adata, target_sum=target_sum)
-    sc.pp.log1p(adata)
-    if variable_genes:
-        sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
-    return adata
+#    sc.pp.normalize_total(adata, target_sum=target_sum)
+#    sc.pp.log1p(adata)
+#    if variable_genes:
+#        sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
+#    return adata
 
 class InterventionDataset:
-    def __init__(self, data_path, intervention_labels, concept_key, mmd_label = None, single_cell_preproc = True, target_sum = 1000 ):
+    def __init__(self, data_path, intervention_labels, concept_key, mmd_label = None, single_cell_preproc = True, target_sum = 1000 , **kwargs):
         """
         Loads and preprocesses single cell data
         Inputs:
