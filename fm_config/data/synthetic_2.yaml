@@ -1,12 +1,11 @@
 defaults:
-  - intervention_labels: synthetic/intervention_0
+  - intervention_labels: synthetic/concept_0
 
 _target_: conceptlab.data.dataset.InterventionDataset
-data_path: /gstore/data/resbioai/andera29/cbm/conceptlab/data_local/synth_data/synthetic_1.h5ad
+data_path: /gstore/data/resbioai/andera29/cbm/conceptlab/data_local/synth_data/synthetic_2.h5ad
 concept_key: concepts
 intervention_labels: ${intervention_labels}
 mmd_label: null
 supports_cell_level_evaluation: True
 align_on: 'original_index'
 target_sum: 10000
-use_hvg: False

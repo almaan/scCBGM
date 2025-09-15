@@ -494,15 +494,17 @@ def evaluate_intervention_cell_level_mse(
     # check dimensions
     if adata_ivn_pred.shape[0] != adata_ivn_true.shape[0]:
         raise ValueError(
-            "adata_ivn_pred and adata_inv_true must have the same number of samples."
+            "adata_ivn_pred and adata_ivn_true must have the same number of samples."
         )
 
     if adata_ivn_pred.shape[1] != adata_ivn_true.shape[1]:
         raise ValueError(
-            "adata_ivn_pred and adata_inv_true must have the same number of features."
+            "adata_ivn_pred and adata_ivn_true must have the same number of features."
         )
 
     if align_on is not None:
+        print("Aligning on label: {}".format(align_on))
+
         # align based on original_index
         adata_ivn_pred = adata_ivn_pred[
             adata_ivn_pred.obs[align_on].isin(adata_ivn_true.obs[align_on])
@@ -513,6 +515,8 @@ def evaluate_intervention_cell_level_mse(
 
         adata_ivn_pred = adata_ivn_pred[adata_ivn_pred.obs[align_on].argsort()].copy()
         adata_ivn_true = adata_ivn_true[adata_ivn_true.obs[align_on].argsort()].copy()
+
+    print("Evaluating on {} cells".format(adata_ivn_pred.shape[0]))
 
     mse = np.mean((adata_ivn_pred.X - adata_ivn_true.X) ** 2)
 

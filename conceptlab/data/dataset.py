@@ -29,6 +29,8 @@ class InterventionDataset:
         target_sum=1000,
         supports_cell_level_evaluation=False,
         align_on: str | None = None,
+        use_hvg: bool = True,
+        n_top_genes: int = 3000,
     ):
         """
         Loads and preprocesses single cell data
@@ -69,7 +71,8 @@ class InterventionDataset:
             sc.pp.normalize_total(adata, target_sum=target_sum)
             adata.layers["og"] = adata.X.copy()  # preserve counts (after normalization)
             sc.pp.log1p(adata)
-            sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
+            # TODO: confirm
+            sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, subset=use_hvg)
 
         if not isinstance(adata.X, np.ndarray):
             adata.X = adata.X.toarray()

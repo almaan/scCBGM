@@ -1,7 +1,7 @@
 # @package intervention_labels
-label_variable: 'concept_$CONCEPT_split'
+label_variable: 'intervention_$NUM'
 hold_out_label: 'hold_out'
 mod_label: 'modify'
 drop_label: 'drop'
-concepts_to_flip: ["concept_$CONCEPT"]
+concepts_to_flip: ["intervention_$NUM_concept"]
 reference: [0] # reference for the concepts to flip
