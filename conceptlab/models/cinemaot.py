@@ -13,6 +13,7 @@ class CinemaOT:
         self.thresh = thresh
         self.eps = eps
 
+        print("CINEMAOT is using concept key: ", concept_key)
         self.concept_key = concept_key
         self.obsm_key = obsm_key
 
@@ -22,10 +23,12 @@ class CinemaOT:
     def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
 
         # Infering the control signature - how to define a control
+
         control_signature = {
-            concept: adata_inter.obsm["concepts"][concept].unique()
+            concept: adata_inter.obsm[self.concept_key][concept].unique()
             for concept in concepts_to_flip
         }
+
         for k, v in control_signature.items():
             assert len(v) == 1
         control_signature = {k: v[0] for k, v in control_signature.items()}

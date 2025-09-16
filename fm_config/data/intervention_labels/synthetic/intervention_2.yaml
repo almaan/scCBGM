@@ -3,5 +3,6 @@ label_variable: 'intervention_2'
 hold_out_label: 'hold_out'
 mod_label: 'modify'
 drop_label: 'drop'
-concepts_to_flip: ["intervention_2_concept"]
+concepts_to_flip: ["target_concept"]
+concept_key: "intervention_2_concept"
 reference: [0] # reference for the concepts to flip

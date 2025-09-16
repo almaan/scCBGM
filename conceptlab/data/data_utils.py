@@ -32,10 +32,10 @@ def split_data_for_counterfactuals(
         is_inter = labels == mod_label
 
         # old
-        is_train = ~is_test
+        # is_train = ~is_test
 
         # TODO: suggest > exclude intervention group from training
-        # is_train = ~is_test & ~is_inter
+        is_train = ~is_test & ~is_inter
 
     # Create AnnData objects for each split
     adata_train = adata[is_train].copy()

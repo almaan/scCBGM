@@ -45,7 +45,13 @@ class InterventionDataset:
         print("Loading and preprocessing data...")
         print(intervention_labels)
 
-        self.concept_key = concept_key
+        if hasattr(intervention_labels, "concept_key"):
+            self.concept_key = intervention_labels.concept_key
+        else:
+            self.concept_key = concept_key
+
+        print("Using concept key: ", concept_key)
+
         self.hold_out_label = intervention_labels.hold_out_label
         self.mod_label = intervention_labels.mod_label
         self.drop_label = intervention_labels.get("drop_label", None)

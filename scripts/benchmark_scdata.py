@@ -24,12 +24,23 @@ def main(cfg: DictConfig):
 
     adata, adata_train, adata_test, adata_inter = dataset.get_anndatas()
 
+    for data_name, _adata in zip(
+        ["og", "train", "test", "inter"], [adata, adata_train, adata_test, adata_inter]
+    ):
+        print(data_name)
+        print(_adata.X)
+
+    print("----")
+
     model.train(adata_train.copy())
     adata_preds = model.predict_intervention(
         adata_inter.copy(),
         hold_out_label=dataset.hold_out_label,
         concepts_to_flip=dataset.concepts_to_flip,
     )
+
+    print("Raw preds")
+    print(adata_preds.X)
 
     if cfg.model.obsm_key == "X_pca":
         x_baseline_rec = adata_train.X
@@ -44,6 +55,7 @@ def main(cfg: DictConfig):
         mse_score = clab.evaluation.interventions.evaluate_intervention_cell_level_mse(
             adata_ivn_pred=adata_preds,
             adata_ivn_true=adata_test,
+            align_on=dataset.align_on,
         )
 
         score_dict.update(mse_score)
