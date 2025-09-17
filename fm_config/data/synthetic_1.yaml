@@ -11,5 +11,5 @@ concept_key: ${oc.select:intervention_labels.concept_key, concepts}
 mmd_label: null
 supports_cell_level_evaluation: True
 align_on: 'original_index'
-target_sum: 10000
+target_sum: 1214
 use_hvg: False

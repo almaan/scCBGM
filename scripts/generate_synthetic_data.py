@@ -24,7 +24,7 @@ class ArgParser(Tap):
     std_batch: float = 0.06
     std_celltype: float = 0.04
     std_tissue: float = 0.05
-    std_concept: float = 0.50
+    std_concept: float = 0.08
     std_libsize_lower: float = 0.01
     std_libsize_upper: float = 0.03
     std_noise: float = 0.01

@@ -502,25 +502,8 @@ def evaluate_intervention_cell_level_mse(
             "adata_ivn_pred and adata_ivn_true must have the same number of features."
         )
 
-    print("FIRST")
-
-    print(adata_ivn_pred.X)
-    print("---")
-    print(adata_ivn_true.X)
-
     if align_on is not None:
         print("Aligning on label: {}".format(align_on))
-
-        # # align based on original_index
-        # adata_ivn_pred = adata_ivn_pred[
-        #     adata_ivn_pred.obs[align_on].isin(adata_ivn_true.obs[align_on])
-        # ].copy()
-        # adata_ivn_true = adata_ivn_true[
-        #     adata_ivn_true.obs[align_on].isin(adata_ivn_pred.obs[align_on])
-        # ].copy()
-
-        # adata_ivn_pred = adata_ivn_pred[adata_ivn_pred.obs[align_on].argsort()].copy()
-        # adata_ivn_true = adata_ivn_true[adata_ivn_true.obs[align_on].argsort()].copy()
 
         X_pred = adata_ivn_pred.to_df()
         X_true = adata_ivn_true.to_df()
@@ -532,11 +515,7 @@ def evaluate_intervention_cell_level_mse(
 
     print("Evaluating on {} cells".format(adata_ivn_pred.shape[0]))
 
-    print(X_pred)
-    print("---")
-    print(X_true)
-
-    mse = np.mean((adata_ivn_pred.X - adata_ivn_true.X) ** 2)
+    mse = np.mean((X_true.values - X_pred.values) ** 2)
 
     score = dict(cell_level_mse=mse)
 

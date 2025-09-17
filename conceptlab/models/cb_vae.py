@@ -172,6 +172,7 @@ class CB_VAE(BaseCBVAE):
             mask=mask.to(device),
             intervene=True,
         )
+
         dec = self.decode(**cbm)
         return dec
 

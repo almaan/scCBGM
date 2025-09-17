@@ -7,8 +7,7 @@ parameters:
   model:
     value: cinemaot
   seed:
-    # values: [13,42,1337,69]
-    value: 13
+    values: [13,42,1337,69]
   data/intervention_labels:
     values:
     - synthetic/intervention_0
