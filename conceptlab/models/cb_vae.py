@@ -35,7 +35,6 @@ class CB_VAE(BaseCBVAE):
             **kwargs,
         )
 
-        print("now using skip ")
         self.dropout = config.get("dropout", 0.0)
 
         # Encoder
@@ -348,8 +347,10 @@ class CB_VAE(BaseCBVAE):
 class scCBGM(CB_VAE):
     def __init__(self, config, decoder_type = 'skip', **kwargs):
         if(decoder_type == 'skip'):
+            print("Using Skip Decoder")
             decoder = SkipDecoderBlock
         else:
+            print("Using Residual Decoder")
             decoder = DecoderBlock
         super().__init__(config, _decoder = decoder, **kwargs)
 

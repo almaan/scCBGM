@@ -150,8 +150,8 @@ class SkipDecoderBlock(nn.Module):
         self.output_later = nn.Linear(self.hidden_dim, self.input_dim)
 
     def forward(self, input_concept, unknown, **kwargs):
-        h = self.concept_embedder(input_concept)
-        c = self.unknown_embedder(unknown)
+        c = self.concept_embedder(input_concept)
+        h = self.unknown_embedder(unknown)
 
         for layer in self.layers:
             h = layer(h, c)
