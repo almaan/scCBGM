@@ -33,7 +33,8 @@ class ArgParser(Tap):
     beta_b: float = 0.8
     seed: int = 42
     zero_inflate: bool = True
-    use_concept_dependency: bool = False
+    zero_shot_data: bool = True
+    reference_value: int = 1
 
 
 def main():
@@ -70,14 +71,16 @@ def main():
                 ct_name, concept_name
             )
         )
+        is_on = C[concept_name].values == args.reference_value
 
-        is_ct = U["cell_type"].values == ct_name
-        is_on = C[concept_name].values == 1
-
-        # cells that are ct and concept on - we will drop these
-        drop_ix = np.where(is_ct & (is_on))[0]
-        # cells that are ct and concept off
-        ct_off_ix = np.where(is_ct & (~is_on))[0]
+        if zero_shot_data:
+            is_ct = U["cell_type"].values == ct_name
+            # cells that are ct and concept on - we will drop these
+            drop_ix = np.where(is_ct & (is_on))[0]
+            # cells that are ct and concept off
+            ct_off_ix = np.where(is_ct & (~is_on))[0]
+        else:
+            ct_off_ix = np.where((~is_on))[0]
 
         np.random.shuffle(ct_off_ix)
 

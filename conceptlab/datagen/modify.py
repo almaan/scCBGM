@@ -23,9 +23,10 @@ def _get_concepts(
         raise ValueError("Ond of dataset and concepts has to not be None")
     n_concepts = concepts.shape[1]
 
-    coefs = dataset["concept_coef"].to_dataframe().unstack()["concept_coef"].T.copy()
-
     if return_coefs:
+        coefs = (
+            dataset["concept_coef"].to_dataframe().unstack()["concept_coef"].T.copy()
+        )
         return concepts, n_concepts, coefs
 
     return concepts, n_concepts

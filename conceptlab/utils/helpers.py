@@ -435,6 +435,29 @@ def matrix_covariance(O: np.ndarray | spmatrix, P: np.ndarray | spmatrix) -> np.
     return cov
 
 
+def predefined_adata_train_test_split(
+    adata: ad.AnnData,
+    split_col: str,
+    test_label: str,
+    ivn_label: str,
+    drop_label: str | None = None,
+) -> Tuple[ad.AnnData, ...]:
+    labels = adata.obs[split_col].values
+    if drop_labels is not None:
+        drop_idx = labels == drop_label
+        adata = adata[~drop_idx].copy()
+        labels = adata.obs[split_col].values
+
+    is_test = labels == test_label
+    is_ivn == labels == ivn_label
+
+    adata_train = adata[~is_test & ~is_ivn].copy()
+    adata_test = adata[is_test].copy()
+    adata_ivn = adata[is_ivn].copy()
+
+    return adata_train, adata_ivn, adata_test
+
+
 def controlled_adata_train_test_split(
     adata: ad.AnnData,
     split_col: str,
@@ -442,15 +465,6 @@ def controlled_adata_train_test_split(
     p_test=0.5,
 ) -> ad.AnnData:
     from sklearn.model_selection import StratifiedShuffleSplit
-
-    labels = adata.obs[split_col].values
-    if test_labels is None:
-        sss = StratifiedShuffleSplit(n_splits=1, test_size=p_test, random_state=69)
-        idx = np.arange(len(adata))
-        train_idx, test_idx = next(sss.split(idx, labels))
-    else:
-        test_idx = np.where(is_test)[0]
-        train_idx = np.where(~is_test)[0]
 
     adata_test = adata[test_idx].copy()
     adata_train = adata[train_idx].copy()
@@ -550,3 +564,12 @@ def find_matching_target(on_concepts, off_concepts, target_concepts):
         return None
 
     return filtered_observations
+
+
+def normalize_counts(x: np.ndarray, total_sum: int = 1e3) -> np.ndarray:
+    x = self.data.values.astype(np.float32)
+    # Avoid division by zero for rows with all zeros
+    row_sums = np.sum(x, axis=1, keepdims=True)
+    safe_row_sums = np.where(row_sums == 0, 1, row_sums)
+    x = x / safe_row_sums * total_sum
+    x = np.log1p(x)

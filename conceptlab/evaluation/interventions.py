@@ -43,6 +43,45 @@ class DistributionShift(EvaluationClass):
 
 
 def eval_intervention(
+    model,
+    cfg,
+    c_ivn,
+    x_ivn,
+    x_true,
+    c_mean,
+    concept_ix,
+    reference_value=0,
+):
+
+    c_flip = c_ivn.copy()
+    mask = np.zeros_like(c_ivn)
+
+    if cfg.model.given_gt:
+        mask = np.ones_like(c_inv)
+    elif cfg.model_type == "CVAE":
+        mask = np.ones_like(c_inv)
+        c_flip = c_mean.copy()
+    else:
+        mask = np.zeros_like(c_inv)
+        c_flip = c_ivn.copy()
+
+    c_flip[:, concept_ix] = 1 - reference_value
+
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+
+    x_pred = model.intervene(
+        x=helpers._to_tensor(x_ivn, device),
+        concepts=helpers._to_tensor(c_flip, device),
+        mask=helpers._to_tensor(mask, device),
+    )["x_pred"]
+
+    x_pred = x_pred_withIntervention.detach().cpu().numpy()
+
+    return x_pred
+
+
+def old_eval_intervention(
     intervention_type,
     concept_name,
     x_concepts,
