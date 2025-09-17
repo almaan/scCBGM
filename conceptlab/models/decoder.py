@@ -165,57 +165,57 @@ class SkipDecoderBlock(nn.Module):
 
 
 
-# class DefaultDecoderBlock(nn.Module):
-#     def __init__(
-#         self,
-#         input_dim: int,
-#         n_unknown: int,
-#         hidden_dim: int,
-#         dropout: float,
-#         n_concepts: int = 0,
-#         **kwargs,
-#     ):
-#         super().__init__()
+class DefaultDecoderBlock(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        n_unknown: int,
+        hidden_dim: int,
+        dropout: float,
+        n_concepts: int = 0,
+        **kwargs,
+    ):
+        super().__init__()
 
-#         self.input_dim = input_dim
-#         self.hidden_dim = (
-#             hidden_dim if isinstance(hidden_dim, (list, tuple)) else [hidden_dim]
-#         )
-#         self.n_concepts = n_concepts
-#         self.n_unknown = n_unknown
-#         self.dropout = dropout
+        self.input_dim = input_dim
+        self.hidden_dim = (
+            hidden_dim if isinstance(hidden_dim, (list, tuple)) else [hidden_dim]
+        )
+        self.n_concepts = n_concepts
+        self.n_unknown = n_unknown
+        self.dropout = dropout
 
-#         layers = []
-#         layers_dim = [self.n_concepts + self.n_unknown] + self.hidden_dim
+        layers = []
+        layers_dim = [self.n_concepts + self.n_unknown] + self.hidden_dim
 
-#         for k in range(0, len(layers_dim) - 1):
+        for k in range(0, len(layers_dim) - 1):
 
-#             layer_k = [
-#                 nn.Linear(layers_dim[k], layers_dim[k + 1]),
-#                 nn.ReLU(),
-#                 nn.Dropout(p=self.dropout),
-#             ]
+            layer_k = [
+                nn.Linear(layers_dim[k], layers_dim[k + 1]),
+                nn.ReLU(),
+                nn.Dropout(p=self.dropout),
+            ]
 
-#             layers += layer_k
+            layers += layer_k
 
-#         layers.append(nn.Linear(self.hidden_dim[-1], self.input_dim))
+        layers.append(nn.Linear(self.hidden_dim[-1], self.input_dim))
 
-#         if len(self.hidden_dim) == 1 and (self.hidden_dim[0] == self.input_dim):
-#             layers.append(nn.ReLU())
+        if len(self.hidden_dim) == 1 and (self.hidden_dim[0] == self.input_dim):
+            layers.append(nn.ReLU())
 
-#         self.decoder_layers = nn.Sequential(*layers)
+        self.decoder_layers = nn.Sequential(*layers)
 
-#     def forward(self, h, **kwargs):
-#         h = self.decoder_layers(h)
-#         return dict(x_pred=h)
+    def forward(self, h, **kwargs):
+        h = self.decoder_layers(h)
+        return dict(x_pred=h)
 
 
-# class ConditionalDecoderBlock(DefaultDecoderBlock):
-#     def forward(self, h, concepts=None, **kwargs):
-#         h0 = t.cat((h, concepts), dim=1)
-#         h = self.decoder_layers(h0)
+class ConditionalDecoderBlock(DefaultDecoderBlock):
+    def forward(self, h, concepts=None, **kwargs):
+        h0 = t.cat((h, concepts), dim=1)
+        h = self.decoder_layers(h0)
 
-#         return dict(x_pred=h)
+        return dict(x_pred=h)
 
 
 # class SkipLayer(nn.Module):

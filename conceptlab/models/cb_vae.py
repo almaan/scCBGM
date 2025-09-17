@@ -346,7 +346,11 @@ class CB_VAE(BaseCBVAE):
 
 
 class scCBGM(CB_VAE):
-    def __init__(self, config, decoder = SkipDecoderBlock, **kwargs):
+    def __init__(self, config, decoder_type = 'skip', **kwargs):
+        if(decoder_type == 'skip'):
+            decoder = SkipDecoderBlock
+        else:
+            decoder = DecoderBlock
         super().__init__(config, _decoder = decoder, **kwargs)
 
     def decode(self, input_concept, unknown, **kwargs):
