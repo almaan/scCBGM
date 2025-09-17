@@ -481,7 +481,7 @@ class CEM_MetaTrainer:
 
         return self.model
 
-    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
+    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip, values_to_set = None):
         """Performs intervention using a trained CEM-VAE model.
         Returns an anndata with predicted values."""
         print("Performing intervention with CEM-VAE...")

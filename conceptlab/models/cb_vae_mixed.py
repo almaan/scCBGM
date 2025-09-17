@@ -229,7 +229,8 @@ class CB_VAE_MIXED(BaseCBVAE):
                           num_epochs: int = 100, 
                           batch_size: int = 64, 
                           lr: float = 3e-4, 
-                          lr_gamma: float = 0.997):
+                          lr_gamma: float = 0.997,
+                          num_workers: int = 4,):
             
         if concepts is not None:
             if self.use_hard_concepts and not self.use_soft_concepts:
@@ -253,7 +254,7 @@ class CB_VAE_MIXED(BaseCBVAE):
         if self.use_soft_concepts: dataset_tensors.append(soft_concepts)
         
         dataset = TensorDataset(*dataset_tensors)
-        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
+        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=lr_gamma)
 

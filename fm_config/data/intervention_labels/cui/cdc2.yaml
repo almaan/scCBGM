@@ -4,5 +4,4 @@ hold_out_label: 'cDC2_IFNa1'
 mod_label: 'cDC2_PBS'
 concepts_to_flip: ["PBS","IFNa1"]
 reference: [1,0] # reference for the concepts to flip
-
-
+values_to_set: [0,1] # values to set for the concepts to flip

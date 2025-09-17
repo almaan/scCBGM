@@ -17,7 +17,7 @@ class CinemaOT:
     def train(self,adata_train):
         self.adata_train = adata_train
 
-    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
+    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip, values_to_set = None):
         
         # Infering the control signature - how to define a control
         control_signature = {concept: adata_inter.obsm["concepts"][concept].unique() for concept in concepts_to_flip}

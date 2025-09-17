@@ -4,5 +4,5 @@ hold_out_label: 'CD4 T cells_2_stim'
 mod_label: 'CD4 T cells_2_ctrl'
 concepts_to_flip: ["stim"]
 reference: [0] # reference for the concepts to flip
-
+values_to_set: [1] # values to set for the concepts to flip
 

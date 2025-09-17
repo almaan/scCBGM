@@ -38,6 +38,7 @@ class InterventionDataset:
         self.mod_label = intervention_labels.mod_label
         self.concepts_to_flip = intervention_labels.concepts_to_flip
         self.control_reference = intervention_labels.reference # The value of controls in the concepts to flip
+        self.values_to_set = intervention_labels.values_to_set # The values to set for the concepts to flip
 
         self.label_variable = intervention_labels.label_variable
         self.mmd_label = mmd_label

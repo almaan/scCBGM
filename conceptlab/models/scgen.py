@@ -67,7 +67,7 @@ class scGEN:
 
 
 
-    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
+    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip, values_to_set = None):
         
         assert concepts_to_flip == self.concepts_to_flip, f"concepts to flip in prediction {concepts_to_flip} should be the same as in training {self.concepts_to_flip}"
         
