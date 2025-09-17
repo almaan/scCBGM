@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader, Dataset, random_split, Subset
 import torch as t
 import numpy as np
 import pandas as pd
-from clab.utils import helpers
+from conceptlab.utils import helpers
 
 import xarray as xr
 

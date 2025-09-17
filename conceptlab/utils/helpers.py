@@ -443,13 +443,13 @@ def predefined_adata_train_test_split(
     drop_label: str | None = None,
 ) -> Tuple[ad.AnnData, ...]:
     labels = adata.obs[split_col].values
-    if drop_labels is not None:
+    if drop_label is not None:
         drop_idx = labels == drop_label
         adata = adata[~drop_idx].copy()
         labels = adata.obs[split_col].values
 
     is_test = labels == test_label
-    is_ivn == labels == ivn_label
+    is_ivn = labels == ivn_label
 
     adata_train = adata[~is_test & ~is_ivn].copy()
     adata_test = adata[is_test].copy()
@@ -567,9 +567,12 @@ def find_matching_target(on_concepts, off_concepts, target_concepts):
 
 
 def normalize_counts(x: np.ndarray, total_sum: int = 1e3) -> np.ndarray:
-    x = self.data.values.astype(np.float32)
+    if isinstance(x, pd.DataFrame):
+        x = x.values
+    x = x.astype(np.float32)
     # Avoid division by zero for rows with all zeros
     row_sums = np.sum(x, axis=1, keepdims=True)
     safe_row_sums = np.where(row_sums == 0, 1, row_sums)
     x = x / safe_row_sums * total_sum
     x = np.log1p(x)
+    return x
