@@ -14,7 +14,7 @@ from tqdm import tqdm
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import EncoderBlock
-from .decoder import DecoderBlock
+from .decoder import DecoderBlock, SkipDecoderBlock
 
 EPS = 1e-6
 
@@ -26,7 +26,7 @@ class CB_VAE(BaseCBVAE):
         self,
         config,
         _encoder: nn.Module = EncoderBlock,
-        _decoder: nn.Module = DecoderBlock,
+        _decoder: nn.Module = SkipDecoderBlock,
         **kwargs,
     ):
 
@@ -35,6 +35,7 @@ class CB_VAE(BaseCBVAE):
             **kwargs,
         )
 
+        print("now using skip ")
         self.dropout = config.get("dropout", 0.0)
 
         # Encoder
@@ -345,8 +346,8 @@ class CB_VAE(BaseCBVAE):
 
 
 class scCBGM(CB_VAE):
-    def __init__(self, config, **kwargs):
-        super().__init__(config, _decoder=DecoderBlock, **kwargs)
+    def __init__(self, config, decoder = SkipDecoderBlock, **kwargs):
+        super().__init__(config, _decoder = decoder, **kwargs)
 
     def decode(self, input_concept, unknown, **kwargs):
         return self._decoder(input_concept, unknown, **kwargs)
