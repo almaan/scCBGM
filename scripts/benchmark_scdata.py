@@ -25,6 +25,7 @@ def main(cfg: DictConfig):
     adata, adata_train, adata_test, adata_inter = dataset.get_anndatas()
 
     model.train(adata_train.copy())
+
     adata_preds = model.predict_intervention(
         adata_inter.copy(),
         hold_out_label=dataset.hold_out_label,
