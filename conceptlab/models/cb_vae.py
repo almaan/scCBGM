@@ -14,7 +14,7 @@ from tqdm import tqdm
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import EncoderBlock
-from .decoder import DecoderBlock, SkipDecoderBlock
+from .decoder import DecoderBlock, SkipDecoderBlock, NoResDecoderBlock
 
 EPS = 1e-6
 
@@ -349,6 +349,9 @@ class scCBGM(CB_VAE):
         if(decoder_type == 'skip'):
             print("Using Skip Decoder")
             decoder = SkipDecoderBlock
+        elif(decoder_type == 'no residual'):
+            print("Using No Residual Decoder")
+            decoder = NoResDecoderBlock
         else:
             print("Using Residual Decoder")
             decoder = DecoderBlock
