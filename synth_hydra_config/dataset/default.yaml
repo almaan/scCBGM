@@ -1,9 +1,6 @@
-dataset_name: "default"
-n_obs: 50000
-n_vars:  5000
-n_tissues: 3
-n_celltypes:  10
-n_batches: 2
-n_concepts: 8
-add_all_effects_as_concepts: False
-use_concept_dependency: False
+dataset_path: "/gstore/data/resbioai/andera29/cbm/conceptlab/data_local/synth_data/synthetic_1.h5ad"
+normalize: True
+
+defaults:
+  - _self_
+  - interventions: default/intervention_0

@@ -566,7 +566,7 @@ def find_matching_target(on_concepts, off_concepts, target_concepts):
     return filtered_observations
 
 
-def normalize_counts(x: np.ndarray, total_sum: int = 1e3) -> np.ndarray:
+def _normalize_counts(x: np.ndarray, total_sum: int = 1e4) -> np.ndarray:
     if isinstance(x, pd.DataFrame):
         x = x.values
     x = x.astype(np.float32)
@@ -576,3 +576,19 @@ def normalize_counts(x: np.ndarray, total_sum: int = 1e3) -> np.ndarray:
     x = x / safe_row_sums * total_sum
     x = np.log1p(x)
     return x
+
+
+def normalize_counts(
+    data: np.ndarray | ad.AnnData | pd.DataFrame, total_sum: int = 1e4
+) -> np.ndarray:
+
+    if isinstance(data, ad.AnnData):
+        data.X = _normalize_counts(data.X, total_sum)
+    elif isinstance(data, pd.DataFrame):
+        data.values = _normalize_counts(data.values, total_sum)
+    elif isinstance(data, np.ndarray):
+        data = _normalize_counts(data)
+    else:
+        raise ValueError("data must be AnnData, DataFrame, or ndarray")
+
+    return data

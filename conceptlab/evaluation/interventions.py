@@ -47,8 +47,6 @@ def eval_intervention(
     cfg,
     c_ivn,
     x_ivn,
-    x_true,
-    c_mean,
     concept_ix,
     reference_value=0,
 ):
@@ -58,7 +56,8 @@ def eval_intervention(
     c_flip = c_ivn.copy()
     mask = np.zeros_like(c_ivn)
 
-    if cfg.model.given_gt:
+    given_gt = cfg.model.get("given_gt", False)
+    if given_gt:
         # we only use the given concepts (mask all predicted)
         mask = np.ones_like(c_ivn)
     else:

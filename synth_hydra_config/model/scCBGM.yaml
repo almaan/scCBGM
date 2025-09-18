@@ -5,13 +5,13 @@ n_concepts: null
 
 has_cbm: True
 lr: 5e-4
-beta: 1e-05
+n_layers: 2
 hidden_dim: 256
+beta: 1e-05
 latent_dim: 128
+n_unknown: 128
 min_bottleneck_size: 128
+# independent_training: True
 concepts_hp: 0.005
-normalize: True
 orthogonality_hp: 0.2
-n_decoder_layers: 2
 use_soft_concepts: False
-independent_training: True

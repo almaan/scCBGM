@@ -69,3 +69,36 @@ def cosine_similarity(x_true, x_pred):
     cos_sim = np.mean(rowwise_cos)
 
     return cos_sim
+
+
+def rowwise_correlation(x_true, x_pred):
+    """
+    Compute the average row-wise Pearson correlation
+    between x_true and x_pred, vectorized.
+
+    Args:
+        x_true (ndarray): shape (n_samples, n_features)
+        x_pred (ndarray): shape (n_samples, n_features)
+
+    Returns:
+        float: average correlation across rows
+    """
+    x_true = np.asarray(x_true, dtype=float)
+    x_pred = np.asarray(x_pred, dtype=float)
+
+    # Center each row (subtract row mean)
+    x_true_centered = x_true - x_true.mean(axis=1, keepdims=True)
+    x_pred_centered = x_pred - x_pred.mean(axis=1, keepdims=True)
+
+    # Row-wise numerator (dot product)
+    num = np.sum(x_true_centered * x_pred_centered, axis=1)
+
+    # Row-wise denominator (product of norms)
+    denom = np.linalg.norm(x_true_centered, axis=1) * np.linalg.norm(
+        x_pred_centered, axis=1
+    )
+
+    # Avoid division by zero
+    corrs = np.divide(num, denom, out=np.zeros_like(num), where=denom != 0)
+
+    return np.mean(corrs)
