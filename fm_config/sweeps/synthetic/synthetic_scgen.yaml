@@ -1,0 +1,23 @@
+name: CBM_synthetic
+program: benchmark_scdata.py
+method: grid
+parameters:
+  data:
+    value: synthetic_1
+  model:
+    value: scgen
+  seed:
+    # values: [13,42,1337,69]
+    value: 13
+  data/intervention_labels:
+    values:
+    - synthetic_1/concept_0
+    - synthetic_1/concept_1
+    - synthetic_1/concept_2
+    - synthetic_1/concept_3
+    - synthetic_1/concept_4
+command:
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.project=conceptlab

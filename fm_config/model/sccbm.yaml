@@ -1,0 +1,20 @@
+_target_: conceptlab.models.cb_vae.CBM_MetaTrainer
+concept_key: ${data.concept_key}
+max_epochs: 200
+log_every_n_steps: 10
+num_workers: 4
+obsm_key: X
+z_score: False
+cbm_config:
+  has_cbm: True
+  lr: 5e-4
+  n_layers: 2
+  hidden_dim: 256
+  beta: 1e-05
+  latent_dim: 128
+  n_unknown: 128
+  min_bottleneck_size: 128
+  # independent_training: True
+  concepts_hp: 0.005
+  orthogonality_hp: 0.2
+  use_soft_concepts: False
