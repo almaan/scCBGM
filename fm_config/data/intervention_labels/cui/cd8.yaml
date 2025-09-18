@@ -1,0 +1,8 @@
+# @package intervention_labels
+label_variable: L2_stim # variable to select the train/inter/test groups
+hold_out_label: 'T_cell_CD8_TNFa'
+mod_label: 'T_cell_CD8_PBS'
+concepts_to_flip: ["PBS","TNFa"]
+reference: [1,0] # reference for the concepts to flip
+values_to_set: [0,1] # values to set for the concepts to flip
+

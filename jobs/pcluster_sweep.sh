@@ -39,5 +39,4 @@ if [[ -z "$SWEEP_ID" ]]; then
   exit 1
 fi
 
-# --- run the agent ---
 "${runner[@]}" wandb agent "${SWEEP_ID}"

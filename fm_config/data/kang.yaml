@@ -7,3 +7,6 @@ concept_key: concepts
 intervention_labels: ${intervention_labels}
 mmd_label: "L1_stim"
 target_sum: 1214 # target sum for normalization (target_sum = np.median(adata.X.sum(axis=1)) if isinstance(adata.X, np.ndarray) else np.median(adata.X.toarray().sum(axis=1)))
+concepts_as_cov: L1 # column in obs that recapitulates the concepts \ intervention (for scGen)
+soft_concept_key: null
+hard_concept_key: concepts

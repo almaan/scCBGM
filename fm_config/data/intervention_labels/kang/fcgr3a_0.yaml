@@ -4,5 +4,5 @@ hold_out_label: 'FCGR3A+ Monocytes_0_stim'
 mod_label: 'FCGR3A+ Monocytes_0_ctrl'
 concepts_to_flip: ["stim"]
 reference: [0] # reference for the concepts to flip
-
+values_to_set: [1] # values to set for the concepts to flip
 

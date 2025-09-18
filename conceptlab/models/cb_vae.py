@@ -14,7 +14,7 @@ from tqdm import tqdm
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import EncoderBlock
-from .decoder import DecoderBlock
+from .decoder import DecoderBlock, SkipDecoderBlock
 
 EPS = 1e-6
 
@@ -30,7 +30,7 @@ class CB_VAE(BaseCBVAE):
         self,
         config,
         _encoder: nn.Module = EncoderBlock,
-        _decoder: nn.Module = DecoderBlock,
+        _decoder: nn.Module = SkipDecoderBlock,
         **kwargs,
     ):
 
@@ -364,8 +364,14 @@ class CB_VAE(BaseCBVAE):
 
 
 class scCBGM(CB_VAE):
-    def __init__(self, config, **kwargs):
-        super().__init__(config, _decoder=DecoderBlock, **kwargs)
+    def __init__(self, config, decoder_type="skip", **kwargs):
+        if decoder_type == "skip":
+            print("Using Skip Decoder")
+            decoder = SkipDecoderBlock
+        else:
+            print("Using Residual Decoder")
+            decoder = DecoderBlock
+        super().__init__(config, _decoder=decoder, **kwargs)
 
     def decode(self, input_concept, unknown, **kwargs):
         return self._decoder(input_concept, unknown, **kwargs)
@@ -443,18 +449,11 @@ class CBM_MetaTrainer:
 
         self.model = model
 
-        # data_module = clab.data.dataloader.GeneExpressionDataModule(
-        #    adata_train, add_concepts=True, concept_key=self.concept_key, batch_size=512, normalize=False, num_workers=self.num_workers
-        # )
-
-        # trainer = pl.Trainer(max_epochs=self.max_epochs, log_every_n_steps = self.log_every_n_steps, accelerator='auto')
-        # trainer.fit(model, data_module)
-
-        # self.model = model.to("cpu").eval()
-
         return self.model
 
-    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
+    def predict_intervention(
+        self, adata_inter, hold_out_label, concepts_to_flip, values_to_set=None
+    ):
         """Performs intervention using a trained scCBGM model.
         Returns an anndata with predicted values."""
         print("Performing intervention with scCBGM...")
@@ -484,7 +483,7 @@ class CBM_MetaTrainer:
 
         # Define the intervention by creating a mask and new concept values
         mask = torch.zeros(c_intervene_on.shape, dtype=torch.float32)
-        mask[:, concept_to_intervene_idx] = 1  # Intervene on the last concept (stim)
+        mask[:, concept_to_intervene_idx] = 1
 
         inter_concepts = torch.tensor(c_intervene_on, dtype=torch.float32)
         inter_concepts[:, concept_to_intervene_idx] = (
@@ -513,5 +512,216 @@ class CBM_MetaTrainer:
 
         if self.obsm_key != "X":
             pred_adata.obsm[self.obsm_key] = inter_preds
+
+        return pred_adata
+
+
+class Mixed_CBM_MetaTrainer:
+    def __init__(
+        self,
+        cbm_config,
+        max_epochs,
+        log_every_n_steps,
+        concept_key,
+        num_workers,
+        obsm_key: str = "X",
+        z_score: bool = False,
+        hard_concept_key: str = None,
+        soft_concept_key: str = None,
+    ):
+        """
+        Class to train and predict interventions with a scCBMG model
+        Inputs:
+        - cbm_config: config for the model
+        - max_epochs: max number of epochs to train for
+        - log_every_n_steps:
+        - concept_key: Key in adata.obsm where the concept vectors are stored
+        - num_workers: num workers in the dataloaders
+        - obsm_key where to apply the method on (obsm) - "X" or "X_pca"
+        - zscore: whether to whiten the data
+        """
+        self.cbm_config = cbm_config
+        self.max_epochs = max_epochs
+        self.log_every_n_steps = log_every_n_steps
+        self.concept_key = concept_key
+        self.num_workers = num_workers
+
+        self.model = None
+
+        self.obsm_key = obsm_key
+        self.z_score = z_score
+
+        self.hard_concept_key = hard_concept_key
+        self.soft_concept_key = soft_concept_key
+        if self.hard_concept_key is None and self.soft_concept_key is None:
+            raise ValueError(
+                "You must provide at least one of 'hard_concept_key' or 'soft_concept_key'."
+            )
+
+    def train(self, adata_train):
+
+        """Trains and returns the scCBGM model."""
+        print("Training scCBGM model...")
+
+        if self.obsm_key != "X":
+            data_matrix = adata_train.obsm[self.obsm_key]
+        else:
+            data_matrix = adata_train.X
+            # if self.z_score:
+            #    data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization
+
+        torch.set_flush_denormal(True)
+
+        # --- Prepare Concept Tensors ---
+        hard_concepts_tensor = None
+        n_hard = 0
+        if self.hard_concept_key:
+            hard_concepts_data = (
+                adata_train.obsm[self.hard_concept_key].to_numpy().astype(np.float32)
+            )
+            hard_concepts_tensor = torch.from_numpy(hard_concepts_data)
+            n_hard = hard_concepts_tensor.shape[1]
+
+        soft_concepts_tensor = None
+        n_soft = 0
+        if self.soft_concept_key:
+            soft_concepts_data = (
+                adata_train.obsm[self.soft_concept_key].to_numpy().astype(np.float32)
+            )
+            soft_concepts_tensor = torch.from_numpy(soft_concepts_data)
+            n_soft = soft_concepts_tensor.shape[1]
+
+        config = OmegaConf.create(
+            dict(
+                input_dim=data_matrix.shape[1],
+                n_concepts=adata_train.obsm[self.concept_key].shape[1],
+                use_soft_concepts=self.soft_concept_key is not None,
+                use_hard_concepts=self.hard_concept_key is not None,
+                n_hard_concepts=n_hard,
+                n_soft_concepts=n_soft,
+            )
+        )
+        merged_config = OmegaConf.merge(config, self.cbm_config)
+
+        model = clab.models.CB_VAE_MIXED(merged_config)
+
+        print("\nModel's train_loop would be called with:")
+        print(f"data shape: {data_matrix.shape}")
+        if hard_concepts_tensor is not None:
+            print(f"hard_concepts shape: {hard_concepts_tensor.shape}")
+        if soft_concepts_tensor is not None:
+            print(f"soft_concepts shape: {soft_concepts_tensor.shape}")
+
+        model.train_loop(
+            data=torch.from_numpy(data_matrix.astype(np.float32)),
+            hard_concepts=hard_concepts_tensor,
+            soft_concepts=soft_concepts_tensor,
+            # concepts=torch.from_numpy(adata_train.obsm[self.concept_key].to_numpy().astype(np.float32)),
+            num_epochs=self.max_epochs,
+            batch_size=128,
+            num_workers=self.num_workers,
+        )
+
+        self.model = model
+
+        return self.model
+
+    def predict_intervention(
+        self, adata_inter, hold_out_label, concepts_to_flip, values_to_set=None
+    ):
+        """Performs intervention using a trained scCBGM model.
+        Returns an anndata with predicted values."""
+        print("Performing intervention with scCBGM...")
+
+        if self.model is None:
+            raise ValueError(
+                "Model has not been trained yet. Call train() before predict_intervention()."
+            )
+
+        if self.obsm_key != "X":
+            x_intervene_on = torch.tensor(
+                adata_inter.obsm[self.obsm_key], dtype=torch.float32
+            )
+        else:
+            x_intervene_on = torch.tensor(adata_inter.X, dtype=torch.float32)
+
+        # --- Prepare original concept tensors and find column indices ---
+        concept_parts, hard_concepts_df, soft_concepts_df = [], None, None
+        n_hard = 0
+
+        if self.hard_concept_key:
+            hard_concepts_df = adata_inter.obsm[self.hard_concept_key]
+            concept_parts.append(
+                torch.from_numpy(hard_concepts_df.to_numpy(dtype=np.float32))
+            )
+            n_hard = hard_concepts_df.shape[1]
+
+        if self.soft_concept_key:
+            soft_concepts_df = adata_inter.obsm[self.soft_concept_key]
+            concept_parts.append(
+                torch.from_numpy(soft_concepts_df.to_numpy(dtype=np.float32))
+            )
+
+        if not concept_parts:
+            raise ValueError(
+                "Must provide at least one concept key ('hard_concept_key' or 'soft_concept_key') to perform intervention."
+            )
+
+        c_intervene_on = torch.cat(concept_parts, dim=1)
+        inter_concepts = c_intervene_on.clone()
+        mask = torch.zeros_like(c_intervene_on)
+
+        # --- Build the mask and intervention tensor from the dictionary ---
+        for concept_name, new_value in zip(concepts_to_flip, values_to_set):
+            found = False
+            if (
+                hard_concepts_df is not None
+                and concept_name in hard_concepts_df.columns
+            ):
+                col_idx = hard_concepts_df.columns.get_loc(concept_name)
+                mask[:, col_idx] = 1
+                inter_concepts[:, col_idx] = new_value
+                found = True
+                print(
+                    f"Intervening on HARD concept '{concept_name}' (index {col_idx}) -> {new_value}"
+                )
+
+            elif (
+                soft_concepts_df is not None
+                and concept_name in soft_concepts_df.columns
+            ):
+                col_idx = soft_concepts_df.columns.get_loc(concept_name) + n_hard
+                mask[:, col_idx] = 1
+                inter_concepts[:, col_idx] = new_value
+                found = True
+                print(
+                    f"Intervening on SOFT concept '{concept_name}' (index {col_idx}) -> {new_value}"
+                )
+
+            if not found:
+                raise ValueError(
+                    f"Warning: Concept '{concept_name}' not found in provided keys. Ignoring."
+                )
+
+        # --- Run intervention on the model ---
+        device = "cuda"
+        with torch.no_grad():
+            inter_preds_dict = self.model.intervene(
+                x_intervene_on.to(device),
+                mask=mask.to(device),
+                concepts=inter_concepts.to(device),
+            )
+        inter_preds = inter_preds_dict["x_pred"].cpu().numpy()
+
+        # --- Create prediction AnnData object ---
+        pred_adata = adata_inter.copy()
+
+        pred_adata.obs["ident"] = "intervened"
+
+        if self.obsm_key != "X":
+            pred_adata.X = np.zeros_like(pred_adata.X)
+            pred_adata.obsm[self.obsm_key] = inter_preds
+        else:
+            pred_adata.X = inter_preds
 
         return pred_adata

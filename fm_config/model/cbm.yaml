@@ -15,6 +15,6 @@ cbm_config:
   n_unknown: 128
   min_bottleneck_size: 128
   #independent_training: True
-  concepts_hp: 0.01
+  concepts_hp: 0.1
   orthogonality_hp: 0.5
   use_soft_concepts: False

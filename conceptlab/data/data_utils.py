@@ -13,24 +13,15 @@ def split_data_for_counterfactuals(
     print("Splitting data for counterfactual experiment...")
 
     labels = adata.obs[label_variable]
-    is_test = labels == hold_out_label
-    is_inter_pool = labels == mod_label
 
-    if (
-        subsample_control_int
-    ):  # only train on a subset of the control group to be intervened on
-        # Create a random mask to select a subset for intervention
-        inter_mask = np.random.binomial(
-            1, p=p_intervention, size=is_inter_pool.sum()
-        ).astype(bool)
-        is_inter = np.zeros_like(labels, dtype=bool)
-        is_inter[is_inter_pool] = inter_mask
+    if not isinstance(hold_out_label, list):
+        hold_out_label = [hold_out_label]
+    if not isinstance(mod_label, list):
+        mod_label = [mod_label]
 
-        is_train = ~is_test & ~is_inter
-
-    else:  # training and inference on the whole control group to intervene upon
-        is_inter = labels == mod_label
-        is_train = ~is_test
+    is_test = np.isin(labels, hold_out_label)
+    is_inter = np.isin(labels, mod_label)
+    is_train = ~is_test
 
     # Create AnnData objects for each split
     adata_train = adata[is_train].copy()

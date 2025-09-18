@@ -3,7 +3,6 @@ import scanpy as sc
 import scvi
 import hydra
 import numpy as np
-from conceptlab.data.dataset import normalize_sc_data
 
 class scGEN:
     def __init__(self, 
@@ -62,13 +61,13 @@ class scGEN:
                 early_stopping=True,
                 early_stopping_patience=25,
                 accelerator="auto",
+                plan_kwargs={"lr": self.lr},
             )
-
         return
 
 
 
-    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip):
+    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip, values_to_set = None):
         
         assert concepts_to_flip == self.concepts_to_flip, f"concepts to flip in prediction {concepts_to_flip} should be the same as in training {self.concepts_to_flip}"
         
@@ -90,13 +89,9 @@ class scGEN:
         stim_key = adata_inter_.obs["concepts_flipped"].unique()[0]
         celltype_to_predict = adata_inter_.obs[self.concepts_as_cov].unique()[0]
 
-        pred, delta = self.model.predict(ctrl_key=ctrl_key, 
-            stim_key=stim_key, 
-            #celltype_to_predict=celltype_to_predict,
-            adata_to_predict = adata_inter_)
+        pred, delta = self.model.predict(ctrl_key=ctrl_key, stim_key=stim_key, adata_to_predict = adata_inter_)
 
         #pred_, delta_ = self.model.predict(ctrl_key=ctrl_key, stim_key=stim_key, celltype_to_predict=celltype_to_predict)#adata_to_predict = adata_inter_)
-        
         pred_adata = adata_inter_.copy()
         pred_adata.X = np.clip(pred.X, a_min = 0, a_max = np.inf)
         sc.pp.log1p(pred_adata) # because scvi outputs raw counts

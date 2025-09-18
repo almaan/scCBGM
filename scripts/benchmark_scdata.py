@@ -29,6 +29,7 @@ def main(cfg: DictConfig):
         adata_inter.copy(),
         hold_out_label=dataset.hold_out_label,
         concepts_to_flip=dataset.concepts_to_flip,
+        values_to_set=dataset.values_to_set,
     )
 
     if cfg.model.obsm_key == "X_pca":
