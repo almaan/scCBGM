@@ -77,7 +77,6 @@ class InterventionDataset:
             sc.pp.normalize_total(adata, target_sum=target_sum)
             adata.layers["og"] = adata.X.copy()  # preserve counts (after normalization)
             sc.pp.log1p(adata)
-            # TODO: confirm
             sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, subset=use_hvg)
 
         if not isinstance(adata.X, np.ndarray):
