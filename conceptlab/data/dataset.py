@@ -9,15 +9,6 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 
-def normalize_sc_data(adata, target_sum, variable_genes=True):
-    # target_sum = np.median(adata.X.sum(axis=1)) if isinstance(adata.X, np.ndarray) else np.median(adata.X.toarray().sum(axis=1))
-    sc.pp.normalize_total(adata, target_sum=target_sum)
-    sc.pp.log1p(adata)
-    if variable_genes:
-        sc.pp.highly_variable_genes(adata, n_top_genes=3000, subset=True)
-    return adata
-
-
 class InterventionDataset:
     def __init__(
         self,
@@ -31,6 +22,7 @@ class InterventionDataset:
         align_on: str | None = None,
         use_hvg: bool = True,
         n_top_genes: int = 3000,
+        **kwargs,
     ):
         """
         Loads and preprocesses single cell data
@@ -59,6 +51,9 @@ class InterventionDataset:
         self.control_reference = (
             intervention_labels.reference
         )  # The value of controls in the concepts to flip
+        self.values_to_set = (
+            intervention_labels.values_to_set
+        )  # The values to set for the concepts to flip
 
         self.label_variable = intervention_labels.label_variable
         self.mmd_label = mmd_label
@@ -77,7 +72,6 @@ class InterventionDataset:
             sc.pp.normalize_total(adata, target_sum=target_sum)
             adata.layers["og"] = adata.X.copy()  # preserve counts (after normalization)
             sc.pp.log1p(adata)
-            # TODO: confirm
             sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, subset=use_hvg)
 
         if not isinstance(adata.X, np.ndarray):

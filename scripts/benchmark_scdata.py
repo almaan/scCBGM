@@ -5,6 +5,7 @@ import wandb
 import omegaconf
 from conceptlab.utils import helpers
 import numpy as np
+from conceptlab.datagen import modify
 
 
 @hydra.main(config_path="../fm_config/", config_name="general.yaml")
@@ -30,6 +31,7 @@ def main(cfg: DictConfig):
         adata_inter.copy(),
         hold_out_label=dataset.hold_out_label,
         concepts_to_flip=dataset.concepts_to_flip,
+        values_to_set=dataset.values_to_set,
     )
 
     if cfg.model.obsm_key == "X_pca":

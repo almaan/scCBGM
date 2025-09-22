@@ -1,5 +1,0 @@
-# @package intervention_labels
-hold_out_label: 'NK_cell_IL15'
-mod_label: 'NK_cell_PBS'
-concepts_to_flip: ["PBS","IL15"] #concepts that should be flipped in the intervention prediction
-reference: [1,0] # reference for the concepts to flip

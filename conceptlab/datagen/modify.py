@@ -170,7 +170,7 @@ def add_noise(
 def add_duplicate(
     dataset: xr.Dataset | None = None,
     concepts: np.ndarray | None = None,
-    n_mod: PositiveInt = 1,
+    n_mod: PositiveInt | PositiveFloat = 1,
     n_replica: PositiveInt = 1,
     **kwargs,
 ):
@@ -180,15 +180,11 @@ def add_duplicate(
 
     indicator = _get_indicator(n_concepts)
     if n_mod == 0:
-        return concepts
-    elif n_mod == 0:
         return concepts, indicator
     elif n_mod < 1:
         n_mod = _get_fraction(n_concepts, n_mod)
     elif n_mod > n_concepts:
         ValueError("Can't duplicate more concepts than number of concepts in data")
-
-    _get_num(n_concepts, n_mod)
 
     dup_idx = np.random.choice(n_concepts, replace=False, size=n_mod)
 

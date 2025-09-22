@@ -5,6 +5,7 @@ from conceptlab.utils.types import NonNegativeFloat
 from typing import Tuple, List
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -446,6 +447,7 @@ def predefined_adata_train_test_split(
     if drop_label is not None:
         drop_idx = labels == drop_label
         adata = adata[~drop_idx].copy()
+        print("Dropping {} cells".format(sum(drop_idx)))
         labels = adata.obs[split_col].values
 
     is_test = labels == test_label
@@ -566,15 +568,19 @@ def find_matching_target(on_concepts, off_concepts, target_concepts):
     return filtered_observations
 
 
-def _normalize_counts(x: np.ndarray, total_sum: int = 1e4) -> np.ndarray:
+def _normalize_counts(x: np.ndarray, total_sum: int) -> np.ndarray:
     if isinstance(x, pd.DataFrame):
         x = x.values
+
     x = x.astype(np.float32)
     # Avoid division by zero for rows with all zeros
     row_sums = np.sum(x, axis=1, keepdims=True)
     safe_row_sums = np.where(row_sums == 0, 1, row_sums)
+
     x = x / safe_row_sums * total_sum
+
     x = np.log1p(x)
+
     return x
 
 

@@ -1,9 +1,0 @@
-# @package dataset.ivn
-split_col: 'intervention_$NUM'
-hold_out_label: 'hold_out'
-ivn_label: 'modify'
-drop_label: 'drop'
-target_concept: "target_concept"
-concept_key: "intervention_$NUM_concept"
-reference_value: 0
-align_on: 'original_index'

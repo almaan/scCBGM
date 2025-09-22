@@ -1,0 +1,5 @@
+# @package dataset
+
+
+dataset_path: "/gstore/data/resbioai/andera29/cbm/conceptlab/data_local/synth_data/synthetic_1.h5ad"
+normalize: True

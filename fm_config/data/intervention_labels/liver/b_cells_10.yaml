@@ -1,0 +1,7 @@
+# @package intervention_labels
+label_variable: L2_dose # variable to select the train/inter/test groups
+hold_out_label: 'B cell_10.0' # labels to hold out for testing
+mod_label: 'B cell_1.0'
+concepts_to_flip: ["dose"]
+reference: [1.0] # reference for the concepts to flip
+values_to_set: [10.0] # values to set for the concepts to flip

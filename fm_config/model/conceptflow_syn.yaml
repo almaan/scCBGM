@@ -1,0 +1,21 @@
+_target_: conceptlab.models.cb_fm.ConceptFlow_MetaTrainer
+num_epochs: 200
+batch_size: 128
+lr: 5e-4
+raw: False
+concept_key: ${data.concept_key}
+num_workers: 4
+obsm_key: 'X'
+z_score: False
+mod_cfg:
+  hidden_dim: 128
+  latent_dim: 128
+  n_unknown: 128
+  n_layers: 2
+  dropout: 0.1
+  p_uncond: 0.
+  unknown_activation: "relu"
+  kl_hp: 0.1
+  concepts_hp: 0.1
+  othogonality_hp: 0.1
+  flow_hp: 1.0

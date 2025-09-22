@@ -22,26 +22,6 @@ import wandb
 from scipy.stats import spearmanr, pearsonr
 
 
-class DistributionShift(EvaluationClass):
-    """
-    A class to evaluate distribution shifts between two datasets by comparing
-    their statistical properties and concept distributions.
-
-    Inherits from:
-        EvaluationClass: A base class that provides common evaluation utilities.
-    """
-
-    def __init__(
-        self,
-    ):
-        super().__init__()
-
-    @classmethod
-    def _score_fun(cls, X_new, X_old):
-        d_values = pd.Series(cohens_d(X_new.values, X_old.values), index=X_new.columns)
-        return d_values
-
-
 def eval_intervention(
     model,
     cfg,
@@ -65,7 +45,11 @@ def eval_intervention(
         mask = np.zeros_like(c_ivn)
         mask[:, concept_ix] = 1
 
+    print("og")
+    print(c_flip)
     c_flip[:, concept_ix] = 1 - reference_value
+    print("given")
+    print(c_flip)
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     model = model.to(device)

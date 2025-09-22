@@ -1,5 +1,5 @@
 mod: "duplicate"
 
 params:
-  n_mod: 1
+  n_mod: 1.0
   n_replica: 1

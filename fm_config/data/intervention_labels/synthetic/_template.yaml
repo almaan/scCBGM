@@ -6,3 +6,4 @@ drop_label: 'drop'
 concepts_to_flip: ["target_concept"]
 concept_key: "intervention_$NUM_concept"
 reference: [0] # reference for the concepts to flip
+values_to_set: [1]

@@ -1,7 +1,7 @@
 _target_: conceptlab.models.scgen.scGEN
 concept_key: ${data.concept_key}
 concepts_to_flip: ${data.intervention_labels.concepts_to_flip}
-concepts_as_cov: L1
+concepts_as_cov: ${data.concepts_as_cov}
 concepts_to_flip_ref: ${data.intervention_labels.reference}
 max_epochs: 100
 num_workers: 4

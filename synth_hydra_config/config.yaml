@@ -1,10 +1,11 @@
 defaults:
-  - _self_
-  - dataset: default.yaml
+  - dataset: synthetic_1.yaml
+  - intervention: synthetic/intervention_0
   - constants: default.yaml
   - model: vae.yaml
   - modify: default.yaml
   - experiment: null
+  - _self_
 
 
 wandb:

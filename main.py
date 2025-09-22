@@ -60,7 +60,7 @@ def main(
 
     set_seed(cfg.constants.seed)
     original_path = get_original_cwd()
-    checkpoint_dir = osp.join(original_path, cfg.constants.checkpoint_dir)
+    osp.join(original_path, cfg.constants.checkpoint_dir)
     normalize = cfg.dataset.get("normalize", True)
     concept_key = cfg.dataset.get("concept_key", "concepts")
     data_dir = osp.join(original_path, cfg.constants.data_path)
@@ -79,23 +79,30 @@ def main(
     if normalize:
         helpers.normalize_counts(adata)
 
-    concept_key = cfg.dataset.ivn.concept_key
+    concept_key = cfg.intervention.concept_key
+    logger.info("using concept key: {}".format(concept_key))
     concepts = adata.obsm[concept_key].copy()
 
     mod = cfg.modify.mod
-    mod_fun = MODS[mod]
-    mod_prms = cfg.modify.params
-    concepts, indicator = mod_fun(concepts=concepts, **mod_prms)
+    if mod != "identity":
+        mod_fun = MODS[mod]
+        mod_prms = cfg.modify.params
+        logger.info("Modification: {}".format(mod))
+        logger.info("Modification Parameters: {}".format(mod_prms))
 
-    adata.obsm[concept_key] = concepts
-    adata.uns["concept_indicator"] = indicator
+        target_concept_values = concepts[cfg.intervention.target_concept].copy()
+        concepts.drop(columns=cfg.intervention.target_concept, inplace=True)
+
+        concepts, _ = mod_fun(concepts=concepts, **mod_prms)
+        concepts[cfg.intervention.target_concept] = target_concept_values
+        adata.obsm[concept_key] = concepts
 
     adata_train, adata_ivn, adata_test = helpers.predefined_adata_train_test_split(
         adata,
-        split_col=cfg.dataset.ivn.split_col,
-        test_label=cfg.dataset.ivn.hold_out_label,
-        ivn_label=cfg.dataset.ivn.ivn_label,
-        drop_label=cfg.dataset.ivn.get("drop_label"),
+        split_col=cfg.intervention.split_col,
+        test_label=cfg.intervention.hold_out_label,
+        ivn_label=cfg.intervention.ivn_label,
+        drop_label=cfg.intervention.get("drop_label"),
     )
 
     del adata
@@ -105,6 +112,7 @@ def main(
     n_obs, n_vars = adata_train.shape
     n_concepts = adata_train.obsm[concept_key].shape[1]
     print(adata_train)
+    print(adata_train.obsm[concept_key])
 
     cfg.model.input_dim = n_vars
     cfg.model.n_concepts = n_concepts
@@ -124,36 +132,6 @@ def main(
 
     callbacks = []
 
-    if cfg.save_checkpoints:
-        if not osp.isdir(checkpoint_dir):
-            logger.info(f"Creating checkpoint directory >>> {checkpoint_dir}")
-            os.makedirs(checkpoint_dir)
-        else:
-            logger.info(f"Checkpoints are saved to >>> {checkpoint_dir}")
-
-        checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            dirpath=checkpoint_dir,
-            filename=cfg.wandb.experiment,
-            save_top_k=1,
-            verbose=True,
-            monitor="val_Total_loss",
-            mode="min",
-            every_n_epochs=10,
-        )
-
-        callbacks.append(checkpoint_callback)
-
-    if cfg.model.get("early_stopping", False):
-        logger.info("Using Early Stopping")
-        early_stop_callback = pl.callbacks.EarlyStopping(
-            monitor="val_concept_loss",
-            min_delta=0.00,
-            patience=10,
-            verbose=False,
-            mode="min",
-        )
-        callbacks.append(early_stop_callback)
-
     callbacks = callbacks if len(callbacks) > 0 else None
     cfg.trainer.max_epochs
     logger.info("Model>>")
@@ -165,6 +143,7 @@ def main(
     align_on = cfg.dataset.get("align_on", None)
 
     if align_on is not None:
+        print("Aligning on {}".format(align_on))
         ivn_ix = adata_ivn.obs[align_on].values
         test_ix = adata_test.obs[align_on].values
 
@@ -179,11 +158,10 @@ def main(
     x_train = adata_train.X.astype(np.float32).copy()
 
     c_ivn = adata_ivn.obsm[concept_key].values.copy().astype(np.float32)
-    adata_test.obsm[concept_key].values.copy().astype(np.float32)
+    c_test = adata_test.obsm[concept_key].values.copy().astype(np.float32)
     c_train = adata_train.obsm[concept_key].values.copy().astype(np.float32)
 
-    print(x_train.shape)
-    print(c_train.shape)
+    print(c_test)
 
     model.train_loop(
         data=helpers._to_tensor(x_train),
@@ -212,8 +190,9 @@ def main(
     wandb.log({"corr_reconstructed": corr_rec})
 
     if model.has_concepts and cfg.test_intervention:
+
         concept_ix = np.argmax(
-            adata_ivn.obsm[concept_key].values == cfg.dataset.ivn.target_concept
+            adata_ivn.obsm[concept_key].columns == cfg.intervention.target_concept
         )
 
         x_test_pred = clab.evaluation.interventions.eval_intervention(
@@ -222,7 +201,7 @@ def main(
             c_ivn=c_ivn,
             x_ivn=x_ivn,
             concept_ix=concept_ix,
-            reference_value=cfg.dataset.ivn.reference_value,
+            reference_value=cfg.intervention.reference_value,
         )
         mse_ivn = gen.mse_loss(x_test, x_test_pred)
         cosine_sim_ivn = gen.cosine_similarity(x_test, x_test_pred)

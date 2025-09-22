@@ -73,7 +73,7 @@ def main():
         )
         is_on = C[concept_name].values == args.reference_value
 
-        if zero_shot_data:
+        if args.zero_shot_data:
             is_ct = U["cell_type"].values == ct_name
             # cells that are ct and concept on - we will drop these
             drop_ix = np.where(is_ct & (is_on))[0]

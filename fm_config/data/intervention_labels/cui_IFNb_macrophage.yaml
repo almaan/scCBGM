@@ -1,5 +1,0 @@
-# @package intervention_labels
-hold_out_label: 'Macrophage_IFNb'
-mod_label: 'Macrophage_PBS'
-concepts_to_flip: ["PBS","IFNb"] #concepts that should be flipped in the intervention prediction
-reference: [1,0] # reference for the concepts to flip

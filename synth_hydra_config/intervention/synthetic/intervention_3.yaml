@@ -1,0 +1,9 @@
+# @package intervention
+split_col: 'intervention_3'
+hold_out_label: 'hold_out'
+ivn_label: 'modify'
+drop_label: 'drop'
+target_concept: "target_concept"
+concept_key: "intervention_3_concept"
+reference_value: 0
+align_on: 'original_index'

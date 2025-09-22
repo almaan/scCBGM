@@ -4,14 +4,14 @@ input_dim: null
 n_concepts: null
 
 has_cbm: True
-lr: 5e-4
-n_layers: 2
-hidden_dim: 256
-beta: 1e-05
-latent_dim: 128
 n_unknown: 128
+lr: 5e-4
+beta: 1e-4
+n_layers: 2
+concepts_hp: 0.05
+hidden_dim: 128
 min_bottleneck_size: 128
-# independent_training: True
-concepts_hp: 0.005
-orthogonality_hp: 0.2
+latent_dim: 128
+orthogonality_hp: 0.5
+decoder_type: 'skip'
 use_soft_concepts: False

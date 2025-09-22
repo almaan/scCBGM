@@ -3,9 +3,9 @@ program: benchmark_scdata.py
 method: grid
 parameters:
   data:
-    value: synthetic_1
+    values: [synthetic_1, synthetic_2, synthetic_3]
   model:
-    value: sccbm
+    value: cbm_syn
   seed:
     values: [13,42,1337,69]
   data/intervention_labels:

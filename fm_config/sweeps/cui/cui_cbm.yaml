@@ -1,0 +1,28 @@
+name: CBM_Cui
+program: benchmark_scdata.py
+method: grid
+parameters:
+  model:
+    value: cbm
+  seed:
+    values: [13,42,1337,69]
+  data:
+    value: cui
+  data/intervention_labels:
+    values:
+    - cui/cd4
+    - cui/cd8
+    - cui/Tcell_gd
+    - cui/nk
+    - cui/macrophage
+    - cui/cdc2
+    - cui/langerhans
+  model.cbm_config.concepts_hp:
+    value: 0.1
+command:
+  - uv
+  - run
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.project=conceptlab
