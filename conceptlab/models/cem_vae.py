@@ -122,8 +122,6 @@ class CEM_VAE(BaseCBVAE):
 
         self.use_concept_loss = config.get("use_concept_loss", True)
 
-        # self.save_hyperparameters()
-
     @property
     def has_concepts(
         self,
@@ -337,13 +335,11 @@ class CEM_VAE(BaseCBVAE):
         print(f"Starting training on {device} for {num_epochs} epochs...")
 
         self.train()  # Set the model to training mode
-
         # --- 2. The Training Loop ---
         pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=150)
 
         for epoch in pbar:
             total_loss = 0.0
-
             # --- CHANGE: Initialize counters for F1 score calculation ---
             epoch_tp = 0.0
             epoch_fp = 0.0
@@ -372,7 +368,6 @@ class CEM_VAE(BaseCBVAE):
 
                 # Accumulate losses for logging
                 total_loss += loss.item()
-
                 # --- CHANGE: Calculate and accumulate TP, FP, FN for the batch ---
                 with torch.no_grad():
                     pred_concepts = out["pred_concept"]
@@ -448,7 +443,6 @@ class CEM_MetaTrainer:
 
     def train_loop(self, data_module, model):
         trainer = pl.Trainer(max_epochs=self.max_epochs)
-
         trainer.fit(model, data_module)
 
         model.eval()
@@ -463,8 +457,6 @@ class CEM_MetaTrainer:
             data_matrix = adata_train.obsm[self.obsm_key]
         else:
             data_matrix = adata_train.X
-            # if self.z_score:
-            #    data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization
 
         torch.set_flush_denormal(True)
 

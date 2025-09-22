@@ -111,7 +111,6 @@ class scGEN:
             ctrl_key=ctrl_key, stim_key=stim_key, adata_to_predict=adata_inter_
         )
 
-        # pred_, delta_ = self.model.predict(ctrl_key=ctrl_key, stim_key=stim_key, celltype_to_predict=celltype_to_predict)#adata_to_predict = adata_inter_)
         pred_adata = adata_inter_.copy()
         pred_adata.X = np.clip(pred.X, a_min=0, a_max=np.inf)
         sc.pp.log1p(pred_adata)  # because scvi outputs raw counts

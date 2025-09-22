@@ -145,7 +145,6 @@ class SkipDecoderBlock(nn.Module):
 
         self.concept_embedder = nn.Linear(self.n_concepts, hidden_dim)
         self.unknown_embedder = nn.Linear(self.n_unknown, hidden_dim)
-
         self.layers = nn.ModuleList(
             [SkipBlock(hidden_dim, hidden_dim, dropout) for _ in range(n_layers)]
         )
@@ -160,7 +159,6 @@ class SkipDecoderBlock(nn.Module):
             h = layer(h, c)
 
         h = self.output_later(h)
-
         return dict(x_pred=h)
 
 
@@ -215,74 +213,6 @@ class ConditionalDecoderBlock(DefaultDecoderBlock):
         h = self.decoder_layers(h0)
 
         return dict(x_pred=h)
-
-
-# class SkipLayer(nn.Module):
-#     def __init__(self, input_dim, hidden_dim, dropout_p=0.0, is_last_layer=False):
-#         super(SkipLayer, self).__init__()
-#         self.fc = nn.Linear(input_dim, hidden_dim)
-#         self.dropout = nn.Dropout(p=dropout_p)
-#         self.is_last_layer = is_last_layer
-
-#     def forward(self, inputs):
-#         h, c = inputs
-#         x = t.cat((h, c), dim=-1)
-#         x = self.fc(x)
-#         if not self.is_last_layer:
-#             x = F.relu(x)
-#             x = self.dropout(x)
-#         return x, c
-
-
-# class SkipDecoderBlock(nn.Module):
-#     def __init__(
-#         self,
-#         input_dim: int,
-#         n_unknown: int,
-#         hidden_dim: int,
-#         dropout: float = 0.0,
-#         n_concepts: int = 0,
-#         **kwargs,
-#     ):
-#         super().__init__()
-
-#         self.input_dim = input_dim
-#         self.hidden_dim = (
-#             hidden_dim if isinstance(hidden_dim, (list, tuple)) else [hidden_dim]
-#         )
-#         self.n_concepts = n_concepts
-#         self.n_unknown = n_unknown
-#         self.dropout = dropout
-
-#         layers = []
-#         layers_dim = [self.n_concepts + self.n_unknown] + self.hidden_dim
-
-#         for k in range(0, len(layers_dim) - 1):
-
-#             layers.append(
-#                 SkipLayer(
-#                     layers_dim[k],
-#                     layers_dim[k + 1],
-#                     self.dropout,
-#                     is_last_layer=False,
-#                 )
-#             )
-
-#         layers.append(
-#             SkipLayer(
-#                 self.hidden_dim[-1] + self.n_concepts,
-#                 self.input_dim,
-#                 is_last_layer=True,
-#             )
-#         )
-
-#         if len(self.hidden_dim) == 1 and (self.hidden_dim[0] == self.input_dim):
-#             layers.append(nn.ReLU())
-#         self.decoder_layers = nn.Sequential(*layers)
-
-#     def forward(self, input_concept, unknown, **kwargs):
-#         h, _ = self.decoder_layers((unknown, input_concept))
-#         return dict(x_pred=h)
 
 
 class FourierEmbedding(nn.Module):

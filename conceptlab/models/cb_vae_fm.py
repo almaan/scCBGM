@@ -246,7 +246,6 @@ class CB_VAE_FM(BaseCBVAE):
                     pred_concepts = out["pred_concept"]
                     predicted_labels = (pred_concepts > 0.5).float()
                     true_labels = concepts_batch
-
                     # True Positives: predicted is 1 and true is 1
                     epoch_tp += (predicted_labels * true_labels).sum().item()
                     # False Positives: predicted is 1 and true is 0
