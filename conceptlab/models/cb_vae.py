@@ -364,13 +364,18 @@ class CB_VAE(BaseCBVAE):
 
 
 class scCBGM(CB_VAE):
-    def __init__(self, config, decoder_type="skip", **kwargs):
-        if decoder_type == "skip":
-            print("Using Skip Decoder")
-            decoder = SkipDecoderBlock
-        else:
-            print("Using Residual Decoder")
-            decoder = DecoderBlock
+    def __init__(self, config, **kwargs):
+        decoder_type = config.get("decoder_type", "skip")
+        match decoder_type:
+            case "skip":
+                print("Using Skip Decoder")
+                decoder = SkipDecoderBlock
+            case "residual":
+                print("Using Residual Decoder")
+                decoder = DecoderBlock
+            case _:
+                raise ValueError(f"Unknown decoder type: {decoder_type}")
+
         super().__init__(config, _decoder=decoder, **kwargs)
 
     def decode(self, input_concept, unknown, **kwargs):

@@ -5,25 +5,23 @@ metric:
   name: test_avg_concept_acc
 parameters:
   constants.seed:
-    values: [13,42,1337,69]
+    values: [13,1337]
   model:
     value: cem_vae
-  model.independent_training:
-    value: True
   modify:
     values: [default, add, noise, drop, duplicate]
-  dataset.n_concepts:
-    values: [8,25,50,75]
-  dataset.use_concept_dependency:
-    value: False
-  model.n_decoder_layers:
-    value: 2
-  model.scale_concept:
-    value: False
-  model.use_gaussian_mixture_KL:
-    value: False
   modify.params.n_mod:
-    values: [0.1, 0.5, 0.9]
+    values: [1.0, 3.0]
+  dataset:
+    values: [synthetic_1,synthetic_2,synthetic_3]
+  intervention:
+    values:
+      - synthetic/intervention_0
+      - synthetic/intervention_1
+      - synthetic/intervention_2
+      - synthetic/intervention_3
+      - synthetic/intervention_4
+
 
 command:
   - ${env}

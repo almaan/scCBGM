@@ -5,4 +5,3 @@ mod_label: 'T_cell_gd_PBS'
 concepts_to_flip: ["PBS","IL17E"]
 reference: [1,0] # reference for the concepts to flip
 values_to_set: [0,1] # values to set for the concepts to flip
-

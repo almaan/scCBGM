@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader, Dataset, random_split, Subset
 import torch as t
 import numpy as np
 import pandas as pd
+from conceptlab.utils import helpers
 
 import xarray as xr
 
@@ -56,7 +57,7 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         batch_size: int = 32,
         val_split: float = 0.2,
         layer: str | None = None,
-        obsm_key: str | None = None, # <-- Added parameter
+        obsm_key: str | None = None,  # <-- Added parameter
         add_concepts: bool = False,
         concept_key: str = "concepts",
         normalize: bool = True,
@@ -86,7 +87,9 @@ class GeneExpressionDataModule(pl.LightningDataModule):
             # --- MODIFICATION END ---
 
             if self.add_concepts:
-                self.concepts = pd.DataFrame(data.obsm[concept_key], index=data.obs.index)
+                self.concepts = pd.DataFrame(
+                    data.obsm[concept_key], index=data.obs.index
+                )
         elif isinstance(data, pd.DataFrame):
             self.data = data.copy()
         else:
@@ -100,12 +103,11 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         if normalize:
             print("Applying log(1+CPM) normalization...")
             X = self.data.values.astype(np.float32)
-            # Avoid division by zero for rows with all zeros
-            row_sums = np.sum(X, axis=1, keepdims=True)
-            safe_row_sums = np.where(row_sums == 0, 1, row_sums)
-            X = X / safe_row_sums * 1e4
-            X = np.log1p(X)
-            self.data = pd.DataFrame(X, index=self.data.index, columns=self.data.columns)
+            X = helpers.normalize_counts(X)
+
+            self.data = pd.DataFrame(
+                X, index=self.data.index, columns=self.data.columns
+            )
 
         self.batch_size = batch_size
         self.val_split = val_split
@@ -121,7 +123,12 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         )
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+        )
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size)

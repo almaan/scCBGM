@@ -10,4 +10,4 @@ single_cell_preproc: true
 target_sum: null # target sum for normalization (target_sum = np.median(adata.X.sum(axis=1)) if isinstance(adata.X, np.ndarray) else np.median(adata.X.toarray().sum(axis=1)))
 concepts_as_cov: cell_type_L1 # column that recapitulates the concepts \ intervention (for scGen)
 soft_concept_key: null
-hard_concept_key: concepts 
+hard_concept_key: concepts

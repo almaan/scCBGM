@@ -1,4 +1,4 @@
 mod: "add"
 params:
-    n_mod: 1
+    n_mod: 1.0
     p_active: 0.5

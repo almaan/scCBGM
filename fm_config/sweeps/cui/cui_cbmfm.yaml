@@ -9,7 +9,7 @@ parameters:
   data:
     value: cui
   data/intervention_labels:
-    values: 
+    values:
     - cui/cd4
     - cui/cd8
     - cui/Tcell_gd

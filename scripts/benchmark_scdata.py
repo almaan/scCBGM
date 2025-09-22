@@ -5,6 +5,7 @@ import wandb
 import omegaconf
 from conceptlab.utils import helpers
 import numpy as np
+from conceptlab.datagen import modify
 
 
 @hydra.main(config_path="../fm_config/", config_name="general.yaml")
@@ -25,6 +26,7 @@ def main(cfg: DictConfig):
     adata, adata_train, adata_test, adata_inter = dataset.get_anndatas()
 
     model.train(adata_train.copy())
+
     adata_preds = model.predict_intervention(
         adata_inter.copy(),
         hold_out_label=dataset.hold_out_label,

@@ -22,176 +22,47 @@ import wandb
 from scipy.stats import spearmanr, pearsonr
 
 
-class DistributionShift(EvaluationClass):
-    """
-    A class to evaluate distribution shifts between two datasets by comparing
-    their statistical properties and concept distributions.
-
-    Inherits from:
-        EvaluationClass: A base class that provides common evaluation utilities.
-    """
-
-    def __init__(
-        self,
-    ):
-        super().__init__()
-
-    @classmethod
-    def _score_fun(cls, X_new, X_old):
-        d_values = pd.Series(cohens_d(X_new.values, X_old.values), index=X_new.columns)
-        return d_values
-
-
 def eval_intervention(
-    intervention_type,
-    concept_name,
-    x_concepts,
-    x_true,
-    ix_og_concepts,
-    original_test_concepts,
-    true_data,
-    genetrated_data,
-    coefs,
-    concept_vars,
     model,
     cfg,
-    x_mean_concepts=None,
+    c_ivn,
+    x_ivn,
+    concept_ix,
+    reference_value=0,
 ):
 
-    mask = np.zeros_like(x_concepts.values)
-    mask[:, x_concepts.columns.get_loc(concept_name)] = 1
+    # in cbm: input_concept = pred_concepts * (1 - mask) + given_concepts * mask
 
-    if (not cfg.model.type == "CVAE") or (cfg.model.given_gt):
-        x_concepts_intervene = x_concepts.copy()
+    c_flip = c_ivn.copy()
+    mask = np.zeros_like(c_ivn)
 
-        if intervention_type == "On":
-            x_concepts_intervene.loc[:, concept_name] = 1
-            indices = np.where(x_concepts.loc[:, concept_name] == 0)[0]
-
-        else:
-            x_concepts_intervene.loc[:, concept_name] = 0
-            indices = np.where(x_concepts.loc[:, concept_name] == 1)[0]
-
+    given_gt = cfg.model.get("given_gt", False)
+    if given_gt:
+        # we only use the given concepts (mask all predicted)
+        mask = np.ones_like(c_ivn)
     else:
+        # we use all predicted concepts except the intervened
+        mask = np.zeros_like(c_ivn)
+        mask[:, concept_ix] = 1
 
-        x_concepts_intervene = x_mean_concepts.copy()
-
-        if intervention_type == "On":
-            x_concepts_intervene.loc[:, concept_name] = 1
-            indices = np.arange(x_concepts_intervene.shape[0])
-
-        else:
-            x_concepts_intervene.loc[:, concept_name] = 0
-            indices = np.arange(x_concepts_intervene.shape[0])
+    print("og")
+    print(c_flip)
+    c_flip[:, concept_ix] = 1 - reference_value
+    print("given")
+    print(c_flip)
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
 
-    if cfg.model.type == "CVAE":
+    x_pred = model.intervene(
+        x=helpers._to_tensor(x_ivn, device),
+        concepts=helpers._to_tensor(c_flip, device),
+        mask=helpers._to_tensor(mask, device),
+    )["x_pred"]
 
-        if cfg.model.given_gt:
+    x_pred = x_pred.detach().cpu().numpy()
 
-            x_pred_withIntervention = model.intervene(
-                helpers._to_tensor(x_true, device),
-                helpers._to_tensor(x_concepts, device),
-                helpers._to_tensor(x_concepts_intervene, device),
-                helpers._to_tensor(mask, device),
-            )["x_pred"]
-        else:
-
-            x_pred_withIntervention = model.intervene(
-                helpers._to_tensor(x_true, device),
-                helpers._to_tensor(x_mean_concepts, device),
-                helpers._to_tensor(x_concepts_intervene, device),
-                helpers._to_tensor(mask, device),
-            )["x_pred"]
-
-    else:
-
-        x_pred_withIntervention = model.intervene(
-            helpers._to_tensor(x_true, device),
-            helpers._to_tensor(x_concepts_intervene, device),
-            helpers._to_tensor(mask, device),
-        )["x_pred"]
-
-    x_pred_withIntervention = x_pred_withIntervention.detach().cpu().numpy()
-
-    genetrated_data_after_intervention = pd.DataFrame(
-        x_pred_withIntervention, columns=coefs.columns
-    )
-
-    # get subset
-    subset_genetrated_data_after_intervention = genetrated_data_after_intervention.iloc[
-        indices
-    ]
-    subset_genetrated_data = genetrated_data.iloc[indices]
-    subset_true_data = true_data.iloc[indices]
-
-    results = dict(values=[], data=[], coef_direction=[])
-
-    for data_name, data in zip(
-        ["perturbed", "genetrated", "original"],
-        [
-            subset_genetrated_data_after_intervention,
-            subset_genetrated_data,
-            subset_true_data,
-        ],
-    ):
-        for direction_name, genes in concept_vars.items():
-            ndata = data.loc[:, genes].copy()
-            ndata = ndata.mean(axis=1).values
-            results["values"] += ndata.tolist()
-            results["data"] += len(ndata) * [data_name]
-            results["coef_direction"] += len(ndata) * [direction_name]
-
-    results = pd.DataFrame(results)
-    # for visualization
-    results["data"] = pd.Categorical(
-        results["data"], ["perturbed", "genetrated", "original"]
-    )
-
-    concepts = x_concepts_intervene.iloc[:, ix_og_concepts]
-
-    # get subset
-    subset_original_test_concepts = original_test_concepts.iloc[indices]
-    subset_concepts = concepts.iloc[indices]
-
-    scores = DistributionShift.score(
-        X_old=subset_genetrated_data,
-        X_new=subset_genetrated_data_after_intervention,
-        concepts_old=subset_original_test_concepts,
-        concepts_new=subset_concepts,
-        concept_coefs=coefs,
-        use_neutral=False,
-        concept_names=concept_name,
-    )
-
-    return results, scores, genetrated_data_after_intervention
-
-
-def cohens_d(x, y):
-    """
-    Calculate Cohen's d for each column between two NxD arrays.
-    Args:
-    x: A numpy array of shape (N, D) representing the first group.
-    y: A numpy array of shape (N, D) representing the second group.
-
-    Returns:
-    A numpy array of Cohen's d values for each column.
-    """
-    # Means of each column for both groups
-    mean_x = np.mean(x, axis=0)
-    mean_y = np.mean(y, axis=0)
-
-    # Pooled standard deviation
-    pooled_std = np.sqrt(
-        ((np.std(x, axis=0, ddof=1) ** 2) + (np.std(y, axis=0, ddof=1) ** 2)) / 2
-    )
-
-    # Cohen's d calculation for each column
-    d_values = (mean_x - mean_y) / (pooled_std + 1e-8)
-
-    return d_values
+    return x_pred
 
 
 def compute_auroc(y_true, y_pred, plot=False):

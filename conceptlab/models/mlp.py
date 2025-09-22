@@ -4,11 +4,13 @@ import torch.nn as nn
 import math
 from typing import Optional
 
+
 class ConditionEmbedding(nn.Module):
     """
     A learnable embedding layer for the condition vector 'c'.
     This layer projects the condition vector into a higher-dimensional space.
     """
+
     def __init__(self, c_dim: int, emb_dim: int):
         """
         Initializes the condition embedding layer.
@@ -28,7 +30,7 @@ class ConditionEmbedding(nn.Module):
             torch.Tensor: The embedded condition vector, shape (batch_size, emb_dim).
         """
         c_emb = self.linear(c)
-        #c_emb = c_emb / c_emb.norm(dim=-1, keepdim=True)  # normalize to be on hypersphere
+        # c_emb = c_emb / c_emb.norm(dim=-1, keepdim=True)  # normalize to be on hypersphere
         return c_emb
 
 
@@ -37,6 +39,7 @@ class FourierEmbedding(nn.Module):
     Projects a scalar time value 't' into a higher-dimensional Fourier feature space.
     This allows the model to more easily understand the continuous nature of time.
     """
+
     def __init__(self, emb_dim: int):
         """
         Initializes the Fourier embedding layer.
@@ -46,12 +49,10 @@ class FourierEmbedding(nn.Module):
         super().__init__()
         if emb_dim % 2 != 0:
             raise ValueError(f"Embedding dimension must be even, but got {emb_dim}")
-        
+
         # A constant factor used in the Fourier feature calculation.
         # This is not a trainable parameter.
-        self.register_buffer(
-            "weights", torch.randn(emb_dim // 2) * 2 * math.pi
-        )
+        self.register_buffer("weights", torch.randn(emb_dim // 2) * 2 * math.pi)
 
     def forward(self, t: torch.Tensor) -> torch.Tensor:
         """
@@ -72,6 +73,7 @@ class MLPBlock(nn.Module):
     A single block of the MLP, consisting of a linear layer, normalization,
     activation, and dropout, with skip connections for the main data path.
     """
+
     def __init__(self, emb_dim: int, dropout: float = 0.1):
         """
         Initializes the MLP block.
@@ -87,8 +89,9 @@ class MLPBlock(nn.Module):
 
         nn.init.zeros_(self.linear.bias)
 
-
-    def forward(self, x: torch.Tensor, c_emb: torch.Tensor, t_emb: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, c_emb: torch.Tensor, t_emb: torch.Tensor
+    ) -> torch.Tensor:
         """
         Forward pass for the MLP block.
         Args:
@@ -112,7 +115,15 @@ class FlowDecoder(nn.Module):
     A fully-connected neural network with skip connections, designed for
     flow matching. It takes cell data, time, and an optional concept vector as input.
     """
-    def __init__(self, x_dim: int, c_dim: Optional[int], emb_dim: int, n_layers: int, dropout: float = 0.1):
+
+    def __init__(
+        self,
+        x_dim: int,
+        c_dim: Optional[int],
+        emb_dim: int,
+        n_layers: int,
+        dropout: float = 0.1,
+    ):
         """
         Initializes the MLP model.
         Args:
@@ -130,13 +141,13 @@ class FlowDecoder(nn.Module):
 
         # --- Initial Embedding Layers ---
         self.x_embedder = nn.Linear(x_dim, emb_dim)
-        
+
         # Only create a concept embedder if c_dim is provided and greater than 0
         if self.c_dim is not None and self.c_dim > 0:
             self.c_embedder = nn.Linear(self.c_dim, emb_dim)
         else:
             self.c_embedder = None
-        
+
         self.t_embedder = FourierEmbedding(emb_dim)
         self.t_mapper = nn.Sequential(
             nn.Linear(emb_dim, emb_dim),
@@ -151,10 +162,12 @@ class FlowDecoder(nn.Module):
 
         # --- Output Layer ---
         self.output_layer = nn.Linear(emb_dim, self.x_dim)
-        nn.init.xavier_uniform_(self.output_layer.weight, gain=0.1) 
+        nn.init.xavier_uniform_(self.output_layer.weight, gain=0.1)
         nn.init.zeros_(self.output_layer.bias)
 
-    def forward(self, x_t: torch.Tensor, t: torch.Tensor, c: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self, x_t: torch.Tensor, t: torch.Tensor, c: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         """
         The forward pass for the entire model.
         Args:
@@ -167,14 +180,14 @@ class FlowDecoder(nn.Module):
         """
         # 1. Embed all inputs
         x_emb = self.x_embedder(x_t)
-        
+
         # Embed concepts if the embedder exists and concepts are provided
         if self.c_embedder is not None and c is not None:
             c_emb = self.c_embedder(c)
         else:
             # Use a zero tensor if model is unconditional or no concepts are passed
             c_emb = torch.zeros(x_t.shape[0], self.emb_dim, device=x_t.device)
-        
+
         if t.dim() == 1:
             t = t.unsqueeze(-1)
         t_fourier_emb = self.t_embedder(t)
@@ -195,6 +208,7 @@ class FeedForwardBlock(nn.Module):
     A single block of the MLP, consisting of a linear layer, normalization,
     activation, and dropout, with skip connections for the main data path.
     """
+
     def __init__(self, emb_dim: int, dropout: float = 0.1):
         """
         Initializes the MLP block.
@@ -209,7 +223,7 @@ class FeedForwardBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         nn.init.zeros_(self.linear.bias)
-        
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass for the MLP block.
@@ -236,7 +250,7 @@ class DenseEncoder(nn.Module):
         latent_dim: int,
         dropout: float,
         n_layers: int = 4,
-        output_activation: 'str' = 'none',
+        output_activation: "str" = "none",
         **kwargs,
     ):
 
@@ -251,18 +265,21 @@ class DenseEncoder(nn.Module):
         self.x_embedder = nn.Linear(self.input_dim, self.hidden_dim)
 
         self.layers = nn.ModuleList(
-            [FeedForwardBlock(self.hidden_dim, self.dropout) for _ in range(self.n_layers)]
-        ) 
+            [
+                FeedForwardBlock(self.hidden_dim, self.dropout)
+                for _ in range(self.n_layers)
+            ]
+        )
 
         self.output_layer = nn.Linear(self.hidden_dim, self.latent_dim)
 
-        self.normalize_to_hypersphere = (output_activation == 'hypersphere')
-        if(output_activation == 'sigmoid'):
+        self.normalize_to_hypersphere = output_activation == "hypersphere"
+        if output_activation == "sigmoid":
             self.output_layer_activation = nn.Sigmoid()
-        elif(output_activation == 'relu'):
+        elif output_activation == "relu":
             self.output_layer_activation = nn.ReLU()
         else:
-            # The 'hypersphere' case will use nn.Identity() here, 
+            # The 'hypersphere' case will use nn.Identity() here,
             # as the normalization is a separate step.
             self.output_layer_activation = nn.Identity()
 
@@ -280,4 +297,3 @@ class DenseEncoder(nn.Module):
             z = F.normalize(z, p=2, dim=1)
 
         return z
-

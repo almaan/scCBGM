@@ -21,6 +21,7 @@ from omegaconf import OmegaConf
 import conceptlab as clab
 import anndata as ad
 
+
 class CEM_VAE(BaseCBVAE):
     def __init__(
         self,
@@ -120,8 +121,6 @@ class CEM_VAE(BaseCBVAE):
         self.use_concept_loss = config.get("use_concept_loss", True)
 
         self.use_concept_loss = config.get("use_concept_loss", True)
-
-        #self.save_hyperparameters()
 
     @property
     def has_concepts(
@@ -305,23 +304,29 @@ class CEM_VAE(BaseCBVAE):
                 "monitor": "val_loss",  # Optional: if you use reduce-on-plateau schedulers
             },
         }
-    def train_loop(self, data: torch.Tensor,
-               concepts: torch.Tensor,
-               num_epochs: int,
-               batch_size: int,
-               lr_gamma: float = 0.997,
-               num_workers:int = 0):
+
+    def train_loop(
+        self,
+        data: torch.Tensor,
+        concepts: torch.Tensor,
+        num_epochs: int,
+        batch_size: int,
+        lr_gamma: float = 0.997,
+        num_workers: int = 0,
+    ):
         """
         Defines the training loop for the CEM-VAE model.
         """
         # --- 1. Setup Device, DataLoader, Optimizer, Scheduler ---
-        torch.set_flush_denormal(True) # Add this to prevent slowdowns
-        
+        torch.set_flush_denormal(True)  # Add this to prevent slowdowns
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.to(device)
 
         dataset = TensorDataset(data, concepts)
-        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers = num_workers)
+        data_loader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        )
 
         lr = self.learning_rate
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
@@ -329,20 +334,18 @@ class CEM_VAE(BaseCBVAE):
 
         print(f"Starting training on {device} for {num_epochs} epochs...")
 
-        self.train() # Set the model to training mode
-        
+        self.train()  # Set the model to training mode
         # --- 2. The Training Loop ---
         pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=150)
 
         for epoch in pbar:
             total_loss = 0.0
-            
             # --- CHANGE: Initialize counters for F1 score calculation ---
             epoch_tp = 0.0
             epoch_fp = 0.0
             epoch_fn = 0.0
             # --- End of Change ---
-            
+
             for x_batch, concepts_batch in data_loader:
                 # Move batch to the correct device
                 x_batch = x_batch.to(device)
@@ -365,13 +368,12 @@ class CEM_VAE(BaseCBVAE):
 
                 # Accumulate losses for logging
                 total_loss += loss.item()
-                
                 # --- CHANGE: Calculate and accumulate TP, FP, FN for the batch ---
                 with torch.no_grad():
                     pred_concepts = out["pred_concept"]
                     predicted_labels = (pred_concepts > 0.5).float()
                     true_labels = concepts_batch
-                    
+
                     # True Positives: predicted is 1 and true is 1
                     epoch_tp += (predicted_labels * true_labels).sum().item()
                     # False Positives: predicted is 1 and true is 0
@@ -380,47 +382,48 @@ class CEM_VAE(BaseCBVAE):
                     epoch_fn += ((1 - predicted_labels) * true_labels).sum().item()
                 # --- End of Change ---
 
-           # --- End of Epoch ---
+            # --- End of Epoch ---
             avg_loss = total_loss / len(data_loader)
-             
+
             # --- CHANGE: Calculate epoch-level F1 score and update progress bar ---
-            epsilon = 1e-7 # To avoid division by zero
+            epsilon = 1e-7  # To avoid division by zero
             precision = epoch_tp / (epoch_tp + epoch_fp + epsilon)
             recall = epoch_tp / (epoch_tp + epoch_fn + epsilon)
             f1_score = 2 * (precision * recall) / (precision + recall + epsilon)
 
-            pbar.set_postfix({
-                "avg_loss": f"{avg_loss:.3e}",
-                "concept_f1": f"{f1_score:.4f}", # Display F1 score
-                "lr": f"{scheduler.get_last_lr()[0]:.5e}"
-            })
+            pbar.set_postfix(
+                {
+                    "avg_loss": f"{avg_loss:.3e}",
+                    "concept_f1": f"{f1_score:.4f}",  # Display F1 score
+                    "lr": f"{scheduler.get_last_lr()[0]:.5e}",
+                }
+            )
             # --- End of Change ---
-             
+
             scheduler.step()
-             
 
         print("Training finished.")
-        self.eval() # Set the model to evaluation mode
-    
+        self.eval()  # Set the model to evaluation mode
+
 
 class CEM_MetaTrainer:
-
-    def __init__(self,
-                 cbm_config,
-                 max_epochs,
-                 log_every_n_steps,
-                concept_key,
-                num_workers,
-                batch_size,
-                obsm_key:str = "X",
-                z_score:bool = False
-            ):
+    def __init__(
+        self,
+        cbm_config,
+        max_epochs,
+        log_every_n_steps,
+        concept_key,
+        num_workers,
+        batch_size,
+        obsm_key: str = "X",
+        z_score: bool = False,
+    ):
         """
         Class to train and predict interventions with a scCBMG model
         Inputs:
         - cbm_config: config for the model
         - max_epochs: max number of epochs to train for
-        - log_every_n_steps: 
+        - log_every_n_steps:
         - concept_key: Key in adata.obsm where the concept vectors are stored
         - num_workers: num workers in the dataloaders
         - obsm_key where to apply the method on (obsm) - "X" or "X_pca"
@@ -437,17 +440,14 @@ class CEM_MetaTrainer:
 
         self.obsm_key = obsm_key
         self.z_score = z_score
-        
-    def train_loop(self, data_module, model):    
-        trainer = pl.Trainer(
-            max_epochs=self.max_epochs
-            )
 
+    def train_loop(self, data_module, model):
+        trainer = pl.Trainer(max_epochs=self.max_epochs)
         trainer.fit(model, data_module)
 
         model.eval()
         return model
-    
+
     def train(self, adata_train):
 
         """Trains and returns the scCBGM model."""
@@ -457,71 +457,92 @@ class CEM_MetaTrainer:
             data_matrix = adata_train.obsm[self.obsm_key]
         else:
             data_matrix = adata_train.X
-            #if self.z_score:
-            #    data_matrix = (data_matrix - adata_train.var['mean'].to_numpy()[None, :]) / adata_train.var['std'].to_numpy()[None, :]  # Z-score normalization       
- 
+
         torch.set_flush_denormal(True)
 
-        config = OmegaConf.create(dict(
-            input_dim=data_matrix.shape[1], 
-            n_concepts=adata_train.obsm[self.concept_key].shape[1],
-        ))
+        config = OmegaConf.create(
+            dict(
+                input_dim=data_matrix.shape[1],
+                n_concepts=adata_train.obsm[self.concept_key].shape[1],
+            )
+        )
         merged_config = OmegaConf.merge(config, self.cbm_config)
-        
+
         model = clab.models.CEM_VAE(merged_config)
 
         model.train_loop(
             data=torch.from_numpy(data_matrix.astype(np.float32)),
-            concepts=torch.from_numpy(adata_train.obsm[self.concept_key].to_numpy().astype(np.float32)),
-            num_epochs=self.max_epochs, batch_size=self.batch_size,
-            num_workers=self.num_workers
-            )
-        
+            concepts=torch.from_numpy(
+                adata_train.obsm[self.concept_key].to_numpy().astype(np.float32)
+            ),
+            num_epochs=self.max_epochs,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+        )
+
         self.model = model
 
         return self.model
 
-    def predict_intervention(self, adata_inter, hold_out_label, concepts_to_flip, values_to_set = None):
+    def predict_intervention(
+        self, adata_inter, hold_out_label, concepts_to_flip, values_to_set=None
+    ):
         """Performs intervention using a trained CEM-VAE model.
         Returns an anndata with predicted values."""
         print("Performing intervention with CEM-VAE...")
 
         if self.model is None:
-            raise ValueError("Model has not been trained yet. Call train() before predict_intervention().")
-        
+            raise ValueError(
+                "Model has not been trained yet. Call train() before predict_intervention()."
+            )
+
         if self.obsm_key != "X":
-            x_intervene_on =  torch.tensor(adata_inter.obsm[self.obsm_key], dtype=torch.float32)
+            x_intervene_on = torch.tensor(
+                adata_inter.obsm[self.obsm_key], dtype=torch.float32
+            )
         else:
             x_intervene_on = torch.tensor(adata_inter.X, dtype=torch.float32)
 
-        c_intervene_on = adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)
+        c_intervene_on = (
+            adata_inter.obsm[self.concept_key].to_numpy().astype(np.float32)
+        )
 
         # what indices should we flip in the concepts
-        concept_to_intervene_idx = [idx for idx,c in enumerate(adata_inter.obsm[self.concept_key].columns) if c in concepts_to_flip]
+        concept_to_intervene_idx = [
+            idx
+            for idx, c in enumerate(adata_inter.obsm[self.concept_key].columns)
+            if c in concepts_to_flip
+        ]
 
         # Define the intervention by creating a mask and new concept values
         mask = torch.zeros(c_intervene_on.shape, dtype=torch.float32)
-        mask[:, concept_to_intervene_idx] = 1 
+        mask[:, concept_to_intervene_idx] = 1
 
         inter_concepts = torch.tensor(c_intervene_on, dtype=torch.float32)
-        inter_concepts[:, concept_to_intervene_idx] = 1 - inter_concepts[:, concept_to_intervene_idx] # Set stim concept to the opposite of the observed value.
+        inter_concepts[:, concept_to_intervene_idx] = (
+            1 - inter_concepts[:, concept_to_intervene_idx]
+        )  # Set stim concept to the opposite of the observed value.
 
         with torch.no_grad():
-            inter_preds = self.model.intervene(x_intervene_on.to("cuda"), mask=mask.to("cuda"), concepts=inter_concepts.to("cuda"))
-        
-        inter_preds = inter_preds['x_pred'].cpu().numpy() 
+            inter_preds = self.model.intervene(
+                x_intervene_on.to("cuda"),
+                mask=mask.to("cuda"),
+                concepts=inter_concepts.to("cuda"),
+            )
 
-        if(self.obsm_key != "X"):
+        inter_preds = inter_preds["x_pred"].cpu().numpy()
+
+        if self.obsm_key != "X":
             x_inter_preds = np.zeros_like(adata_inter.X)
         else:
             x_inter_preds = inter_preds
 
         pred_adata = adata_inter.copy()
         pred_adata.X = x_inter_preds
-        pred_adata.obs['ident'] = 'intervened on'
-        pred_adata.obs['cell_stim'] = hold_out_label + '*'
+        pred_adata.obs["ident"] = "intervened on"
+        pred_adata.obs["cell_stim"] = hold_out_label + "*"
 
-        if(self.obsm_key != "X"):
+        if self.obsm_key != "X":
             pred_adata.obsm[self.obsm_key] = inter_preds
 
         return pred_adata
