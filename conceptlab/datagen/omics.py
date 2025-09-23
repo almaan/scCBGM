@@ -6,6 +6,7 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 from scipy.stats import wishart
+from scipy.stats import poisson
 
 __all__ = ["OmicsDataGenerator"]
 
@@ -32,6 +33,9 @@ class OmicsDataGenerator(DataGenerator):
         p_Q="p_tissue",
         p_T="p_celltype_in_tissue",
         p_C="p_concept_in_celltype",
+        eps_mat="noise",
+        exog_mat="exogenous_noise",
+        cov="concept_covariance",
     )
 
     def __init__(self, **kwargs):
@@ -54,6 +58,7 @@ class OmicsDataGenerator(DataGenerator):
         cov: np.ndarray,
         std_noise: float = 0.01,
         rng: np.random._generator.Generator | None = None,
+        exog_noise: np.ndarray | None = None,
         seed: int = 42,
         **kwargs,
     ) -> List[np.ndarray]:
@@ -76,6 +81,7 @@ class OmicsDataGenerator(DataGenerator):
             cov (np.ndarray) : covariance matrix for logits
             std_noise (float, optional): Standard deviation for noise. Defaults to 0.01.
             rng (np.random.Generator, optional): Random number generator. Defaults to None.
+            exog_noise (np.ndarray, optional): Exogenous noise matrix. Defaults to None.
             seed (int, optional): Seed for random number generator if rng is None. Defaults to 42.
 
         Returns:
@@ -101,6 +107,11 @@ class OmicsDataGenerator(DataGenerator):
         L_mat = np.zeros(N)
         P_mat = np.zeros((N, C))
 
+        eps_mat = np.zeros((N, F))
+
+        sample_exog = exog_noise is None
+        exog_mat = np.zeros((N, F)) if exog_noise is None else exog_noise
+
         # -- Generate Data -- #
         for n in range(N):
             # get batch ID
@@ -124,7 +135,7 @@ class OmicsDataGenerator(DataGenerator):
             # get library size
             l_n = rng.normal(0, std_l[b_n])
             # get noise
-            eps_n = rng.normal(0, std_noise)
+            eps_n = rng.normal(0, std_noise, size=F)
             # log lambda
             log_lambda = (
                 ws
@@ -136,7 +147,10 @@ class OmicsDataGenerator(DataGenerator):
                 + eps_n
             )
             # sample gene expression
-            x_n = rng.poisson(np.exp(log_lambda))
+            if sample_exog:
+                exog_mat[n, :] = rng.uniform(0, 1, size=F)
+
+            x_n = poisson.ppf(exog_mat[n, :], np.exp(log_lambda))
 
             # register values
             X_mat[n] = x_n
@@ -145,6 +159,7 @@ class OmicsDataGenerator(DataGenerator):
             C_mat[n] = v_n
             T_mat[n] = t_n
             L_mat[n] = l_n
+            eps_mat[n] = eps_n
 
         return {
             "X_mat": X_mat,
@@ -154,6 +169,8 @@ class OmicsDataGenerator(DataGenerator):
             "T_mat": T_mat,
             "L_mat": L_mat,
             "P_mat": P_mat,
+            "eps_mat": eps_mat,
+            "exog_mat": exog_mat,
         }
 
     @classmethod
@@ -166,6 +183,7 @@ class OmicsDataGenerator(DataGenerator):
         B_mat: np.ndarray,
         L_mat: np.ndarray,
         P_mat: np.ndarray,
+        eps_mat: np.ndarray,
         gamma: np.ndarray,
         omega: np.ndarray,
         tau: np.ndarray,
@@ -177,6 +195,7 @@ class OmicsDataGenerator(DataGenerator):
         p_T: np.ndarray,
         p_C: np.ndarray,
         cov: np.ndarray,
+        exog_mat: np.ndarray,
     ):
         """helper function to build dataset"""
 
@@ -218,7 +237,7 @@ class OmicsDataGenerator(DataGenerator):
             "batch_coef": (("batch", "var"), gamma),
             _C.DataVars.celltype.value: (("obs",), U_mat),
             "libsize": (("obs"), L_mat),
-            "cov": (("concept", "_concept"), cov),
+            cls.params_key["cov"]: (("concept", "_concept"), cov),
             cls.params_key["omega"]: (("celltype", "var"), omega),
             cls.params_key["std_l"]: (("batch"), std_l),
             cls.params_key["p_N"]: (("batch"), p_N),
@@ -226,7 +245,9 @@ class OmicsDataGenerator(DataGenerator):
             cls.params_key["p_T"]: (("tissue", "celltype"), p_T),
             cls.params_key["p_C"]: (("celltype", "concept"), p_C),
             cls.params_key["ws"]: (("var"), ws),
-            "bernoulli_prob": (("obs", "concepts"), P_mat),
+            cls.params_key["eps_mat"]: (("obs", "var"), eps_mat),
+            cls.params_key["exog_mat"]: (("obs", "var"), exog_mat),
+            "bernoulli_prob": (("obs", "concept"), P_mat),
         }
 
         # create xarray dataset
@@ -419,6 +440,12 @@ class OmicsDataGenerator(DataGenerator):
                 input_params[key] = val
 
         new_data = cls._model(n_obs, **input_params)
+        for key in new_data.keys():
+            if key in input_params:
+                del input_params[key]
+
+        print(new_data.keys())
+        print(input_params.keys())
         new_dataset = cls._build_dataset(**new_data, **input_params)
 
         return new_dataset
@@ -448,7 +475,7 @@ class OmicsDataGenerator(DataGenerator):
 
         """
 
-        rng = np.random.default_rng(seed)
+        np.random.default_rng(seed)
 
         params = cls.get_params_from_dataset(dataset, mode="dataframe")
 
@@ -462,6 +489,7 @@ class OmicsDataGenerator(DataGenerator):
 
         obs_names = dataset.obs.values
 
+        # TODO: make more efficient at some point
         for k, obs in enumerate(obs_names):
 
             u_n = dataset.celltypes.to_dataframe().loc[obs].values[0]
@@ -469,11 +497,9 @@ class OmicsDataGenerator(DataGenerator):
             b_n = dataset.batches.to_dataframe().loc[obs].values[0]
 
             if isinstance(concepts, pd.DataFrame):
-                v_n = concepts.loc[concept, :]
+                v_n = concepts.loc[obs, :].values
             elif isinstance(concepts, np.ndarray):
                 v_n = concepts[k, :]
-
-            eps_n = np.random.normal(0, std_noise)
 
             # log lambda
             log_lambda = (
@@ -483,10 +509,14 @@ class OmicsDataGenerator(DataGenerator):
                 + params["gamma"].loc[b_n].values.flatten()
                 + params["tau"].loc[t_n].values.flatten()
                 + libsize.loc[obs, :].values.flatten()
-                + eps_n
+                + params["eps_mat"].loc[obs].values.flatten()
             )
             # sample gene expression
-            x_n = rng.poisson(np.exp(log_lambda))
+
+            x_n = poisson.ppf(
+                params["exog_mat"].loc[obs, :].values.flatten(), np.exp(log_lambda)
+            )
+
             X_mat[k, :] = x_n
 
         X_mat = pd.DataFrame(X_mat, index=obs_names, columns=dataset["var"].values)

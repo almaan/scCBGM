@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader, Dataset, random_split, Subset
 import torch as t
 import numpy as np
 import pandas as pd
+from conceptlab.utils import helpers
 
 import xarray as xr
 
@@ -55,25 +56,40 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         data: pd.DataFrame | ad.AnnData | xr.Dataset,
         batch_size: int = 32,
         val_split: float = 0.2,
-        layer: str = None,
+        layer: str | None = None,
+        obsm_key: str | None = None,  # <-- Added parameter
         add_concepts: bool = False,
         concept_key: str = "concepts",
         normalize: bool = True,
         split_by: str | None = "split_label",
+        num_workers: int = 0,
     ):
         super().__init__()
 
         self.add_concepts = add_concepts
         self.split_by = split_by
+        self.num_workers = num_workers
 
         if isinstance(data, xr.Dataset):
             self.data = data.data.to_dataframe().unstack()
             if self.add_concepts:
                 self.concepts = data.concepts.to_dataframe().unstack()
         elif isinstance(data, ad.AnnData):
-            self.data = data.to_df(layer=layer)
+            # --- MODIFICATION START ---
+            if obsm_key:
+                print(f"Using data from .obsm['{obsm_key}']")
+                # Ensure the data from obsm is a DataFrame with the correct index
+                self.data = pd.DataFrame(data.obsm[obsm_key], index=data.obs.index)
+            else:
+                # Fallback to the original behavior if obsm_key is not provided
+                print(f"Using data from .X or layer='{layer}'")
+                self.data = data.to_df(layer=layer)
+            # --- MODIFICATION END ---
+
             if self.add_concepts:
-                self.concepts = pd.DataFrame(data.obsm[concept_key])
+                self.concepts = pd.DataFrame(
+                    data.obsm[concept_key], index=data.obs.index
+                )
         elif isinstance(data, pd.DataFrame):
             self.data = data.copy()
         else:
@@ -85,10 +101,13 @@ class GeneExpressionDataModule(pl.LightningDataModule):
             self.concepts = None
 
         if normalize:
-            X = self.data.values
-            X = X / np.sum(X, axis=1, keepdims=True) * 1e4
-            X = np.log1p(X)
-            self.data = pd.DataFrame(X)
+            print("Applying log(1+CPM) normalization...")
+            X = self.data.values.astype(np.float32)
+            X = helpers.normalize_counts(X)
+
+            self.data = pd.DataFrame(
+                X, index=self.data.index, columns=self.data.columns
+            )
 
         self.batch_size = batch_size
         self.val_split = val_split
@@ -104,7 +123,12 @@ class GeneExpressionDataModule(pl.LightningDataModule):
         )
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+        )
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size)

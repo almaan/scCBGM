@@ -1,0 +1,36 @@
+# Python bytecode and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.csv
+*.ckpt
+
+# Virtual environment
+venv/
+env/
+.venv/
+.env/
+
+# IDE and editor folders
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# etc
+notebooks/analysis/wandb/
+logs/
+wandb/
+scripts/outputs/
+tmp/
+old_notebooks/
+data_local/
+ckpts/
+results_local/
+plotting/
+outputs/
+notebooks_local/
+rsc/

@@ -1,0 +1,37 @@
+_target_: conceptlab.models.cb_fm.CBMFM_MetaTrainer
+num_epochs: 200
+batch_size: 128
+lr: 3e-4
+raw: False
+concept_key: ${data.concept_key}
+num_workers: 4
+obsm_key: X_pca
+z_score: False
+edit: True
+fm_mod_cfg:
+  hidden_dim: 1024
+  latent_dim: 128
+  n_layers: 4
+  dropout: 0.1
+  p_uncond: 0.
+cbm_mod:
+  _target_: conceptlab.models.cb_vae.CBM_MetaTrainer
+  concept_key: ${data.concept_key}
+  max_epochs: 200
+  log_every_n_steps: 10
+  num_workers: 4
+  obsm_key: ${model.obsm_key}
+  z_score: ${model.z_score}
+  cbm_config:
+    has_cbm: True
+    lr: 3e-4
+    n_layers: 4
+    hidden_dim: 1024
+    beta: 1e-5
+    latent_dim: 128
+    n_unknown: 128
+    min_bottleneck_size: 128
+    #independent_training: True
+    concepts_hp: 0.1
+    orthogonality_hp: 0.5
+    use_soft_concepts: False

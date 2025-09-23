@@ -1,0 +1,5 @@
+# @package intervention_labels
+hold_out_label: 'T_cell_CD4_IL7'
+mod_label: 'T_cell_CD4_PBS'
+concepts_to_flip: ["PBS","IL7"] #concepts that should be flipped in the intervention prediction
+reference: [1,0] # reference for the concepts to flip

@@ -51,61 +51,54 @@ def r2_score(x_true, x_pred):
 
 
 def mse_loss(
-    gt, pred, raw_data=None, plot=True, normalize_pred=False, normalize_true=False
+    x_true,
+    x_pred,
 ):
-
-    x_pred = _normalize(gt, normalize_pred)
-    x_true = _normalize(pred, normalize_true)
 
     mse = np.mean((x_true - x_pred) ** 2)
 
-    if raw_data is not None:
-        noise_levels = np.arange(0, 1.1, 0.1)
-        mse_noise_array = []
-        for noise_level in noise_levels:
-
-            noisy_gex = _multinomial_resampling(raw_data, noise_level)
-            noisy_gex = noisy_gex / noisy_gex.sum(axis=1, keepdims=True) * 1e4
-            noisy_gex = np.log1p(noisy_gex)
-            mse_noise = np.mean((x_true - noisy_gex) ** 2)
-            mse_noise_array.append(mse_noise)
-
-        if plot:
-            # Create the MSE vs Noise Level plot
-            fig = go.Figure()
-
-            # Plot the MSE values against noise levels
-            fig.add_trace(
-                go.Scatter(
-                    x=noise_levels,
-                    y=mse_noise_array,
-                    mode="lines+markers",
-                    name="Noise MSE",
-                )
-            )
-            # Add a horizontal line to represent the test MSE
-            fig.add_trace(
-                go.Scatter(
-                    x=[noise_levels[0], noise_levels[-1]],
-                    y=[mse, mse],
-                    mode="lines",
-                    name="Test MSE",
-                    line=dict(color="red"),
-                )
-            )
-            # Customize the layout
-            fig.update_layout(
-                title="MSE vs Noise Level",
-                xaxis_title="Noise Level",
-                yaxis_title="MSE",
-                width=300,
-                height=600,
-            )
-
-            # Log the plot to Weights & Biases
-            wandb.log({"mse_vs_noise_level": fig})
-
-    else:
-        mse_noise = None
-
     return mse
+
+
+def cosine_similarity(x_true, x_pred):
+    from numpy.linalg import norm
+
+    rowwise_cos = np.sum(x_true * x_pred, axis=1) / (
+        norm(x_true, axis=1) * norm(x_pred, axis=1)
+    )
+    cos_sim = np.mean(rowwise_cos)
+
+    return cos_sim
+
+
+def rowwise_correlation(x_true, x_pred):
+    """
+    Compute the average row-wise Pearson correlation
+    between x_true and x_pred, vectorized.
+
+    Args:
+        x_true (ndarray): shape (n_samples, n_features)
+        x_pred (ndarray): shape (n_samples, n_features)
+
+    Returns:
+        float: average correlation across rows
+    """
+    x_true = np.asarray(x_true, dtype=float)
+    x_pred = np.asarray(x_pred, dtype=float)
+
+    # Center each row (subtract row mean)
+    x_true_centered = x_true - x_true.mean(axis=1, keepdims=True)
+    x_pred_centered = x_pred - x_pred.mean(axis=1, keepdims=True)
+
+    # Row-wise numerator (dot product)
+    num = np.sum(x_true_centered * x_pred_centered, axis=1)
+
+    # Row-wise denominator (product of norms)
+    denom = np.linalg.norm(x_true_centered, axis=1) * np.linalg.norm(
+        x_pred_centered, axis=1
+    )
+
+    # Avoid division by zero
+    corrs = np.divide(num, denom, out=np.zeros_like(num), where=denom != 0)
+
+    return np.mean(corrs)

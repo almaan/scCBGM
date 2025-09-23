@@ -1,0 +1,31 @@
+name: Biolord_Kang
+program: benchmark_scdata.py
+method: grid
+parameters:
+  model:
+    value: biolord
+  seed:
+    values: [13,42,1337,69]
+  data/intervention_labels:
+    values: 
+    - kang/b_cells_0
+    - kang/b_cells_1
+    - kang/cd4_0
+    - kang/cd4_1
+    - kang/cd4_2
+    - kang/cd8_0
+    - kang/cd8_1
+    - kang/cd14_0
+    - kang/cd14_1
+    - kang/dendritic_0
+    - kang/dendritic_1
+    - kang/fcgr3a_0
+    - kang/fcgr3a_1
+    - kang/nk_0
+command:
+  - uv
+  - run
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.project=conceptlab

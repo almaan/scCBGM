@@ -1,0 +1,29 @@
+name: CBMFM_Liver
+program: benchmark_scdata.py
+method: grid
+parameters:
+  model:
+    value: mixed_cbmfm
+  seed:
+    values: [13,42,1337,69]
+  data:
+    value: liver
+  data/intervention_labels:
+    values:
+    - liver/b_cells_3
+    - liver/b_cells_10
+    - liver/t_cells_3
+    - liver/t_cells_10
+    - liver/macrophage_3
+    - liver/macrophage_10
+  model.edit:
+    values:
+      - True
+      - False
+command:
+  - uv
+  - run
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.project=conceptlab

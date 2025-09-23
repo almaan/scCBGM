@@ -1,0 +1,28 @@
+program: baseline_cinemaot.py
+method: grid
+parameters:
+  model:
+    value: cinemaot
+  constants.seed:
+    values: [13,42,1337,69]
+  modify:
+    values: [default, add, noise, drop, duplicate]
+  dataset.n_concepts:
+    values: [8,25,50,75]
+  dataset.use_concept_dependency:
+    value: False
+  modify.params.n_mod:
+    values: [0.1, 0.5, 0.9]
+  model.thresh:
+    values: [0.05, 0.1, 0.15, 0.2, 0.25]
+  model.eps:
+    values: [1e-5, 1e-4, 1e-3]
+
+command:
+  - uv
+  - run
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.project=conceptlab
+  - test_intervention=True
