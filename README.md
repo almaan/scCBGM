@@ -83,15 +83,13 @@ We use config files in `synth_hydra_config` for this.
 Our code supports sweeps using a combination of **wandb** and **hydra**.
 Official `wandb` documentation can be found [here](https://wandb.ai/adrishd/hydra-example/reports/Configuring-W-B-Projects-with-Hydra--VmlldzoxNTA2MzQw), though we also provide a more minimal and focused guide below.
 
----
 
-### 1️⃣ Setting up a sweep config
+**1️⃣ Setting up a sweep config**
 Prepare a config file compatible with `wandb sweep`.
 A demo is available at `sweeps/sweep_demo.yaml`.
 
----
 
-### 2️⃣ Creating a sweep agent
+**2️⃣ Creating a sweep agent**
 Run the following in the repo root:
 
 ```sh
@@ -109,7 +107,7 @@ $ wandb: Run sweep agent with: wandb agent user/conceptlab/wuw4xyb0
 
 ---
 
-### 3️⃣ Launching the sweep
+**3️⃣ Launching the sweep**
 To launch, simply run:
 
 ```sh
@@ -140,7 +138,7 @@ python jobs/sweeper.py --sweep_id user/conceptlab/wuw4xyb0 --num_jobs 10 lsf
 
 ---
 
-### ⚙️ Scheduler Options
+⚙️ **Scheduler Options**
 
 We support both **LSF** and **SLURM**. For LSF, extra options are available:
 
