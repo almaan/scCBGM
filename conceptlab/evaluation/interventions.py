@@ -356,10 +356,11 @@ def evaluate_intervention_emd_with_target(
     return score
 
 
-def evaluate_intervention_cell_level_mse(
+def _cell_level_metric_align(
     adata_ivn_pred,  # Taking the unstimulated data and changing the stimulation concept to 1 and see what it predicts.
     adata_ivn_true,  # Stimulated data with stimulation of interest.
     align_on: str | None = None,
+    obsm_key: str = "X",
 ) -> Dict[str, Any]:
 
     # check dimensions
@@ -373,18 +374,46 @@ def evaluate_intervention_cell_level_mse(
             "adata_ivn_pred and adata_ivn_true must have the same number of features."
         )
 
-    if align_on is not None:
-        print("Aligning on label: {}".format(align_on))
-
+    if obsm_key == "X":
+        print("Evaluate on X")
         X_pred = adata_ivn_pred.to_df()
         X_true = adata_ivn_true.to_df()
+
+    else:
+        print("Evaluate on obsm key: {}".format(obsm_key))
+        X_pred = pd.DataFrame(
+            adata_ivn_pred.obsm[obsm_key], index=adata_ivn_pred.obs_names
+        )
+        X_true = pd.DataFrame(
+            adata_ivn_true.obsm[obsm_key], index=adata_ivn_true.obs_names
+        )
+
+    if align_on is not None:
+        print("Aligning on label: {}".format(align_on))
 
         X_pred.index = adata_ivn_pred.obs[align_on]
         X_true.index = adata_ivn_true.obs[align_on]
 
         X_pred = X_pred.loc[X_true.index]
 
+    return X_pred, X_true
+
+
+def evaluate_intervention_cell_level_mse(
+    adata_ivn_pred: ad.AnnData,  # Taking the unstimulated data and changing the stimulation concept to 1 and see what it predicts.
+    adata_ivn_true: ad.AnnData,  # Stimulated data with stimulation of interest.
+    align_on: str | None = None,
+    obsm_key: str = "X",
+) -> Dict[str, Any]:
+
     print("Evaluating on {} cells".format(adata_ivn_pred.shape[0]))
+
+    X_pred, X_true = _cell_level_metric_align(
+        adata_ivn_pred,
+        adata_ivn_true,
+        align_on,
+        obsm_key,
+    )
 
     mse = np.mean((X_true.values - X_pred.values) ** 2)
 

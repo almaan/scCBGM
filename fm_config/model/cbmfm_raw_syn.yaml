@@ -5,7 +5,7 @@ lr: 5e-4
 raw: True
 concept_key: ${data.concept_key}
 num_workers: 4
-obsm_key: X
+obsm_key: X_pca
 z_score: False
 edit: True
 fm_mod_cfg:

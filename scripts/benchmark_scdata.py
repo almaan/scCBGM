@@ -44,10 +44,12 @@ def main(cfg: DictConfig):
     score_dict = {}
 
     if dataset.supports_cell_level_evaluation:
+
         mse_score = clab.evaluation.interventions.evaluate_intervention_cell_level_mse(
             adata_ivn_pred=adata_preds,
             adata_ivn_true=adata_test,
             align_on=dataset.align_on,
+            obsm_key=cfg.model.get("obsm_key", "X"),
         )
 
         score_dict.update(mse_score)
