@@ -3,7 +3,7 @@ defaults:
 
 _target_: conceptlab.data.dataset.InterventionDataset
 
-data_path: ${hydra:runtime.config_dir}/../../data/synthetic/synthetic_1.h5ad
+data_path: ${oc.env:PROJECT_ROOT}/data/synthetic/synthetic_1.h5ad
 
 intervention_labels: ${intervention_labels}
 concept_key: ${oc.select:intervention_labels.concept_key, concepts}

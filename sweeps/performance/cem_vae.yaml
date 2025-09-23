@@ -5,7 +5,7 @@ metric:
   name: test_avg_concept_acc
 parameters:
   constants.seed:
-    values: [13,1337]
+    values: [13,1337, 403]
   model:
     value: cem_vae
   modify:

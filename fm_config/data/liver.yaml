@@ -2,7 +2,7 @@ defaults:
   - intervention_labels: liver/b_cells
 
 _target_: conceptlab.data.dataset.InterventionDataset
-data_path: ${hydra:runtime.config_dir}/../../data/real/adata_liver.h5ad
+data_path: ${oc.env:PROJECT_ROOT}data/real/adata_liver.h5ad
 concept_key: concepts
 intervention_labels: ${intervention_labels}
 mmd_label: "L2_dose"

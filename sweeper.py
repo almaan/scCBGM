@@ -2,9 +2,12 @@ import argparse as arp
 import uuid
 import subprocess
 import os.path as osp
+import os
 
 
 if __name__ == "__main__":
+
+    os.environ["PROJECT_ROOT"] = os.getcwd()
 
     # Create the main parser
     parser = arp.ArgumentParser(description="Main parser with LSF subparser.")

@@ -16,6 +16,8 @@
 exec >"$ROOT_DIR/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" \
      2>"$ROOT_DIR/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.err"
 
+export PROJECT_ROOT=$ROOT_DIR
+
 # it can be useful to know what node the job ran on
 hostname
 
