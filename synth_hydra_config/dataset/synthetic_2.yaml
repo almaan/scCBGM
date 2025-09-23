@@ -1,2 +1,2 @@
-dataset_path: "/gstore/data/resbioai/andera29/cbm/conceptlab/data_local/synth_data/synthetic_2.h5ad"
+dataset_path: ${hydra:runtime.config_dir}/../../data/synthetic/synthetic_2.h5ad
 normalize: True

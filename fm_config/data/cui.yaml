@@ -2,7 +2,7 @@ defaults:
   - intervention_labels: cui/cd4
 
 _target_: conceptlab.data.dataset.InterventionDataset
-data_path: /braid/havivd/immune_dictionary/lig_seurat_v2_with_raw_with_concepts.h5ad
+data_path: ${hydra:runtime.config_dir}/../../data/real/lig_seurat_v2_with_raw_with_concepts.h5ad
 concept_key: concepts
 intervention_labels: ${intervention_labels}
 mmd_label: "L1_stim"

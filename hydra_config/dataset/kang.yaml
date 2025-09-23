@@ -1,4 +1,0 @@
-path: data/scgen/curated/kang.h5ad
-concept_key: 'concepts'
-concept_coef_key: 'concepts_coef_hard'
-normalize: True
