@@ -5,7 +5,7 @@ parameters:
   data:
     values: [synthetic_1,synthetic_2, synthetic_3]
   model:
-    value: cbmfm_syn
+    value: cbmfm
   model.edit:
     values:
       - True
