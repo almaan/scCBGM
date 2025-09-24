@@ -5,6 +5,8 @@ __pycache__/
 *.pyd
 *.csv
 *.ckpt
+.ipynb_checkpoints/
+lightning_logs/
 
 # Virtual environment
 venv/
