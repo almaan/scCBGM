@@ -5,6 +5,8 @@ __pycache__/
 *.pyd
 *.csv
 *.ckpt
+.ipynb_checkpoints/
+lightning_logs/
 
 # Virtual environment
 venv/
@@ -22,3 +24,15 @@ Thumbs.db
 
 # etc
 notebooks/analysis/wandb/
+logs/
+wandb/
+scripts/outputs/
+tmp/
+old_notebooks/
+data_local/
+ckpts/
+results_local/
+plotting/
+outputs/
+notebooks_local/
+rsc/

@@ -1,9 +1,0 @@
-dataset_name: "default"
-n_obs: 50000
-n_vars:  5000
-n_tissues: 3
-n_celltypes:  10
-n_batches: 2
-n_concepts: 8
-add_all_effects_as_concepts: False
-use_concept_dependency: False

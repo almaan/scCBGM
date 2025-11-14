@@ -2,7 +2,7 @@ defaults:
   - intervention_labels: kang/b_cells_0
 
 _target_: conceptlab.data.dataset.InterventionDataset
-data_path: /braid/havivd/scgen/kang_scimilarity_v4_with_concepts_processed.h5ad 
+data_path: ${oc.env:PROJECT_ROOT}/data/real/kang_scimilarity_v4_with_concepts_processed.h5ad
 concept_key: concepts
 intervention_labels: ${intervention_labels}
 mmd_label: "L1_stim"

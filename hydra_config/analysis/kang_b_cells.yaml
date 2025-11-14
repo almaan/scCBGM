@@ -1,8 +1,0 @@
-split_col: 'cell_stim'
-test_labels: ['B cells_stim']
-pred_schema:
-  B cells_ctrl:
-    1: ['stim']
-    target: 'B cells_stim'
-split_pred: True
-split_pred_p: 0.2

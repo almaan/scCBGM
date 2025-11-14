@@ -9,7 +9,7 @@ parameters:
   data:
     value: liver
   data/intervention_labels:
-    values: 
+    values:
     - liver/b_cells_3
     - liver/b_cells_10
     - liver/t_cells_3

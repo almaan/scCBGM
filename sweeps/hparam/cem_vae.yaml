@@ -1,39 +1,40 @@
 program: main.py
 method: grid
 metric:
-  goal: maximize
-  name: test_avg_concept_acc
+  goal: minimize
+  name: MSE_intervened
 parameters:
-  constants.seed:
-    values: [13,42]
   model:
     value: cem_vae
+  intervention:
+    values:
+      - synthetic/intervention_0
+      - synthetic/intervention_1
+      - synthetic/intervention_2
+      - synthetic/intervention_3
+      - synthetic/intervention_4
+  dataset:
+    value: synthetic_1
+  constants.seed:
+    values: [13,69]
   modify:
     value: default
   model.beta:
-    values: [1e-4,1e-5]
+    values: [1e-4,5e-5,1e-5]
   model.lr:
     values: [5e-4, 1e-5]
   model.orthogonality_hp:
     values: [0.2,0.5,1]
   model.concepts_hp:
-    values: [0.005,0.05,0.1,0.5]
+    values: [0.005,0.05,0.1]
   model.latent_dim:
-    values: [32,64,128]
-  model.min_bottleneck_size:
     values: [64,128]
+  model.min_bottleneck_size:
+    value: 128
   model.hidden_dim:
     values: [256, 128]
-  dataset.n_concepts:
-    values: [25,50,75]
-  dataset.use_concept_dependency:
-    value: False
-  model.n_decoder_layers:
+  model.n_layers:
     value: 2
-  model.scale_concept:
-    value: False
-  model.use_gaussian_mixture_KL:
-    value: False
 command:
   - ${env}
   - python

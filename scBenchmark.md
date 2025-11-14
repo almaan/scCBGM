@@ -17,7 +17,11 @@ See an example in `conceptlab/models/cb_fm.py` with the class `CBMFM_MetaTrainer
 
 Go in `/jobs` and run:
 
-`./init_sweep.sh ../fm_config/sweeps/kang_cbm.yaml`
+`./init_sweep.sh ../fm_config/sweeps/kang_cbm.yaml WANDB_PROJECT WANDB_ENTITY`
+
+If you're not using `uv` but a standard conda/mamba environment then add a --conda_mode flag, i.e.,:
+
+`./init_sweep.sh ../fm_config/sweeps/kang_cbm.yaml WANDB_PROJECT WANDB_ENTITY -c`
 
 Where you can feed the path to the sweep you want to run.
 
@@ -25,13 +29,17 @@ The output should look like:
 
 ```
 Launching sweep from config: ../fm_config/sweeps/kang_cbmfm_raw.yaml
-Project: conceptlab | Entity: debroue1
-✅ Created sweep: debroue1/conceptlab/sweeps
+Project: conceptlab | Entity: USER
+✅ Created sweep: USER/conceptlab/idqe1p2q
 ```
 
 Copy paste the sweep path in `pcluster_sweep.sh` and run it !
 
-`sbatch pclsuter_sweep.sh`
+`sbatch --export=ALL,ROOT_DIR='path_to_conceptlab_root_dir' pclsuter_sweep.sh SWEEP_ID`
+
+If you're not using `uv` but a standard conda/mamba environment then add a --conda_mode flag
+
+`sbatch --export=ALL,ROOT_DIR='path_to_conceptlab_root_dir' pclsuter_sweep.sh -c SWEEP_ID`
 
 Check your results in wandb !
 
