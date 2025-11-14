@@ -10,6 +10,7 @@ from .cb_fm import CB_FM
 from .cb_vae_fm import CB_VAE_FM
 from .concept_fm import Concept_FM
 from .cond_fm import Cond_FM
+from .sc_cvae import scCVAE
 
 
 

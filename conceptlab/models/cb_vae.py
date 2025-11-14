@@ -47,7 +47,11 @@ class CB_VAE(BaseCBVAE):
             dropout=self.dropout,
         )
 
-        if "n_unknown" in config:
+
+        if config.get("use_cosine_loss", False):
+            print("Using Cosine Loss: Setting n_unknown to n_concepts")
+            n_unknown = self.n_concepts
+        elif "n_unknown" in config:
             n_unknown = config["n_unknown"]
         elif "min_bottleneck_size" in config:
             n_unknown = max(config.min_bottleneck_size, self.n_concepts)
@@ -107,6 +111,10 @@ class CB_VAE(BaseCBVAE):
             self.concept_loss = self._hard_concept_loss
             self.concept_transform = sigmoid
 
+        if config.get("use_cosine_loss", False):
+            self.orthogonality_loss = self._cosine_loss
+        else:
+            self.orthogonality_loss = self._cov_loss
 
     @property
     def has_concepts(
@@ -163,7 +171,20 @@ class CB_VAE(BaseCBVAE):
         dec = self.decode(**cbm)
         return dec
 
-    def orthogonality_loss(self, c, u):
+    def _cosine_loss(self, c, u):
+        # Normalize c and u to unit vectors
+        c_norm = F.normalize(c, p=2, dim=1)
+        u_norm = F.normalize(u, p=2, dim=1)
+
+        # Compute cosine similarity
+        cosine_similarity = torch.matmul(c_norm.T, u_norm) / c.size(0)
+
+        # Square the cosine similarity and sum to get the loss
+        loss = (cosine_similarity**2).sum()
+
+        return loss
+
+    def _cov_loss(self, c, u):
 
         batch_size = u.size(0)
 
