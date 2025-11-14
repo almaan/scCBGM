@@ -7,10 +7,36 @@ def emd(x, y):
     dist_mat = ot.dist(x, y)
     dist_mat_norm = dist_mat/dist_mat.max()
 
-    ot_matrix = ot.emd([],[], dist_mat_norm, numItermax=1e7)
-    emd = np.sum(ot_matrix * dist_mat)
+    emd = ot.emd2([],[], dist_mat_norm, numItermax=int(1e7))
+    #emd = np.sum(ot_matrix * dist_mat)
 
     return emd
+
+def w2(x, y):
+    dist_mat = ot.dist(x,y, metric = "sqeuclidean")
+    w2_sq = ot.emd2([], [], dist_mat, numItermax=int(1e7))
+    return np.sqrt(w2_sq)
+
+def sinkhorn_divergence(x, y, reg=0.1):
+    dist_mat = ot.dist(x, y, metric="sqeuclidean")
+    dist_mat_max = dist_mat.max()
+    dist_mat /= dist_mat_max
+
+    sinkhorn_xy = ot.sinkhorn2([], [], dist_mat, reg)
+
+    dist_mat_xx = ot.dist(x, x, metric="sqeuclidean")
+    dist_mat_xx_max = dist_mat_xx.max()
+    dist_mat_xx /= dist_mat_xx_max
+    sinkhorn_xx = ot.sinkhorn2([], [], dist_mat_xx, reg)
+
+    dist_mat_yy = ot.dist(y, y, metric="sqeuclidean")
+    dist_mat_yy_max = dist_mat_yy.max()
+    dist_mat_yy /= dist_mat_yy_max
+    sinkhorn_yy = ot.sinkhorn2([], [], dist_mat_yy, reg)
+
+    sinkhorn_div = dist_mat_max * sinkhorn_xy - 0.5 * dist_mat_xx_max * sinkhorn_xx - 0.5 * dist_mat_yy_max * sinkhorn_yy
+
+    return sinkhorn_div
 
 
 def rbf_kernel(x, y, sigma=1.0):

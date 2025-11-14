@@ -1,3 +1,6 @@
+import rootutils
+rootutils.setup_root(__file__, indicator=".project_root", pythonpath=True)
+
 import hydra
 from omegaconf import DictConfig
 import conceptlab as clab
@@ -6,6 +9,7 @@ import omegaconf
 from conceptlab.utils import helpers
 import numpy as np
 from conceptlab.datagen import modify
+
 
 
 @hydra.main(config_path="../fm_config/", config_name="general.yaml")
@@ -33,6 +37,8 @@ def main(cfg: DictConfig):
         concepts_to_flip=dataset.concepts_to_flip,
         values_to_set=dataset.values_to_set,
     )
+
+    ##### EVALUATION #####
 
     if cfg.model.obsm_key == "X_pca":
         x_baseline_rec = adata_train.X
@@ -76,6 +82,7 @@ def main(cfg: DictConfig):
         )
 
         score_dict.update(mmd_score)
+        print(mmd_score)
 
         # The DE metric is only evaluated in gene space (reconstructions)
         de_score = clab.evaluation.interventions.evaluate_intervention_DE_with_target(
@@ -87,6 +94,7 @@ def main(cfg: DictConfig):
 
         score_dict.update(de_score)
 
+        print("Computing EMD...")
         emd_score = clab.evaluation.interventions.evaluate_intervention_emd_with_target(
             x_train=(
                 adata_train.obsm[cfg.model.obsm_key]
@@ -105,8 +113,77 @@ def main(cfg: DictConfig):
             ),
             labels_train=adata_train.obs[dataset.mmd_label].values,
         )
-
         score_dict.update(emd_score)
+        print(emd_score)
+
+        print("Computing W2...")
+        w2_score = clab.evaluation.interventions.evaluate_intervention_w2_with_target(
+            x_train=(
+                adata_train.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_train.X
+            ),
+            x_ivn=(
+                adata_preds.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_preds.X
+            ),
+            x_target=(
+                adata_test.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_test.X
+            ),
+            labels_train=adata_train.obs[dataset.mmd_label].values,
+        )
+        score_dict.update(w2_score)
+        print(w2_score)
+
+        print("Computing Sinkhorn Divergence with epsilon = 0.1 ...")
+        sd_score = clab.evaluation.interventions.evaluate_intervention_w2_with_target(
+            x_train=(
+                adata_train.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_train.X
+            ),
+            x_ivn=(
+                adata_preds.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_preds.X
+            ),
+            x_target=(
+                adata_test.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_test.X
+            ),
+            labels_train=adata_train.obs[dataset.mmd_label].values,
+            sinkhorn_reg=0.1,
+        )
+        score_dict.update({'sinkhorn_div_' + k:v for k,v in sd_score.items()})
+        print(sd_score)
+
+        print("Computing FID ...")
+        frechet_score = clab.evaluation.interventions.evaluate_intervention_frechet_with_target(
+            x_train=(
+                adata_train.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_train.X
+            ),
+            x_ivn=(
+                adata_preds.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_preds.X
+            ),
+            x_target=(
+                adata_test.obsm[cfg.model.obsm_key]
+                if cfg.model.obsm_key != "X"
+                else adata_test.X
+            ),
+            labels_train=adata_train.obs[dataset.mmd_label].values,
+        )
+        score_dict.update(frechet_score)
+        print(frechet_score)
+
+
 
     for k, v in score_dict.items():
         wandb.log({k: v})
