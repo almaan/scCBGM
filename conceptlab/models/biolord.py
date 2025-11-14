@@ -78,15 +78,15 @@ class Biolord:
         )
 
         self.model.train(
-            max_epochs=self.max_epochs,
-            batch_size=self.batch_size,
-            plan_kwargs=self.trainer_cfg,
-            early_stopping=True,
-            early_stopping_patience=20,
-            check_val_every_n_epoch=10,
-            num_workers=self.num_workers,
-            enable_checkpointing=False,
-        )
+                max_epochs=self.max_epochs,
+                batch_size=self.batch_size,
+                plan_kwargs=self.trainer_cfg,
+                early_stopping=True,
+                early_stopping_patience=20,
+                check_val_every_n_epoch=10,
+                num_workers=self.num_workers,
+                enable_checkpointing=False,
+            )
 
         self.adata_train = adata_train_
 
@@ -120,7 +120,10 @@ class Biolord:
 
         pred_mask = 1
         for i_c, c in enumerate(concepts_to_flip):
-            pred_mask *= (adata_preds.obs[concepts_to_flip_map[c]].values == 1 - self.concepts_to_flip_ref[i_c])
+            if values_to_set is not None:
+                pred_mask *= (adata_preds.obs[concepts_to_flip_map[c]].values == values_to_set[i_c])
+            else:
+                pred_mask *= (adata_preds.obs[concepts_to_flip_map[c]].values == 1 - self.concepts_to_flip_ref[i_c])
 
         adata_preds_ = adata_preds[pred_mask==1].copy()
 

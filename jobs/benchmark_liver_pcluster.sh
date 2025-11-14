@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name conceptlab
+#SBATCH --job-name liver
 #SBATCH --nodes 1
 #SBATCH --ntasks-per-node 1
 #SBATCH --gpus 1
@@ -22,4 +22,4 @@ conda deactivate
 
 cd /homefs/home/debroue1/projects/conceptlab/scripts
 
-uv run wandb agent debroue1/conceptlab/r6862kyo # REPLACE WITH YOUR SWEEP PATH !!!!
+uv run python benchmark_liver.py # REPLACE WITH YOUR SWEEP PATH !!!!

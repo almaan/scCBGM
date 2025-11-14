@@ -49,7 +49,7 @@ class scGEN:
         adata_train_.obs["concepts_to_flip"] = adata_train_.obsm["concepts"][self.concepts_to_flip].astype(str).agg("_".join, axis = 1)
         #adata_train_.obs["concepts_as_cov"] = adata_train_.obsm["concepts"][self.concepts_as_cov].astype(str).agg("_".join, axis = 1)
         adata_train_.X = adata_train_.layers["og"]
-
+        
         pt.tl.Scgen.setup_anndata(adata_train_, 
                                   batch_key="concepts_to_flip", 
                                   labels_key=self.concepts_as_cov)
@@ -76,7 +76,11 @@ class scGEN:
         adata_inter_.X = adata_inter_.layers["og"]
  
         concepts_flipped = adata_inter_.obsm["concepts"].copy()
-        concepts_flipped.loc[:, concepts_to_flip] = 1 - concepts_flipped.loc[:, concepts_to_flip].values
+        if values_to_set is not None:
+            for concept, ic in zip(concepts_to_flip, values_to_set):
+                concepts_flipped.loc[:, concept] = ic
+        else:
+            concepts_flipped.loc[:, concepts_to_flip] = 1 - concepts_flipped.loc[:, concepts_to_flip].values
         adata_inter_.obsm["concepts_flipped"] = concepts_flipped
         adata_inter_.obs["concepts_flipped"] = adata_inter_.obsm["concepts_flipped"][self.concepts_to_flip].astype(str).agg("_".join, axis=1)
         

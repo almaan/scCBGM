@@ -66,7 +66,9 @@ def main(cfg: DictConfig):
     for k, v in de_score.items():
         wandb.log({k: v})
     wandb.finish()
-
+    
+    if cfg.get("save_preds",False):
+        adata_preds.write_h5ad(f"./adata_preds.h5ad")
 
 if __name__ == "__main__":
     main()
