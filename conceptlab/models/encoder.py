@@ -76,7 +76,7 @@ class NoResMLPBlock(nn.Module):
         return x
     
 
-class EncoderBlock(nn.Module):
+class NoResEncoderBlock(nn.Module):
     def __init__(
     self,
     input_dim: int,
@@ -85,6 +85,7 @@ class EncoderBlock(nn.Module):
     latent_dim: int,
     dropout: float,
     n_concepts: int = 0,
+    variational: bool = True,
     **kwargs
     ):
         super().__init__()
@@ -95,6 +96,57 @@ class EncoderBlock(nn.Module):
         self.n_concepts = n_concepts
         self.latent_dim = latent_dim
         self.dropout = dropout
+        self.variational = variational
+
+        self.x_embedder = nn.Linear(input_dim, hidden_dim)
+
+        self.layers = nn.ModuleList(
+            [NoResMLPBlock(hidden_dim, dropout) for _ in range(n_layers)]
+        )
+
+        self.fc_mu = nn.Linear(self.hidden_dim, self.latent_dim)
+
+        if self.variational:
+            self.fc_var = nn.Linear(self.hidden_dim, self.latent_dim)
+        else:
+            self.fc_var = None
+
+    def forward(self, x, concepts=None, **kwargs):
+
+        h = self.x_embedder(x)
+        for layer in self.layers:
+            h = layer(h,)
+
+        mu = self.fc_mu(h)
+        if self.variational:
+            logvar = self.fc_var(h)
+            logvar = t.clip(logvar, -1e5, 1e5)
+        else:
+            logvar = None
+
+        return dict(mu=mu, logvar=logvar)
+    
+class EncoderBlock(nn.Module):
+    def __init__(
+    self,
+    input_dim: int,
+    n_layers: int,
+    hidden_dim: int,
+    latent_dim: int,
+    dropout: float,
+    n_concepts: int = 0,
+    variational: bool = True,
+    **kwargs
+    ):
+        super().__init__()
+
+        self.input_dim = input_dim + n_concepts
+        self.hidden_dim = hidden_dim
+
+        self.n_concepts = n_concepts
+        self.latent_dim = latent_dim
+        self.dropout = dropout
+        self.variational = variational
 
         self.x_embedder = nn.Linear(input_dim, hidden_dim)
 
@@ -103,7 +155,11 @@ class EncoderBlock(nn.Module):
         )
 
         self.fc_mu = nn.Linear(self.hidden_dim, self.latent_dim)
-        self.fc_var = nn.Linear(self.hidden_dim, self.latent_dim)
+
+        if self.variational:
+            self.fc_var = nn.Linear(self.hidden_dim, self.latent_dim)
+        else:
+            self.fc_var = None
 
     def forward(self, x, concepts=None, **kwargs):
 
@@ -111,8 +167,12 @@ class EncoderBlock(nn.Module):
         for layer in self.layers:
             h = layer(h,)
 
-        mu, logvar = self.fc_mu(h), self.fc_var(h)
-        logvar = t.clip(logvar, -1e5, 1e5)
+        mu = self.fc_mu(h)
+        if self.variational:
+            logvar = self.fc_var(h)
+            logvar = t.clip(logvar, -1e5, 1e5)
+        else:
+            logvar = None
 
         return dict(mu=mu, logvar=logvar)
 

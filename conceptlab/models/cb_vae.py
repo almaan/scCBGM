@@ -36,19 +36,24 @@ class CB_VAE(BaseCBVAE):
         )
 
         self.dropout = config.get("dropout", 0.0)
-
+        self.variational = config.get("variational", True)
+        
         # Encoder
-
         self._encoder = _encoder(
             input_dim=self.input_dim,
             hidden_dim=self.hidden_dim,
             n_layers=self.n_layers,
             latent_dim=self.latent_dim,
             dropout=self.dropout,
+            variational=self.variational,
         )
 
 
-        if config.get("use_cosine_loss", False):
+
+        self.use_cosine_loss = config.get("use_cosine_loss", False)
+
+
+        if self.use_cosine_loss:
             print("Using Cosine Loss: Setting n_unknown to n_concepts")
             n_unknown = self.n_concepts
         elif "n_unknown" in config:
@@ -111,7 +116,7 @@ class CB_VAE(BaseCBVAE):
             self.concept_loss = self._hard_concept_loss
             self.concept_transform = sigmoid
 
-        if config.get("use_cosine_loss", False):
+        if self.use_cosine_loss:
             self.orthogonality_loss = self._cosine_loss
         else:
             self.orthogonality_loss = self._cov_loss
@@ -172,17 +177,9 @@ class CB_VAE(BaseCBVAE):
         return dec
 
     def _cosine_loss(self, c, u):
-        # Normalize c and u to unit vectors
-        c_norm = F.normalize(c, p=2, dim=1)
-        u_norm = F.normalize(u, p=2, dim=1)
-
-        # Compute cosine similarity
-        cosine_similarity = torch.matmul(c_norm.T, u_norm) / c.size(0)
-
-        # Square the cosine similarity and sum to get the loss
-        loss = (cosine_similarity**2).sum()
-
-        return loss
+        cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
+        output = torch.abs(cos(c, u))
+        return output.mean()
 
     def _cov_loss(self, c, u):
 
@@ -234,7 +231,11 @@ class CB_VAE(BaseCBVAE):
         loss_dict = {}
 
         MSE = self.rec_loss(x_pred, x)
-        KLD = self.KL_loss(mu, logvar)
+
+        if(self.variational):
+            KLD = self.KL_loss(mu, logvar)
+        else:
+            KLD = 0.0
 
         loss_dict["rec_loss"] = MSE
         loss_dict["KL_loss"] = KLD

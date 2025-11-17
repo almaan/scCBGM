@@ -5,21 +5,26 @@ import torch.nn.functional as F
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR, ExponentialLR
 import torch.nn.utils.parametrizations as param
+from torch.utils.data import TensorDataset, DataLoader
 from wandb import Histogram
 import wandb
 
+from tqdm import tqdm
+
 from .base import BaseCBVAE
 from .utils import sigmoid
-from .encoder import DefaultEncoderBlock
-from .decoder import DefaultDecoderBlock, SkipDecoderBlock
+from .encoder import NoResEncoderBlock, EncoderBlock
+from .decoder import DecoderBlock_CEM, SkipDecoderBlock_CEM, NoResDecoderBlock_CEM
+
+
 
 
 class CEM_VAE(BaseCBVAE):
     def __init__(
         self,
         config,
-        _encoder: nn.Module = DefaultEncoderBlock,
-        _decoder: nn.Module = DefaultDecoderBlock,
+        _encoder: nn.Module = NoResEncoderBlock,
+        _decoder: nn.Module = DecoderBlock_CEM,
         **kwargs,
     ):
 
@@ -29,7 +34,7 @@ class CEM_VAE(BaseCBVAE):
         )
 
         self.dropout = config.get("dropout", 0.0)
-
+        self.use_cosine_loss = config.get("use_cosine_loss", False)
         # Encoder
 
         self._encoder = _encoder(
@@ -45,6 +50,7 @@ class CEM_VAE(BaseCBVAE):
             n_unknown = max(config.min_bottleneck_size, self.n_concepts)
         else:
             n_unknown = 32
+
 
         if self.n_concepts > n_unknown:
             # Case 1: If n_concepts is larger than n_unknown
@@ -110,11 +116,18 @@ class CEM_VAE(BaseCBVAE):
         self.orthogonality_hp = config.orthogonality_hp
 
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
-        self.use_concept_loss = config.get("use_concept_loss", True)
+
+        if(self.use_cosine_loss):
+            print("Using Cosine Orthogonality Loss")
+            self.orthogonality_loss = self._cosine_loss
+        else:
+            print("Using Covariance Orthogonality Loss")
+            self.orthogonality_loss = self._cov_loss
 
         self.use_concept_loss = config.get("use_concept_loss", True)
 
-        self.save_hyperparameters()
+
+
 
     @property
     def has_concepts(
@@ -222,11 +235,31 @@ class CEM_VAE(BaseCBVAE):
         dec = self.decode(**cbm)
         return dec
 
-    def orthogonality_loss(self, c, u):
+    def _cosine_loss(self, c, u):
         cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
         output = torch.abs(cos(c, u))
         return output.mean()
 
+    def _cov_loss(self, c, u):
+
+        batch_size = u.size(0)
+
+        # Compute means along the batch dimension
+        u_mean = u.mean(dim=0, keepdim=True)
+        c_mean = c.mean(dim=0, keepdim=True)
+
+        # Center the variables in-place to save memory
+        u_centered = u - u_mean
+        c_centered = c - c_mean
+
+        # Compute the cross-covariance matrix using batch dimension
+        cross_covariance = torch.matmul(u_centered.T, c_centered) / (batch_size - 1)
+
+        # Frobenius norm squared of the cross-covariance matrix
+        loss = (cross_covariance**2).sum()
+
+        return loss
+    
     def rec_loss(self, x_pred, x):
         return F.mse_loss(x_pred, x, reduction="mean")
 
@@ -298,3 +331,119 @@ class CEM_VAE(BaseCBVAE):
                 "monitor": "val_loss",  # Optional: if you use reduce-on-plateau schedulers
             },
         }
+
+    def train_loop(
+        self,
+        data: torch.Tensor,
+        concepts: torch.Tensor,
+        num_epochs: int,
+        batch_size: int,
+        lr_gamma: float = 0.997,
+        num_workers: int = 0,
+    ):
+        """
+        Defines the training loop for the CEM-VAE model.
+        """
+        # --- 1. Setup Device, DataLoader, Optimizer, Scheduler ---
+        torch.set_flush_denormal(True)  # Add this to prevent slowdowns
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.to(device)
+
+        dataset = TensorDataset(data, concepts)
+        data_loader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        )
+
+        lr = self.learning_rate
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=lr_gamma)
+
+        print(f"Starting training on {device} for {num_epochs} epochs...")
+
+        self.train()  # Set the model to training mode
+        # --- 2. The Training Loop ---
+        pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=150)
+
+        for epoch in pbar:
+            total_loss = 0.0
+            # --- CHANGE: Initialize counters for F1 score calculation ---
+            epoch_tp = 0.0
+            epoch_fp = 0.0
+            epoch_fn = 0.0
+            # --- End of Change ---
+
+            for x_batch, concepts_batch in data_loader:
+                # Move batch to the correct device
+                x_batch = x_batch.to(device)
+                concepts_batch = concepts_batch.to(device)
+
+                # --- Core logic from your _step function ---
+                # 1. Forward pass
+                # We assume independent_training=True for this standalone loop
+                out = self.forward(x_batch)
+
+                # 2. Calculate loss
+                loss_dict = self.loss_function(x_batch, concepts_batch, **out)
+                loss = loss_dict["Total_loss"]
+                # -------------------------------------------
+
+                # 3. Backward pass and optimization
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                # Accumulate losses for logging
+                total_loss += loss.item()
+                # --- CHANGE: Calculate and accumulate TP, FP, FN for the batch ---
+                with torch.no_grad():
+                    pred_concepts = out["pred_concept"]
+                    predicted_labels = (pred_concepts > 0.5).float()
+                    true_labels = concepts_batch
+
+                    # True Positives: predicted is 1 and true is 1
+                    epoch_tp += (predicted_labels * true_labels).sum().item()
+                    # False Positives: predicted is 1 and true is 0
+                    epoch_fp += (predicted_labels * (1 - true_labels)).sum().item()
+                    # False Negatives: predicted is 0 and true is 1
+                    epoch_fn += ((1 - predicted_labels) * true_labels).sum().item()
+                # --- End of Change ---
+
+            # --- End of Epoch ---
+            avg_loss = total_loss / len(data_loader)
+
+            # --- CHANGE: Calculate epoch-level F1 score and update progress bar ---
+            epsilon = 1e-7  # To avoid division by zero
+            precision = epoch_tp / (epoch_tp + epoch_fp + epsilon)
+            recall = epoch_tp / (epoch_tp + epoch_fn + epsilon)
+            f1_score = 2 * (precision * recall) / (precision + recall + epsilon)
+
+            pbar.set_postfix(
+                {
+                    "avg_loss": f"{avg_loss:.3e}",
+                    "concept_f1": f"{f1_score:.4f}",  # Display F1 score
+                    "lr": f"{scheduler.get_last_lr()[0]:.5e}",
+                }
+            )
+            # --- End of Change ---
+
+            scheduler.step()
+
+        print("Training finished.")
+        self.eval()  # Set the model to evaluation mode
+
+
+
+class scCEM(CEM_VAE):
+    def __init__(self, config, decoder_type = 'skip', **kwargs):
+        if(decoder_type == 'skip'):
+            print("Using Skip Decoder")
+            decoder = SkipDecoderBlock_CEM
+        elif(decoder_type == 'no residual'):
+            print("Using No Residual Decoder")
+            decoder = NoResDecoderBlock_CEM
+        else:
+            print("Using Residual Decoder")
+            decoder = DecoderBlock_CEM
+        super().__init__(config, _decoder = decoder, **kwargs)
+

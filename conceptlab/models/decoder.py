@@ -225,7 +225,7 @@ class NoResDecoderBlock(nn.Module):
             [NoResBlock(hidden_dim, dropout) for _ in range(n_layers)]
         )
 
-        self.output_later = nn.Linear(self.hidden_dim, self.input_dim )
+        self.output_later = nn.Linear(self.hidden_dim, self.input_dim)
 
     def forward(self, input_concept, unknown, **kwargs):
         x = torch.concat((unknown, input_concept), dim=1)
@@ -587,3 +587,115 @@ class FlowDecoder(nn.Module):
 
 
 
+
+class NoResDecoderBlock_CEM(nn.Module):
+    def __init__(
+    self,
+    input_dim: int,
+    n_concepts: int,
+    n_unknown: int,
+    hidden_dim: int,
+    n_layers: int,
+    dropout: float = 0.0,
+    **kwargs
+    ):
+        super().__init__()
+
+        self.input_dim = input_dim 
+        self.hidden_dim = hidden_dim
+
+        self.n_concepts = n_concepts
+        self.n_unknown = n_unknown
+        self.dropout = dropout
+
+        self.x_embedder = nn.Linear(self.n_concepts + self.n_unknown, hidden_dim)
+        self.layers = nn.ModuleList(
+            [NoResBlock(hidden_dim, dropout) for _ in range(n_layers)]
+        )
+
+        self.output_later = nn.Linear(self.hidden_dim, self.input_dim)
+
+    def forward(self, decoder_input, **kwargs):
+        x = decoder_input
+        h = self.x_embedder(x)
+        for layer in self.layers:
+            h = layer(h)
+        h = self.output_later(h)
+
+        return dict(x_pred=h)
+    
+class SkipDecoderBlock_CEM(nn.Module):
+    def __init__(
+    self,
+    input_dim: int,
+    n_concepts: int,
+    n_unknown: int,
+    hidden_dim: int,
+    n_layers: int,
+    dropout: float = 0.0,
+    **kwargs
+    ):
+        super().__init__()
+
+        self.input_dim = input_dim 
+        self.hidden_dim = hidden_dim
+
+        self.n_concepts = n_concepts
+        self.n_unknown = n_unknown
+        self.dropout = dropout
+
+        self.x_embedder = nn.Linear(self.n_concepts + self.n_unknown, hidden_dim)
+        
+        self.layers = nn.ModuleList(
+            [SkipBlock(hidden_dim, hidden_dim, dropout) for _ in range(n_layers)]
+        )
+
+        self.output_later = nn.Linear(self.hidden_dim, self.input_dim)
+
+    def forward(self, decoder_input, **kwargs):
+        x = decoder_input
+        h = self.x_embedder(x)
+
+        for layer in self.layers:
+            h = layer(h)
+
+        h = self.output_later(h)
+        return dict(x_pred=h)
+    
+
+class DecoderBlock_CEM(nn.Module):
+    def __init__(
+    self,
+    input_dim: int,
+    n_concepts: int,
+    n_unknown: int,
+    hidden_dim: int,
+    n_layers: int,
+    dropout: float = 0.0,
+    **kwargs
+    ):
+        super().__init__()
+
+        self.input_dim = input_dim 
+        self.hidden_dim = hidden_dim
+
+        self.n_concepts = n_concepts
+        self.n_unknown = n_unknown
+        self.dropout = dropout
+
+        self.x_embedder = nn.Linear(self.n_concepts + self.n_unknown, hidden_dim)
+        self.layers = nn.ModuleList(
+            [MLPBlock(hidden_dim, dropout) for _ in range(n_layers)]
+        )
+
+        self.output_later = nn.Linear(self.hidden_dim, self.input_dim )
+
+    def forward(self, decoder_input, **kwargs):
+        x = decoder_input
+        
+        h = self.x_embedder(x)
+        for layer in self.layers:
+            h = layer(h)
+        h = self.output_later(h)
+
+        return dict(x_pred=h)
