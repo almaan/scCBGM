@@ -14,7 +14,7 @@ from tqdm import tqdm
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import NoResEncoderBlock, EncoderBlock
-from .decoder import DecoderBlock_CEM, SkipDecoderBlock_CEM, NoResDecoderBlock_CEM
+from .decoder import DecoderBlock, SkipDecoderBlock, NoResDecoderBlock
 
 
 
@@ -24,7 +24,7 @@ class CEM_VAE(BaseCBVAE):
         self,
         config,
         _encoder: nn.Module = NoResEncoderBlock,
-        _decoder: nn.Module = DecoderBlock_CEM,
+        _decoder: nn.Module = DecoderBlock,
         **kwargs,
     ):
 
@@ -40,6 +40,7 @@ class CEM_VAE(BaseCBVAE):
         self._encoder = _encoder(
             input_dim=self.input_dim,
             hidden_dim=self.hidden_dim,
+            n_layers=self.n_layers,
             latent_dim=self.latent_dim,
             dropout=self.dropout,
         )
@@ -106,6 +107,7 @@ class CEM_VAE(BaseCBVAE):
             n_concepts=n_unknown,
             n_unknown=n_unknown,
             hidden_dim=self.hidden_dim,
+            n_layers=self.n_layers,
             dropout=self.dropout,
         )
 
@@ -223,11 +225,22 @@ class CEM_VAE(BaseCBVAE):
 
         return dict(
             pred_concept=known_concepts,
-            emd_concept=emd_concept,
+            input_concept=emd_concept,
             unknown=unknown,
             h=h,
         )
 
+    def forward(self, x, concepts=None, **kwargs):
+        enc = self.encode(x, concepts=concepts, **kwargs)
+        z_dict = self.reparametrize(**enc)
+        cbm_dict = self.cbm(**z_dict, concepts=concepts, **enc)
+        dec_dict = self.decode(**enc, **z_dict, **cbm_dict, concepts=concepts)
+
+        out = {}
+        for d in [enc, z_dict, cbm_dict, dec_dict]:
+            out.update(d)
+        return out
+    
     def intervene(self, x, concepts, mask, **kwargs):
         enc = self.encode(x)
         z = self.reparametrize(**enc)
@@ -271,7 +284,7 @@ class CEM_VAE(BaseCBVAE):
         mu,
         logvar,
         pred_concept,
-        emd_concept,
+        input_concept,
         unknown,
         **kwargs,
     ):
@@ -293,7 +306,7 @@ class CEM_VAE(BaseCBVAE):
             loss_dict["Total_loss"] += self.concepts_hp * overall_concept_loss
 
         if self.use_orthogonality_loss:
-            orth_loss = self.orthogonality_loss(emd_concept, unknown)
+            orth_loss = self.orthogonality_loss(input_concept, unknown)
             loss_dict["orth_loss"] = orth_loss
             loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
 
@@ -355,7 +368,7 @@ class CEM_VAE(BaseCBVAE):
             dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
         )
 
-        lr = self.learning_rate
+        lr = 3e-4 #self.learning_rate
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=lr_gamma)
 
@@ -438,12 +451,14 @@ class scCEM(CEM_VAE):
     def __init__(self, config, decoder_type = 'skip', **kwargs):
         if(decoder_type == 'skip'):
             print("Using Skip Decoder")
-            decoder = SkipDecoderBlock_CEM
+            decoder = SkipDecoderBlock
         elif(decoder_type == 'no residual'):
             print("Using No Residual Decoder")
-            decoder = NoResDecoderBlock_CEM
+            decoder = NoResDecoderBlock
         else:
             print("Using Residual Decoder")
-            decoder = DecoderBlock_CEM
+            decoder = DecoderBlock
         super().__init__(config, _decoder = decoder, **kwargs)
 
+    def decode(self, input_concept, unknown, **kwargs):
+        return self._decoder(input_concept, unknown, **kwargs)
