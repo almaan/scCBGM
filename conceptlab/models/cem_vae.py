@@ -368,7 +368,7 @@ class CEM_VAE(BaseCBVAE):
             dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
         )
 
-        lr = 3e-4 #self.learning_rate
+        lr = self.learning_rate
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=lr_gamma)
 
