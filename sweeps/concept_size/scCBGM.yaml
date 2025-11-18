@@ -1,0 +1,30 @@
+program: main.py
+method: grid
+metric:
+  goal: minimize
+  name: MSE_intervention
+parameters:
+  constants.seed:
+    values: [13, 42, 67]
+  model:
+    value: scCBGM
+  modify:
+    value: default
+  dataset:
+    values: [concept_size_8, concept_size_20, concept_size_100, concept_size_250]
+  intervention:
+    values:
+      - synthetic/intervention_0
+      - synthetic/intervention_1
+      - synthetic/intervention_2
+      - synthetic/intervention_3
+      - synthetic/intervention_4
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.entity=andera29
+  - wandb.project=conceptlab
+  - test_intervention=True

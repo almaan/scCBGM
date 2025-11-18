@@ -1,9 +1,3 @@
-type: CEM_VAE
-
-input_dim: null
-n_concepts: null
-
-has_cbm: True
 lr: 5e-4
 beta: 1e-4
 n_layers: 2
@@ -12,4 +6,3 @@ hidden_dim: 128
 min_bottleneck_size: 128
 latent_dim: 64
 orthogonality_hp: 0.2
-decoder_type: 'skip'

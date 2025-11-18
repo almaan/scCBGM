@@ -15,7 +15,7 @@ wandb:
 
 
 trainer:
-  max_epochs: 200
+  max_epochs: 250
 
 plotting:
   plot: False

@@ -105,7 +105,6 @@ $ wandb: View sweep at: https://xxx.wandb.io/user/conceptlab
 $ wandb: Run sweep agent with: wandb agent user/conceptlab/wuw4xyb0
 ```
 
----
 
 **3️⃣ Launching the sweep**
 To launch, simply run:
@@ -136,7 +135,6 @@ Example (10 jobs):
 python jobs/sweeper.py --sweep_id user/conceptlab/wuw4xyb0 --num_jobs 10 lsf
 ```
 
----
 
 ⚙️ **Scheduler Options**
 

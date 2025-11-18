@@ -138,8 +138,6 @@ def main():
     adata = ad.AnnData(Xs_df, obs=obs, var=pd.DataFrame([], index=Xs_df.columns))
     adata.obsm["concepts"] = Cs_df
 
-    # TODO: I'M REALLY STUPID - FIX THIS
-
     for k, (_, concept_name) in enumerate(sel_combinations):
         obsm_name = "intervention_{}_concept".format(k)
         adata.obsm[obsm_name] = adata.obsm["concepts"].copy()

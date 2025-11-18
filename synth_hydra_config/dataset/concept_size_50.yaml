@@ -1,0 +1,2 @@
+dataset_path: ${oc.env:PROJECT_ROOT}/data/synthetic/concept_size_50.h5ad
+normalize: True

@@ -1,0 +1,36 @@
+program: main.py
+method: grid
+metric:
+  goal: minimize
+  name: MSE_intervention
+parameters:
+  constants.seed:
+    values: [13, 42]
+  model:
+    values: [scCBGM, cem_vae ]
+  model.decoder_type:
+    values: ['skip','residual']
+  modify:
+    values: [default, add, noise, drop, duplicate]
+  modify.params.n_mod:
+    values: [1.0, 3.0]
+  model.orthogonality_hp:
+    values: [0.0,0.5, 1]
+  dataset:
+    value: synthetic_1
+  intervention:
+    values:
+      - synthetic/intervention_0
+      - synthetic/intervention_1
+      - synthetic/intervention_2
+      - synthetic/intervention_3
+      - synthetic/intervention_4
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - wandb.entity=andera29
+  - wandb.project=conceptlab
+  - test_intervention=True
