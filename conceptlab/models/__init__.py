@@ -4,7 +4,7 @@ from .cb_vae import (
     scCBGM,
 )
 from .cb_vae_mixed import CB_VAE_MIXED
-from .cem_vae import CEM_VAE
+from .cem_vae import CEM_VAE, scCEM
 from .cvae import CVAE
 from .cb_fm import CB_FM
 from .cb_vae_fm import CB_VAE_FM
