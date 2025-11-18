@@ -92,7 +92,9 @@ class scGEN:
             for concept, ic in zip(concepts_to_flip, values_to_set):
                 concepts_flipped.loc[:, concept] = ic
         else:
-            concepts_flipped.loc[:, concepts_to_flip] = 1 - concepts_flipped.loc[:, concepts_to_flip].values
+            concepts_flipped.loc[:, concepts_to_flip] = (
+                1 - concepts_flipped.loc[:, concepts_to_flip].values
+            )
         adata_inter_.obsm["concepts_flipped"] = concepts_flipped
         adata_inter_.obs["concepts_flipped"] = (
             adata_inter_.obsm["concepts_flipped"][self.concepts_to_flip]

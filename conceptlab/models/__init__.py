@@ -6,6 +6,7 @@ from .cb_vae import (
 from .cb_vae_mixed import CB_VAE_MIXED
 from .cem_vae import CEM_VAE
 from .cvae import CVAE
+from .sc_cvae import scCVAE
 from .cb_fm import CB_FM
 from .cb_vae_fm import CB_VAE_FM
 from .concept_fm import Concept_FM

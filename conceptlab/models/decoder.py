@@ -430,12 +430,14 @@ class FlowDecoder(nn.Module):
             xt = xt + velocity * dt
 
         return dict(x_pred=xt)
-    
+
+
 class NoResBlock(nn.Module):
     """
     A single block of the MLP, consisting of a linear layer, normalization,
     activation, and dropout, without skip connections.
     """
+
     def __init__(self, emb_dim: int, dropout: float = 0.1):
         """
         Initializes the MLP block.
@@ -466,20 +468,21 @@ class NoResBlock(nn.Module):
         x = self.dropout(x)
         return x
 
+
 class NoResDecoderBlock(nn.Module):
     def __init__(
-    self,
-    input_dim: int,
-    n_concepts: int,
-    n_unknown: int,
-    hidden_dim: int,
-    n_layers: int,
-    dropout: float = 0.0,
-    **kwargs
+        self,
+        input_dim: int,
+        n_concepts: int,
+        n_unknown: int,
+        hidden_dim: int,
+        n_layers: int,
+        dropout: float = 0.0,
+        **kwargs,
     ):
         super().__init__()
 
-        self.input_dim = input_dim 
+        self.input_dim = input_dim
         self.hidden_dim = hidden_dim
 
         self.n_concepts = n_concepts
@@ -491,11 +494,11 @@ class NoResDecoderBlock(nn.Module):
             [NoResBlock(hidden_dim, dropout) for _ in range(n_layers)]
         )
 
-        self.output_later = nn.Linear(self.hidden_dim, self.input_dim )
+        self.output_later = nn.Linear(self.hidden_dim, self.input_dim)
 
     def forward(self, input_concept, unknown, **kwargs):
         x = torch.concat((unknown, input_concept), dim=1)
-        
+
         h = self.x_embedder(x)
         for layer in self.layers:
             h = layer(h)
@@ -503,20 +506,21 @@ class NoResDecoderBlock(nn.Module):
 
         return dict(x_pred=h)
 
+
 class CVAEDecoderBlock(nn.Module):
     def __init__(
-    self,
-    input_dim: int,
-    n_concepts: int,
-    n_latent: int,
-    hidden_dim: int,
-    n_layers: int,
-    dropout: float = 0.0,
-    **kwargs
+        self,
+        input_dim: int,
+        n_concepts: int,
+        n_latent: int,
+        hidden_dim: int,
+        n_layers: int,
+        dropout: float = 0.0,
+        **kwargs,
     ):
         super().__init__()
 
-        self.input_dim = input_dim 
+        self.input_dim = input_dim
         self.hidden_dim = hidden_dim
 
         self.n_concepts = n_concepts
@@ -532,7 +536,7 @@ class CVAEDecoderBlock(nn.Module):
 
     def forward(self, latent, input_concept, **kwargs):
         x = torch.concat((latent, input_concept), dim=1)
-        
+
         h = self.x_embedder(x)
         for layer in self.layers:
             h = layer(h)

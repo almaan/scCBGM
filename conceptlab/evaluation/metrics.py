@@ -5,17 +5,19 @@ import ot
 
 def emd(x, y):
     dist_mat = ot.dist(x, y)
-    dist_mat_norm = dist_mat/dist_mat.max()
+    dist_mat_norm = dist_mat / dist_mat.max()
 
-    emd = ot.emd2([],[], dist_mat_norm, numItermax=int(1e7))
-    #emd = np.sum(ot_matrix * dist_mat)
+    emd = ot.emd2([], [], dist_mat_norm, numItermax=int(1e7))
+    # emd = np.sum(ot_matrix * dist_mat)
 
     return emd
 
+
 def w2(x, y):
-    dist_mat = ot.dist(x,y, metric = "sqeuclidean")
+    dist_mat = ot.dist(x, y, metric="sqeuclidean")
     w2_sq = ot.emd2([], [], dist_mat, numItermax=int(1e7))
     return np.sqrt(w2_sq)
+
 
 def sinkhorn_divergence(x, y, reg=0.1):
     dist_mat = ot.dist(x, y, metric="sqeuclidean")
@@ -34,7 +36,11 @@ def sinkhorn_divergence(x, y, reg=0.1):
     dist_mat_yy /= dist_mat_yy_max
     sinkhorn_yy = ot.sinkhorn2([], [], dist_mat_yy, reg)
 
-    sinkhorn_div = dist_mat_max * sinkhorn_xy - 0.5 * dist_mat_xx_max * sinkhorn_xx - 0.5 * dist_mat_yy_max * sinkhorn_yy
+    sinkhorn_div = (
+        dist_mat_max * sinkhorn_xy
+        - 0.5 * dist_mat_xx_max * sinkhorn_xx
+        - 0.5 * dist_mat_yy_max * sinkhorn_yy
+    )
 
     return sinkhorn_div
 
@@ -147,7 +153,8 @@ def mmd(X, Y, sigma=1.0, kernel=rbf_kernel, kernel_params={}):
 
     return mmd_squared
 
-def cosine_sim(vector_a,vector_b):
+
+def cosine_sim(vector_a, vector_b):
     dot_product = np.dot(vector_a, vector_b)
 
     # Calculate the magnitude (L2 norm) of each vector
@@ -160,6 +167,7 @@ def cosine_sim(vector_a,vector_b):
 
     return similarity
 
+
 def _calculate_median_distance(X, Y):
     """
     Calculates the median of pairwise distances between points in X and Y.
@@ -167,20 +175,21 @@ def _calculate_median_distance(X, Y):
     """
     # Combine the two point clouds
     Z = np.concatenate([X, Y], 0)
-    
+
     # Calculate pairwise squared Euclidean distances
     Z_norm = np.sum(Z**2, axis=1, keepdims=True)
     dist_sq = Z_norm - 2 * np.dot(Z, Z.T) + Z_norm.T
-    
+
     # Get the unique, non-zero distances and take the square root
     distances = np.sqrt(np.clip(dist_sq, a_min=0, a_max=None))
-    
+
     # Get the upper triangular part to avoid duplicates and diagonal zeros
     triu_indices = np.triu_indices_from(distances, k=1)
     unique_distances = distances[triu_indices]
-    
+
     # Return the median
     return np.median(unique_distances)
+
 
 def rbf_kernel(X, Y, gamma=1.0):
     """
@@ -202,14 +211,15 @@ def rbf_kernel(X, Y, gamma=1.0):
     # ||x - y||^2 = ||x||^2 - 2 * x^T * y + ||y||^2
     X_norm = np.sum(X**2, axis=1, keepdims=True)
     Y_norm = np.sum(Y**2, axis=1, keepdims=True)
-    
+
     XY = np.dot(X, Y.T)
-    
+
     dist_sq = X_norm - 2 * XY + Y_norm.T
-    
+
     # Apply the RBF kernel function
     K = np.exp(-gamma * dist_sq)
     return K
+
 
 def calculate_mmd(X, Y, gamma=None):
     """
@@ -235,7 +245,7 @@ def calculate_mmd(X, Y, gamma=None):
     if m < 2 or n < 2:
         # The unbiased estimator is not defined for fewer than 2 samples.
         return 0.0
-    
+
     # If gamma is not specified, use the median heuristic. This is crucial for
     # high-dimensional data. gamma = 1 / (2 * sigma^2), where sigma is the median distance.
     if gamma is None:
@@ -244,26 +254,26 @@ def calculate_mmd(X, Y, gamma=None):
         if median_dist > 0:
             gamma = 1.0 / (2 * median_dist**2)
         else:
-            gamma = 1.0 / d # Fallback heuristic
+            gamma = 1.0 / d  # Fallback heuristic
 
-        #print("Using median heuristic for gamma:", gamma)
+        # print("Using median heuristic for gamma:", gamma)
     # else:
     #     print("Using provided gamma:", gamma)
     # Calculate the kernel matrices
     K_XX = rbf_kernel(X, X, gamma)
     K_YY = rbf_kernel(Y, Y, gamma)
     K_XY = rbf_kernel(X, Y, gamma)
-    
+
     # Unbiased MMD^2 estimator.
     # We set the diagonal elements to 0 to avoid comparing a point with itself.
     np.fill_diagonal(K_XX, 0)
     np.fill_diagonal(K_YY, 0)
-    
+
     term1 = np.sum(K_XX) / (m * (m - 1))
     term2 = np.sum(K_YY) / (n * (n - 1))
     term3 = -2 * np.mean(K_XY)
-    
+
     mmd_sq = term1 + term2 + term3
-    
+
     # MMD can sometimes be slightly negative due to numerical precision, so we clamp at 0.
     return np.clip(mmd_sq, a_min=0, a_max=None)

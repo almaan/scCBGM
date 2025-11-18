@@ -19,5 +19,3 @@ mod_cfg:
   concepts_hp: 0.1
   othogonality_hp: 0.1
   flow_hp: 1.0
-
-

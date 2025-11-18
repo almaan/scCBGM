@@ -355,13 +355,14 @@ def evaluate_intervention_emd_with_target(
 
     return score
 
+
 def evaluate_intervention_w2_with_target(
     x_train,
     x_ivn,
     x_target,
     labels_train,
     pre_computed_w2_train=None,
-    sinkhorn_reg: float = 0.,
+    sinkhorn_reg: float = 0.0,
 ) -> Dict[str, Any]:
 
     if pre_computed_w2_train is None:
@@ -370,8 +371,10 @@ def evaluate_intervention_w2_with_target(
 
         for k, s in enumerate(source):
             x_source = x_train[labels_train == s]
-            if sinkhorn_reg > 0.:
-                scores[k] = met.sinkhorn_divergence(x_target, x_source, reg=sinkhorn_reg)
+            if sinkhorn_reg > 0.0:
+                scores[k] = met.sinkhorn_divergence(
+                    x_target, x_source, reg=sinkhorn_reg
+                )
             else:
                 scores[k] = met.w2(x_target, x_source)
 
@@ -379,7 +382,7 @@ def evaluate_intervention_w2_with_target(
     else:
         min_train_score = pre_computed_w2_train
 
-    if sinkhorn_reg > 0.:
+    if sinkhorn_reg > 0.0:
         ivn_score = met.sinkhorn_divergence(x_target, x_ivn, reg=sinkhorn_reg)
     else:
         ivn_score = met.w2(x_target, x_ivn)
@@ -389,6 +392,7 @@ def evaluate_intervention_w2_with_target(
     score = dict(w2_ratio=w2_ratio, pre_computed_w2_train=min_train_score)
 
     return score
+
 
 def evaluate_intervention_frechet_with_target(
     x_train,
@@ -414,7 +418,9 @@ def evaluate_intervention_frechet_with_target(
 
     frechet_ratio = ivn_score / (min_train_score + 1e-8)
 
-    score = dict(frechet_ratio=frechet_ratio, pre_computed_frechet_train=min_train_score)
+    score = dict(
+        frechet_ratio=frechet_ratio, pre_computed_frechet_train=min_train_score
+    )
 
     return score
 

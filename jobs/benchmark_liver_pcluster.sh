@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name liver
+#SBATCH --job-name liver_cemvae
 #SBATCH --nodes 1
 #SBATCH --ntasks-per-node 1
 #SBATCH --gpus 1
 #SBATCH --cpus-per-task 8
 #SBATCH --partition braid
-#SBATCH --mem=64G
+#SBATCH --mem=128G
 #SBATCH --time=48:00:00
 #SBATCH --output=/homefs/home/debroue1/projects/conceptlab/logs/cluster/%x_%j.out.out
 #SBATCH --error=/homefs/home/debroue1/projects/conceptlab/logs/cluster/%x_%j.out.err
@@ -22,4 +22,4 @@ conda deactivate
 
 cd /homefs/home/debroue1/projects/conceptlab/scripts
 
-uv run python benchmark_liver.py # REPLACE WITH YOUR SWEEP PATH !!!!
+uv run python benchmark_liver_baselines.py --cemvae # REPLACE WITH YOUR SWEEP PATH !!!!

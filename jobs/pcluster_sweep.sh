@@ -5,31 +5,23 @@
 #SBATCH --ntasks-per-node 1
 #SBATCH --gpus 1
 #SBATCH --cpus-per-task 8
-#SBATCH --partition owner_gred_braid_gpu
-#SBATCH --account owner_gred_braid_gpu
+#SBATCH --partition braid
 #SBATCH --mem=64G
 #SBATCH --time=10:00:00
-#SBATCH --output=/tmp/slurm_placeholder.out
-#SBATCH --error=/tmp/slurm_placeholder.err
+#SBATCH --output=homefs/home/debroue1/projects/conceptlab/logs/cluster/%x_%j.out.out
+#SBATCH --error=/homefs/home/debroue1/projects/conceptlab/logs/cluster/%x_%j.out.err
 
 #### SBATCH --qos=preempt
 
-
-exec >"$ROOT_DIR/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" \
-     2>"$ROOT_DIR/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.err"
-
-export PROJECT_ROOT=$ROOT_DIR
+# Usage: sbatch pcluster_sweep.sh debroue1/conceptlab/2bcfk8lh
 
 # it can be useful to know what node the job ran on
 hostname
 
 source ~/.bashrc  # or ~/.bash_profile, ~/.zshrc based on your shell
 
-cd $ROOT_DIR/scripts/
+cd /homefs/home/debroue1/projects/conceptlab/scripts
 
-<<<<<<< HEAD
-uv run wandb agent debroue1/conceptlab/r6862kyo # REPLACE WITH YOUR SWEEP PATH !!!!
-=======
 runner=(uv run)          # default
 if [[ "${1:-}" == "--conda_mode" ]] || [[ "${1:-}" == "-c" ]]; then
   runner=()
@@ -47,4 +39,3 @@ if [[ -z "$SWEEP_ID" ]]; then
 fi
 
 "${runner[@]}" wandb agent "${SWEEP_ID}"
->>>>>>> cf53f17eabfb63a8f758423e1439330e0ff2e170

@@ -118,7 +118,6 @@ class CB_VAE(BaseCBVAE):
             self.orthogonality_loss = self._cosine_loss
         else:
             self.orthogonality_loss = self._cov_loss
-        
 
     @property
     def has_concepts(
@@ -197,7 +196,6 @@ class CB_VAE(BaseCBVAE):
         loss = (cosine_similarity**2).sum()
 
         return loss
-
 
     def _cov_loss(self, c, u):
 
@@ -439,7 +437,6 @@ class CBM_MetaTrainer:
         self.z_score = z_score
 
     def train(self, adata_train):
-
         """Trains and returns the scCBGM model."""
         print("Training scCBGM model...")
 
@@ -587,7 +584,6 @@ class Mixed_CBM_MetaTrainer:
             )
 
     def train(self, adata_train):
-
         """Trains and returns the scCBGM model."""
         print("Training scCBGM model...")
 

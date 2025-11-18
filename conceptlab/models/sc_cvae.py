@@ -39,6 +39,7 @@ class scCVAE(BaseCBVAE):
     This class inherits from BaseCBVAE to reuse the VAE boilerplate like
     reparametrize() and KL_loss().
     """
+
     def __init__(
         self,
         config,
@@ -51,7 +52,7 @@ class scCVAE(BaseCBVAE):
         )
 
         self.dropout = config.get("dropout", 0.0)
-        self.n_concepts = config.n_concepts # Get n_concepts from config
+        self.n_concepts = config.n_concepts  # Get n_concepts from config
         self.beta = config.beta
 
         # --- 1. Define Encoder ---
@@ -64,7 +65,7 @@ class scCVAE(BaseCBVAE):
             hidden_dim=self.hidden_dim,
             latent_dim=self.latent_dim,
             dropout=self.dropout,
-            n_concepts=self.n_concepts
+            n_concepts=self.n_concepts,
         )
 
         # --- 2. Define Decoder ---
@@ -76,11 +77,10 @@ class scCVAE(BaseCBVAE):
             n_latent=self.latent_dim,
             hidden_dim=self.hidden_dim,
             n_layers=self.n_layers,
-            dropout=self.dropout
+            dropout=self.dropout,
         )
 
         self.dropout = nn.Dropout(p=self.dropout)
-
 
     def cbm(self, z, **kwargs):
         """
@@ -90,7 +90,7 @@ class scCVAE(BaseCBVAE):
         # This method is unused in the CVAE workflow.
         # We return an empty dict to match the expected output type.
         return {}
-    
+
     @property
     def has_concepts(
         self,
@@ -112,7 +112,6 @@ class scCVAE(BaseCBVAE):
         # Pass separate tensors to the encoder
         return self.encoder(x=x, input_concept=concepts, **kwargs)
 
-
     def decode(self, z, concepts, **kwargs):
         """
         Decodes the concatenated input (z + concepts).
@@ -122,29 +121,30 @@ class scCVAE(BaseCBVAE):
         # Pass z and concepts as separate 'latent' and 'input_concept' args
         return self.decoder(latent=z, input_concept=concepts, **kwargs)
 
-
     def forward(self, x, concepts=None, **kwargs):
         """
         Full CVAE forward pass.
         """
         if concepts is None:
-            raise ValueError("CVAE requires 'concepts' (the condition) to be provided during forward pass.")
+            raise ValueError(
+                "CVAE requires 'concepts' (the condition) to be provided during forward pass."
+            )
 
         # 1. Prepare encoder input
         # MODIFIED: No longer concatenating here.
         # enc_input = torch.cat((x, concepts), 1)
-        
+
         # 2. Encode
         # MODIFIED: Pass 'x' and 'concepts' as separate arguments
         enc_dict = self.encode(x, concepts)
-        
+
         # 3. Reparameterize
-        z_dict = self.reparametrize(**enc_dict) # From BaseCBVAE
+        z_dict = self.reparametrize(**enc_dict)  # From BaseCBVAE
 
         # 4. Prepare decoder input
         # MODIFIED: No longer need to concatenate for the decoder
         # dec_input = torch.cat((z_dict["z"], concepts), 1)
-        
+
         # 5. Decode
         # MODIFIED: Pass 'z' and 'concepts' as separate arguments
         dec_dict = self.decode(z=z_dict["z"], concepts=concepts)
@@ -154,17 +154,19 @@ class scCVAE(BaseCBVAE):
         for d in [enc_dict, z_dict, dec_dict]:
             out.update(d)
         return out
-    
+
     def intervene(self, x, concepts_enc, concepts_dec, **kwargs):
         if concepts_enc is None or concepts_dec is None:
-            raise ValueError("CVAE intervention requires both 'concepts_enc' and 'concepts_dec' to be provided.")
+            raise ValueError(
+                "CVAE intervention requires both 'concepts_enc' and 'concepts_dec' to be provided."
+            )
 
         # 1. Encode x conditioned on 'concepts_enc'
         enc_dict = self.encode(x, concepts=concepts_enc, **kwargs)
-        
+
         # 2. Reparameterize to get z
-        z_dict = self.reparametrize(**enc_dict) # From BaseCBVAE
-        
+        z_dict = self.reparametrize(**enc_dict)  # From BaseCBVAE
+
         # 3. Decode z conditioned on 'concepts_dec'
         dec_dict = self.decode(z=z_dict["z"], concepts=concepts_dec, **kwargs)
 
@@ -174,13 +176,11 @@ class scCVAE(BaseCBVAE):
             out.update(d)
         return out
 
-
     def rec_loss(self, x_pred, x):
         """
         Reconstruction loss.
         """
         return F.mse_loss(x_pred, x, reduction="mean")
-
 
     def loss_function(
         self,
@@ -197,7 +197,7 @@ class scCVAE(BaseCBVAE):
 
         # 1. Reconstruction Loss
         MSE = self.rec_loss(x_pred, x)
-        
+
         # 2. KLD Loss (from BaseCBVAE)
         KLD = self.KL_loss(mu, logvar)
 
@@ -219,36 +219,40 @@ class scCVAE(BaseCBVAE):
 
         return loss_dict
 
-    
-    def train_loop(self, data: torch.Tensor,
-               concepts: torch.Tensor,
-               num_epochs: int,
-               batch_size: int,
-               lr: float = 3e-4,
-               lr_gamma: float = 0.997,
-               num_workers: int = 0):
+    def train_loop(
+        self,
+        data: torch.Tensor,
+        concepts: torch.Tensor,
+        num_epochs: int,
+        batch_size: int,
+        lr: float = 3e-4,
+        lr_gamma: float = 0.997,
+        num_workers: int = 0,
+    ):
         """
         Defines the training loop for the scCVAE model.
-        
+
         MODIFIED: Removed F1 score calculation, as this model
         does not predict concepts.
         """
         # --- 1. Setup Device, DataLoader, Optimizer, Scheduler ---
-        torch.set_flush_denormal(True) # Add this to prevent slowdowns
-        
+        torch.set_flush_denormal(True)  # Add this to prevent slowdowns
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.to(device)
 
         dataset = TensorDataset(data, concepts)
-        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        data_loader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        )
 
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=lr_gamma)
 
         print(f"Starting CVAE training on {device} for {num_epochs} epochs...")
 
-        self.train() # Set the model to training mode
-        
+        self.train()  # Set the model to training mode
+
         # --- 2. The Training Loop ---
         pbar = tqdm(range(num_epochs), desc="Training Progress", ncols=150)
 
@@ -256,7 +260,7 @@ class scCVAE(BaseCBVAE):
             total_loss = 0.0
             total_rec_loss = 0.0
             total_kl_loss = 0.0
-            
+
             for x_batch, concepts_batch in data_loader:
                 # Move batch to the correct device
                 x_batch = x_batch.to(device)
@@ -281,26 +285,28 @@ class scCVAE(BaseCBVAE):
                 total_loss += loss.item()
                 total_rec_loss += loss_dict.get("rec_loss", 0.0)
                 total_kl_loss += loss_dict.get("KL_loss", 0.0)
-                
+
                 # --- F1 Score calculation is REMOVED ---
 
-           # --- End of Epoch ---
+            # --- End of Epoch ---
             avg_loss = total_loss / len(data_loader)
             avg_rec = total_rec_loss / len(data_loader)
             avg_kl = total_kl_loss / len(data_loader)
-             
+
             # --- Update progress bar (F1 score removed) ---
-            pbar.set_postfix({
-                "avg_loss": f"{avg_loss:.3e}",
-                "rec_loss": f"{avg_rec:.3e}",
-                "kl_loss": f"{avg_kl:.3e}",
-                "lr": f"{scheduler.get_last_lr()[0]:.5e}"
-            })
-             
+            pbar.set_postfix(
+                {
+                    "avg_loss": f"{avg_loss:.3e}",
+                    "rec_loss": f"{avg_rec:.3e}",
+                    "kl_loss": f"{avg_kl:.3e}",
+                    "lr": f"{scheduler.get_last_lr()[0]:.5e}",
+                }
+            )
+
             scheduler.step()
-             
+
         print("Training finished.")
-        self.eval() # Set the model to evaluation mode
+        self.eval()  # Set the model to evaluation mode
 
 
 class CVAE_MetaTrainer:
@@ -337,7 +343,6 @@ class CVAE_MetaTrainer:
         self.z_score = z_score
 
     def train(self, adata_train):
-
         """Trains and returns the scCVAE model."""
         print("Training scCVAE model...")
 
@@ -409,7 +414,7 @@ class CVAE_MetaTrainer:
         # Define the intervention by creating new concept values for encoding and decoding
         concepts_enc = torch.tensor(c_intervene_on, dtype=torch.float32)
         concepts_dec = torch.tensor(c_intervene_on, dtype=torch.float32)
-        
+
         # Set the intervention concepts to the specified values
         if values_to_set is not None:
             for idx, value in zip(concept_to_intervene_idx, values_to_set):
@@ -488,16 +493,16 @@ class CVAEFM_MetaTrainer:
         """
         Uses a trained scCVAE to generate its latent representation ('mu')
         for all data, conditioned on the true concepts.
-        
+
         It saves the latent 'mu' and a concatenation of 'mu' and the
         true concepts into adata_full.obsm.
         """
         print("Generating latents from scCVAE...")
-        
+
         if self.scCVAE_model.model is None:
             raise ValueError("scCVAE model is not trained. Call fit_cvae_model first")
-        
-        self.scCVAE_model.model.to('cuda')  # Ensure model is on the correct device
+
+        self.scCVAE_model.model.to("cuda")  # Ensure model is on the correct device
 
         # --- 1. Get Input Data 'x' ---
         if self.obsm_key != "X":
@@ -509,25 +514,27 @@ class CVAEFM_MetaTrainer:
 
         # --- 2. Get Conditional Data 'concepts' ---
         # The CVAE encoder requires the concepts as an input condition
-        all_concepts_numpy = adata_full.obsm[self.concept_key].to_numpy().astype(np.float32)
+        all_concepts_numpy = (
+            adata_full.obsm[self.concept_key].to_numpy().astype(np.float32)
+        )
         all_concepts = torch.tensor(all_concepts_numpy, dtype=torch.float32).to("cuda")
 
         # --- 3. Get Latent Variable 'mu' ---
         with torch.no_grad():
             # Encode x *conditioned on* the true concepts
             enc_dict = self.scCVAE_model.model.encode(all_x, all_concepts)
-            
+
             # This is the CVAE latent representation
             latent_mu = enc_dict["mu"].cpu().numpy()
 
         # --- 4. Save Outputs to AnnData ---
         adata_full.obsm["scCVAE_latent"] = latent_mu
-        
+
         # Per request: save the latent concatenated with the true concepts
         adata_full.obsm["scCVAE_latent_and_concepts"] = np.concatenate(
             [latent_mu, all_concepts_numpy], axis=1
         )
-        
+
         print("Saved 'scCVAE_latent' and 'scCVAE_latent_and_concepts' to adata.obsm")
         return adata_full
 
@@ -541,7 +548,7 @@ class CVAEFM_MetaTrainer:
 
         # First, fit the CVAE model
         self.fit_cvae_model(adata_train)
-        
+
         # Generate CVAE latents
         adata_train = self.get_cvae_latents(adata_train.copy())
 
@@ -553,7 +560,7 @@ class CVAEFM_MetaTrainer:
 
         # Use the concatenated latent + concepts as conditioning
         latent_and_concepts_key = "scCVAE_latent_and_concepts"
-        
+
         mod_cfg = hydra.utils.instantiate(self.fm_mod_cfg)
         mod_cfg["input_dim"] = data_matrix.shape[1]
         mod_cfg["n_concepts"] = adata_train.obsm[latent_and_concepts_key].shape[1]
@@ -569,14 +576,14 @@ class CVAEFM_MetaTrainer:
             lr=self.lr,
             num_workers=self.num_workers,
         )
-        
+
         return self.fm_model
 
     def predict_intervention(
         self, adata_inter, hold_out_label, concepts_to_flip, values_to_set=None
     ):
         """Performs intervention using a trained CVAE-FM model.
-        
+
         Args:
             adata_inter: AnnData object with intervention data
             hold_out_label: Label for held-out condition
@@ -605,11 +612,11 @@ class CVAEFM_MetaTrainer:
         latent_and_concepts_key = "scCVAE_latent_and_concepts"
         init_concepts = adata_inter.obsm[latent_and_concepts_key].astype(np.float32)
         edit_concepts = init_concepts.copy()
-        
+
         # The concepts are at the end of the concatenated vector
         # We need to offset by the latent dimension
         latent_dim = adata_inter.obsm["scCVAE_latent"].shape[1]
-        
+
         # Apply interventions to the concept part (after latent)
         if values_to_set is not None:
             for idx, value in zip(concept_to_intervene_idx, values_to_set):
@@ -639,7 +646,7 @@ class CVAEFM_MetaTrainer:
                 n_steps=1000,
                 w_cfg=1.0,
             )
-        
+
         inter_preds = inter_preds.detach().cpu().numpy()
 
         # Create output AnnData

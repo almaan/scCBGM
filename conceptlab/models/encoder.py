@@ -5,11 +5,13 @@ import torch as t
 
 import torch
 
+
 class MLPBlock(nn.Module):
     """
     A single block of the MLP, consisting of a linear layer, normalization,
     activation, and dropout, with skip connections for the main data path.
     """
+
     def __init__(self, emb_dim: int, dropout: float = 0.1):
         """
         Initializes the MLP block.
@@ -44,14 +46,14 @@ class MLPBlock(nn.Module):
 
 class EncoderBlock(nn.Module):
     def __init__(
-    self,
-    input_dim: int,
-    n_layers: int,
-    hidden_dim: int,
-    latent_dim: int,
-    dropout: float,
-    n_concepts: int = 0,
-    **kwargs
+        self,
+        input_dim: int,
+        n_layers: int,
+        hidden_dim: int,
+        latent_dim: int,
+        dropout: float,
+        n_concepts: int = 0,
+        **kwargs,
     ):
         super().__init__()
 
@@ -75,13 +77,14 @@ class EncoderBlock(nn.Module):
 
         h = self.x_embedder(x)
         for layer in self.layers:
-            h = layer(h,)
+            h = layer(
+                h,
+            )
 
         mu, logvar = self.fc_mu(h), self.fc_var(h)
         logvar = t.clip(logvar, -1e5, 1e5)
 
         return dict(mu=mu, logvar=logvar)
-
 
 
 class DefaultEncoderBlock(nn.Module):
@@ -127,12 +130,14 @@ class DefaultEncoderBlock(nn.Module):
         logvar = t.clip(logvar, -1e5, 1e5)
 
         return dict(mu=mu, logvar=logvar)
-    
+
+
 class NoResMLPBlock(nn.Module):
     """
     A single block of the MLP, consisting of a linear layer, normalization,
     activation, and dropout, with skip connections for the main data path.
     """
+
     def __init__(self, emb_dim: int, dropout: float = 0.1):
         """
         Initializes the MLP block.
@@ -161,6 +166,7 @@ class NoResMLPBlock(nn.Module):
         x = self.activation(x)
         x = self.dropout(x)
         return x
+
 
 class ConditionalEncoderBlock(nn.Module):
     def __init__(
@@ -209,16 +215,17 @@ class ConditionalEncoderBlock(nn.Module):
 
         return dict(mu=mu, logvar=logvar)
 
+
 class CVAEEncoderBlock(nn.Module):
     def __init__(
-    self,
-    input_dim: int,
-    n_layers: int,
-    hidden_dim: int,
-    latent_dim: int,
-    dropout: float,
-    n_concepts: int = 0,
-    **kwargs
+        self,
+        input_dim: int,
+        n_layers: int,
+        hidden_dim: int,
+        latent_dim: int,
+        dropout: float,
+        n_concepts: int = 0,
+        **kwargs,
     ):
         super().__init__()
 
@@ -244,7 +251,9 @@ class CVAEEncoderBlock(nn.Module):
 
         h = self.x_embedder(x)
         for layer in self.layers:
-            h = layer(h,)
+            h = layer(
+                h,
+            )
 
         mu, logvar = self.fc_mu(h), self.fc_var(h)
         logvar = t.clip(logvar, -1e5, 1e5)

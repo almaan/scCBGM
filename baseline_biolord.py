@@ -166,7 +166,6 @@ def main(
         test_split="test",
     )
 
-
     trainer_params = {k: v for k, v in cfg.model.trainer.items()}
     batch_size = trainer_params.pop("batch_size")
 

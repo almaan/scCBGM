@@ -1,6 +1,6 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+    rev: v4.6.0
     hooks:
     -   id: check-yaml
     -   id: end-of-file-fixer
@@ -8,7 +8,7 @@ repos:
 
 
 -   repo: https://github.com/psf/black
-    rev: 22.10.0
+    rev: 24.10.0
     hooks:
     -   id: black
 
@@ -17,6 +17,8 @@ repos:
     -   id: autoflake
         name: autoflake
         entry: autoflake
+        additional_dependencies:
+            - autoflake==2.3.1
         language: python
         exclude: ipynb$
         args:
