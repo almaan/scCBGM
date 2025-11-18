@@ -88,9 +88,13 @@ class scGEN:
         adata_inter_.X = adata_inter_.layers["og"]
 
         concepts_flipped = adata_inter_.obsm["concepts"].copy()
-        concepts_flipped.loc[:, concepts_to_flip] = (
-            1 - concepts_flipped.loc[:, concepts_to_flip].values
-        )
+        if values_to_set is not None:
+            for concept, ic in zip(concepts_to_flip, values_to_set):
+                concepts_flipped.loc[:, concept] = ic
+        else:
+            concepts_flipped.loc[:, concepts_to_flip] = (
+                1 - concepts_flipped.loc[:, concepts_to_flip].values
+            )
         adata_inter_.obsm["concepts_flipped"] = concepts_flipped
         adata_inter_.obs["concepts_flipped"] = (
             adata_inter_.obsm["concepts_flipped"][self.concepts_to_flip]

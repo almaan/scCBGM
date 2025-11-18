@@ -44,46 +44,66 @@ MODS = {
     "default": modify.identity,
 }
 
+
 def get_learned_concepts(scCBGM_model, adata_full):
     """Uses a trained scCBGM to generate learned concepts for all data."""
     print("Generating learned concepts from scCBGM...")
     with torch.no_grad():
         all_x = torch.tensor(adata_full.X, dtype=torch.float32)
         enc = scCBGM_model.encode(all_x)
-        adata_full.obsm['scCBGM_concepts_known'] = scCBGM_model.cb_concepts_layers(enc['mu']).cpu().numpy()
-        adata_full.obsm['scCBGM_concepts_unknown'] = scCBGM_model.cb_unk_layers(enc['mu']).cpu().numpy()
+        adata_full.obsm["scCBGM_concepts_known"] = (
+            scCBGM_model.cb_concepts_layers(enc["mu"]).cpu().numpy()
+        )
+        adata_full.obsm["scCBGM_concepts_unknown"] = (
+            scCBGM_model.cb_unk_layers(enc["mu"]).cpu().numpy()
+        )
     return adata_full
 
-def train_method_2_fm_learned(adata_train, num_epochs = 1000):
+
+def train_method_2_fm_learned(adata_train, num_epochs=1000):
     """Trains and returns the CB-FM model using learned concepts."""
     print("Training CB-FM model with learned concepts...")
     fm_model = clab.models.cb_fm.CB_FM(
         x_dim=adata_train.shape[1],
-        c_known_dim=adata_train.obsm['scCBGM_concepts_known'].shape[1],
-        c_unknown_dim=adata_train.obsm['scCBGM_concepts_unknown'].shape[1],
-        emb_dim=1024, n_layers=6
+        c_known_dim=adata_train.obsm["scCBGM_concepts_known"].shape[1],
+        c_unknown_dim=adata_train.obsm["scCBGM_concepts_unknown"].shape[1],
+        emb_dim=1024,
+        n_layers=6,
     )
     fm_model.train(
         data=torch.from_numpy(adata_train.X.astype(np.float32)),
-        concepts_known=torch.from_numpy(adata_train.obsm['scCBGM_concepts_known'].astype(np.float32)),
-        concepts_unknown=torch.from_numpy(adata_train.obsm['scCBGM_concepts_unknown'].astype(np.float32)),
-        num_epochs=num_epochs, batch_size=128, lr=3e-4, p_drop=0.1
+        concepts_known=torch.from_numpy(
+            adata_train.obsm["scCBGM_concepts_known"].astype(np.float32)
+        ),
+        concepts_unknown=torch.from_numpy(
+            adata_train.obsm["scCBGM_concepts_unknown"].astype(np.float32)
+        ),
+        num_epochs=num_epochs,
+        batch_size=128,
+        lr=3e-4,
+        p_drop=0.1,
     )
     return fm_model
+
 
 def predict_with_method_2_fm_learned(model, adata):
     """Performs intervention using a trained learned-concept CB-FM model."""
     print("Performing intervention with CB-FM (learned)...")
-    c_known_inter = torch.from_numpy(adata.obsm['scCBGM_concepts_known'].astype(np.float32))
-    c_unknown_inter = torch.from_numpy(adata.obsm['scCBGM_concepts_unknown'].astype(np.float32))
+    c_known_inter = torch.from_numpy(
+        adata.obsm["scCBGM_concepts_known"].astype(np.float32)
+    )
+    c_unknown_inter = torch.from_numpy(
+        adata.obsm["scCBGM_concepts_unknown"].astype(np.float32)
+    )
 
-    
     inter_preds = model.sample(
         concepts_known=c_known_inter,
         concepts_unknown=c_unknown_inter,
         negative_concepts_known=c_known_inter,
         num_samples=c_known_inter.shape[0],
-        timesteps=1000, w_pos=1.5, w_neg=0.5
+        timesteps=1000,
+        w_pos=1.5,
+        w_neg=0.5,
     )
     x_inter_preds = inter_preds.detach().cpu().numpy()
 
@@ -192,7 +212,7 @@ def main(
     n_obs, n_vars = adata.shape
     n_concepts = adata.obsm[concept_key].shape[1]
     # TODO: check if this makes sense
-    n_concepts_to_eval = cfg.dataset.get("n_concepts", n_concepts)
+    cfg.dataset.get("n_concepts", n_concepts)
 
     try:
         model_to_call = getattr(clab.models, cfg.model.type, None)
@@ -260,7 +280,7 @@ def main(
     if hasattr(model, "log_parameters"):
         model.log_parameters()
 
-    x_raw = adata_test.X.astype(np.float32).copy()
+    adata_test.X.astype(np.float32).copy()
     x_true = adata_test.X.astype(np.float32).copy()
     c_true = adata_test.obsm["concepts"].values.copy().astype(np.float32)
 
@@ -380,15 +400,16 @@ def main(
 
     ad_merge.obs_names_make_unique()
 
-
     ##### Collect the concepts from the concept bottleneck on the whole anndata
 
     adata_train_with_concepts = get_learned_concepts(model, adata.copy())
     adata_test_with_concepts = get_learned_concepts(model, adata_test.copy())
 
-    #Train FM model
-    fm_learned_model = train_method_2_fm_learned(adata_train_with_concepts.copy(), num_epochs = cfg.model.fm_max_epochs)
-    
+    # Train FM model
+    fm_learned_model = train_method_2_fm_learned(
+        adata_train_with_concepts.copy(), num_epochs=cfg.model.fm_max_epochs
+    )
+
     indicator = adata.uns["concept_indicator"]
     ix_og_concepts = indicator.values == C.Mods.none
     original_concepts = adata.obsm[concept_key].iloc[:, ix_og_concepts].copy()
@@ -409,11 +430,18 @@ def main(
         for ivn_value, intervention_type in enumerate(["Off", "On"]):
 
             # selecting values in the "test" or "val" cfg.model.eval_split
-            source_test_idx = adata_test_with_concepts.obsm["concepts"][concept_name].values == ivn_value
+            source_test_idx = (
+                adata_test_with_concepts.obsm["concepts"][concept_name].values
+                == ivn_value
+            )
             adata_test_to_perturb = adata_test_with_concepts[source_test_idx].copy()
-            adata_test_to_perturb.obsm["scCBGM_concepts_known"][:,ic] = 1 - ivn_value # flip the concept to intervene on
+            adata_test_to_perturb.obsm["scCBGM_concepts_known"][:, ic] = (
+                1 - ivn_value
+            )  # flip the concept to intervene on
 
-            adata_test_perturbed = predict_with_method_2_fm_learned(adata = adata_test_to_perturb, model = fm_learned_model)
+            adata_test_perturbed = predict_with_method_2_fm_learned(
+                adata=adata_test_to_perturb, model=fm_learned_model
+            )
 
             x_new = adata_test_perturbed.to_df()
             x_old = adata_test_to_perturb.to_df()
@@ -443,7 +471,7 @@ def main(
             scores=scores,
         )
         breakpoint()
-    
+
     for key, val in joint_score.items():
         wandb.log({key.upper(): val})
 

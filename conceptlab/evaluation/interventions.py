@@ -356,6 +356,75 @@ def evaluate_intervention_emd_with_target(
     return score
 
 
+def evaluate_intervention_w2_with_target(
+    x_train,
+    x_ivn,
+    x_target,
+    labels_train,
+    pre_computed_w2_train=None,
+    sinkhorn_reg: float = 0.0,
+) -> Dict[str, Any]:
+
+    if pre_computed_w2_train is None:
+        source = np.unique(labels_train)
+        scores = np.zeros_like(source)
+
+        for k, s in enumerate(source):
+            x_source = x_train[labels_train == s]
+            if sinkhorn_reg > 0.0:
+                scores[k] = met.sinkhorn_divergence(
+                    x_target, x_source, reg=sinkhorn_reg
+                )
+            else:
+                scores[k] = met.w2(x_target, x_source)
+
+        min_train_score = np.min(scores)
+    else:
+        min_train_score = pre_computed_w2_train
+
+    if sinkhorn_reg > 0.0:
+        ivn_score = met.sinkhorn_divergence(x_target, x_ivn, reg=sinkhorn_reg)
+    else:
+        ivn_score = met.w2(x_target, x_ivn)
+
+    w2_ratio = ivn_score / (min_train_score + 1e-8)
+
+    score = dict(w2_ratio=w2_ratio, pre_computed_w2_train=min_train_score)
+
+    return score
+
+
+def evaluate_intervention_frechet_with_target(
+    x_train,
+    x_ivn,
+    x_target,
+    labels_train,
+    pre_computed_frechet_train=None,
+) -> Dict[str, Any]:
+
+    if pre_computed_frechet_train is None:
+        source = np.unique(labels_train)
+        scores = np.zeros_like(source)
+
+        for k, s in enumerate(source):
+            x_source = x_train[labels_train == s]
+            scores[k] = met.frechet_distance(x_target, x_source)
+
+        min_train_score = np.min(scores)
+    else:
+        min_train_score = pre_computed_frechet_train
+
+    ivn_score = met.frechet_distance(x_target, x_ivn)
+
+    frechet_ratio = ivn_score / (min_train_score + 1e-8)
+
+    score = dict(
+        frechet_ratio=frechet_ratio, pre_computed_frechet_train=min_train_score
+    )
+
+    return score
+
+
 def _cell_level_metric_align(
     adata_ivn_pred,  # Taking the unstimulated data and changing the stimulation concept to 1 and see what it predicts.
     adata_ivn_true,  # Stimulated data with stimulation of interest.

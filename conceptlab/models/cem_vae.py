@@ -492,7 +492,6 @@ class CEM_MetaTrainer:
         return model
 
     def train(self, adata_train):
-
         """Trains and returns the scCBGM model."""
         print("Training scCBGM model...")
 

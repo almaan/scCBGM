@@ -434,7 +434,6 @@ class CBM_MetaTrainer:
         self.z_score = z_score
 
     def train(self, adata_train):
-
         """Trains and returns the scCBGM model."""
         print("Training scCBGM model...")
 
@@ -582,7 +581,6 @@ class Mixed_CBM_MetaTrainer:
             )
 
     def train(self, adata_train):
-
         """Trains and returns the scCBGM model."""
         print("Training scCBGM model...")
 
