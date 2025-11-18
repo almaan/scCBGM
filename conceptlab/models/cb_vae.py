@@ -14,7 +14,7 @@ from tqdm import tqdm
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import EncoderBlock
-from .decoder import DecoderBlock, SkipDecoderBlock
+from .decoder import DecoderBlock, SkipDecoderBlock, NoResDecoderBlock
 
 EPS = 1e-6
 
@@ -40,18 +40,24 @@ class CB_VAE(BaseCBVAE):
         )
 
         self.dropout = config.get("dropout", 0.0)
+        self.variational = config.get("variational", True)
 
         # Encoder
-
         self._encoder = _encoder(
             input_dim=self.input_dim,
             hidden_dim=self.hidden_dim,
             n_layers=self.n_layers,
             latent_dim=self.latent_dim,
             dropout=self.dropout,
+            variational=self.variational,
         )
 
-        if "n_unknown" in config:
+        self.use_cosine_loss = config.get("use_cosine_loss", False)
+
+        if self.use_cosine_loss:
+            print("Using Cosine Loss: Setting n_unknown to n_concepts")
+            n_unknown = self.n_concepts
+        elif "n_unknown" in config:
             n_unknown = config["n_unknown"]
         elif "min_bottleneck_size" in config:
             n_unknown = max(config.min_bottleneck_size, self.n_concepts)
@@ -110,6 +116,11 @@ class CB_VAE(BaseCBVAE):
         else:
             self.concept_loss = self._hard_concept_loss
             self.concept_transform = sigmoid
+
+        if self.use_cosine_loss:
+            self.orthogonality_loss = self._cosine_loss
+        else:
+            self.orthogonality_loss = self._cov_loss
 
     @property
     def has_concepts(
@@ -176,7 +187,12 @@ class CB_VAE(BaseCBVAE):
         dec = self.decode(**cbm)
         return dec
 
-    def orthogonality_loss(self, c, u):
+    def _cosine_loss(self, c, u):
+        cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
+        output = torch.abs(cos(c, u))
+        return output.mean()
+
+    def _cov_loss(self, c, u):
 
         batch_size = u.size(0)
 
@@ -226,7 +242,11 @@ class CB_VAE(BaseCBVAE):
         loss_dict = {}
 
         MSE = self.rec_loss(x_pred, x)
-        KLD = self.KL_loss(mu, logvar)
+
+        if self.variational:
+            KLD = self.KL_loss(mu, logvar)
+        else:
+            KLD = 0.0
 
         loss_dict["rec_loss"] = MSE
         loss_dict["KL_loss"] = KLD
@@ -364,18 +384,16 @@ class CB_VAE(BaseCBVAE):
 
 
 class scCBGM(CB_VAE):
-    def __init__(self, config, **kwargs):
-        decoder_type = config.get("decoder_type", "skip")
-        match decoder_type:
-            case "skip":
-                print("Using Skip Decoder")
-                decoder = SkipDecoderBlock
-            case "residual":
-                print("Using Residual Decoder")
-                decoder = DecoderBlock
-            case _:
-                raise ValueError(f"Unknown decoder type: {decoder_type}")
-
+    def __init__(self, config, decoder_type="skip", **kwargs):
+        if decoder_type == "skip":
+            print("Using Skip Decoder")
+            decoder = SkipDecoderBlock
+        elif decoder_type == "no residual":
+            print("Using No Residual Decoder")
+            decoder = NoResDecoderBlock
+        else:
+            print("Using Residual Decoder")
+            decoder = DecoderBlock
         super().__init__(config, _decoder=decoder, **kwargs)
 
     def decode(self, input_concept, unknown, **kwargs):

@@ -12,3 +12,4 @@ from .concept_fm import Concept_FM
 from .cond_fm import Cond_FM
 from . import scgen
 from . import cinemaot
+from .sc_cvae import scCVAE

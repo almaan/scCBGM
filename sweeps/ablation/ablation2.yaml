@@ -9,7 +9,7 @@ parameters:
   model:
     values: [scCBGM, cem_vae ]
   model.decoder_type:
-    values: ['skip','residual']
+    values: ['skip','residual', 'no residual']
   modify:
     values: [default, add, noise, drop, duplicate]
   modify.params.n_mod:

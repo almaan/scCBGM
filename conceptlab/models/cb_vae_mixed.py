@@ -14,7 +14,7 @@ from tqdm import tqdm
 from .base import BaseCBVAE
 from .utils import sigmoid
 from .encoder import EncoderBlock
-from .decoder import DecoderBlock
+from .decoder import DecoderBlock, SkipDecoderBlock
 
 EPS = 1e-6
 
@@ -24,7 +24,7 @@ class CB_VAE_MIXED(BaseCBVAE):
         self,
         config,
         _encoder: nn.Module = EncoderBlock,
-        _decoder: nn.Module = DecoderBlock,
+        _decoder: nn.Module = SkipDecoderBlock,
         **kwargs,
     ):
         # --- MODIFICATION: Handle different config formats for reverse compatibility ---
@@ -69,6 +69,12 @@ class CB_VAE_MIXED(BaseCBVAE):
             config,
             **kwargs,
         )
+
+        # if decoder is SkipDecoderBlock print message
+        if _decoder == SkipDecoderBlock:
+            print("Using Skip Decoder")
+        else:
+            print("Using Residual Decoder")
 
         self.dropout = config.get("dropout", 0.0)
         self.encoder = _encoder(

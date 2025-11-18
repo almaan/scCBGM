@@ -162,6 +162,119 @@ class SkipDecoderBlock(nn.Module):
         return dict(x_pred=h)
 
 
+class NoResBlock(nn.Module):
+    """
+    A single block of the MLP, consisting of a linear layer, normalization,
+    activation, and dropout, without skip connections.
+    """
+
+    def __init__(self, emb_dim: int, dropout: float = 0.1):
+        """
+        Initializes the MLP block.
+        Args:
+            emb_dim (int): The dimension of the input, output, and embeddings.
+            dropout (float): The dropout rate.
+        """
+        super().__init__()
+        self.linear = nn.Linear(emb_dim, emb_dim)
+        self.norm = nn.LayerNorm(emb_dim)
+        self.activation = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the MLP block.
+        Args:
+            x (torch.Tensor): The main input tensor from the previous layer.
+            c_emb (torch.Tensor): The embedding of the concept vector.
+            t_emb (torch.Tensor): The embedding of the time value.
+        Returns:
+            torch.Tensor: The output tensor of the block.
+        """
+        # Add concept and time embeddings to the main data path before the linear layer
+        x = self.linear(x)
+        x = self.norm(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+        return x
+
+
+class NoResDecoderBlock(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        n_concepts: int,
+        n_unknown: int,
+        hidden_dim: int,
+        n_layers: int,
+        dropout: float = 0.0,
+        **kwargs,
+    ):
+        super().__init__()
+
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+
+        self.n_concepts = n_concepts
+        self.n_unknown = n_unknown
+        self.dropout = dropout
+
+        self.x_embedder = nn.Linear(self.n_concepts + self.n_unknown, hidden_dim)
+        self.layers = nn.ModuleList(
+            [NoResBlock(hidden_dim, dropout) for _ in range(n_layers)]
+        )
+
+        self.output_later = nn.Linear(self.hidden_dim, self.input_dim)
+
+    def forward(self, input_concept, unknown, **kwargs):
+        x = torch.concat((unknown, input_concept), dim=1)
+
+        h = self.x_embedder(x)
+        for layer in self.layers:
+            h = layer(h)
+        h = self.output_later(h)
+
+        return dict(x_pred=h)
+
+
+class CVAEDecoderBlock(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        n_concepts: int,
+        n_latent: int,
+        hidden_dim: int,
+        n_layers: int,
+        dropout: float = 0.0,
+        **kwargs,
+    ):
+        super().__init__()
+
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+
+        self.n_concepts = n_concepts
+        self.n_latent = n_latent
+        self.dropout = dropout
+
+        self.x_embedder = nn.Linear(self.n_concepts + self.n_latent, hidden_dim)
+        self.layers = nn.ModuleList(
+            [NoResBlock(hidden_dim, dropout) for _ in range(n_layers)]
+        )
+
+        self.output_later = nn.Linear(self.hidden_dim, self.input_dim)
+
+    def forward(self, latent, input_concept, **kwargs):
+        x = torch.concat((latent, input_concept), dim=1)
+
+        h = self.x_embedder(x)
+        for layer in self.layers:
+            h = layer(h)
+        h = self.output_later(h)
+
+        return dict(x_pred=h)
+
+
 class DefaultDecoderBlock(nn.Module):
     def __init__(
         self,

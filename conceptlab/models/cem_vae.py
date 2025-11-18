@@ -5,15 +5,19 @@ import torch.nn.functional as F
 import torch as t
 from torch.optim.lr_scheduler import CosineAnnealingLR, ExponentialLR
 import torch.nn.utils.parametrizations as param
+from torch.utils.data import TensorDataset, DataLoader
 from wandb import Histogram
 import wandb
 from tqdm import tqdm
 import numpy as np
 
+from tqdm import tqdm
+
 from .base import BaseCBVAE
 from .utils import sigmoid
-from .encoder import DefaultEncoderBlock
-from .decoder import DefaultDecoderBlock, SkipDecoderBlock
+from .encoder import NoResEncoderBlock, EncoderBlock
+from .decoder import DecoderBlock, SkipDecoderBlock, NoResDecoderBlock
+
 
 from torch.utils.data import TensorDataset, DataLoader
 
@@ -26,8 +30,8 @@ class CEM_VAE(BaseCBVAE):
     def __init__(
         self,
         config,
-        _encoder: nn.Module = DefaultEncoderBlock,
-        _decoder: nn.Module = DefaultDecoderBlock,
+        _encoder: nn.Module = NoResEncoderBlock,
+        _decoder: nn.Module = DecoderBlock,
         **kwargs,
     ):
 
@@ -37,12 +41,13 @@ class CEM_VAE(BaseCBVAE):
         )
 
         self.dropout = config.get("dropout", 0.0)
-
+        self.use_cosine_loss = config.get("use_cosine_loss", False)
         # Encoder
 
         self._encoder = _encoder(
             input_dim=self.input_dim,
             hidden_dim=self.hidden_dim,
+            n_layers=self.n_layers,
             latent_dim=self.latent_dim,
             dropout=self.dropout,
         )
@@ -108,6 +113,7 @@ class CEM_VAE(BaseCBVAE):
             n_concepts=n_unknown,
             n_unknown=n_unknown,
             hidden_dim=self.hidden_dim,
+            n_layers=self.n_layers,
             dropout=self.dropout,
         )
 
@@ -118,7 +124,13 @@ class CEM_VAE(BaseCBVAE):
         self.orthogonality_hp = config.orthogonality_hp
 
         self.use_orthogonality_loss = config.get("use_orthogonality_loss", True)
-        self.use_concept_loss = config.get("use_concept_loss", True)
+
+        if self.use_cosine_loss:
+            print("Using Cosine Orthogonality Loss")
+            self.orthogonality_loss = self._cosine_loss
+        else:
+            print("Using Covariance Orthogonality Loss")
+            self.orthogonality_loss = self._cov_loss
 
         self.use_concept_loss = config.get("use_concept_loss", True)
 
@@ -216,10 +228,21 @@ class CEM_VAE(BaseCBVAE):
 
         return dict(
             pred_concept=known_concepts,
-            emd_concept=emd_concept,
+            input_concept=emd_concept,
             unknown=unknown,
             h=h,
         )
+
+    def forward(self, x, concepts=None, **kwargs):
+        enc = self.encode(x, concepts=concepts, **kwargs)
+        z_dict = self.reparametrize(**enc)
+        cbm_dict = self.cbm(**z_dict, concepts=concepts, **enc)
+        dec_dict = self.decode(**enc, **z_dict, **cbm_dict, concepts=concepts)
+
+        out = {}
+        for d in [enc, z_dict, cbm_dict, dec_dict]:
+            out.update(d)
+        return out
 
     def intervene(self, x, concepts, mask, **kwargs):
         enc = self.encode(x)
@@ -228,10 +251,30 @@ class CEM_VAE(BaseCBVAE):
         dec = self.decode(**cbm)
         return dec
 
-    def orthogonality_loss(self, c, u):
+    def _cosine_loss(self, c, u):
         cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
         output = torch.abs(cos(c, u))
         return output.mean()
+
+    def _cov_loss(self, c, u):
+
+        batch_size = u.size(0)
+
+        # Compute means along the batch dimension
+        u_mean = u.mean(dim=0, keepdim=True)
+        c_mean = c.mean(dim=0, keepdim=True)
+
+        # Center the variables in-place to save memory
+        u_centered = u - u_mean
+        c_centered = c - c_mean
+
+        # Compute the cross-covariance matrix using batch dimension
+        cross_covariance = torch.matmul(u_centered.T, c_centered) / (batch_size - 1)
+
+        # Frobenius norm squared of the cross-covariance matrix
+        loss = (cross_covariance**2).sum()
+
+        return loss
 
     def rec_loss(self, x_pred, x):
         return F.mse_loss(x_pred, x, reduction="mean")
@@ -244,7 +287,7 @@ class CEM_VAE(BaseCBVAE):
         mu,
         logvar,
         pred_concept,
-        emd_concept,
+        input_concept,
         unknown,
         **kwargs,
     ):
@@ -266,7 +309,7 @@ class CEM_VAE(BaseCBVAE):
             loss_dict["Total_loss"] += self.concepts_hp * overall_concept_loss
 
         if self.use_orthogonality_loss:
-            orth_loss = self.orthogonality_loss(emd_concept, unknown)
+            orth_loss = self.orthogonality_loss(input_concept, unknown)
             loss_dict["orth_loss"] = orth_loss
             loss_dict["Total_loss"] += self.orthogonality_hp * orth_loss
 
@@ -546,3 +589,20 @@ class CEM_MetaTrainer:
             pred_adata.obsm[self.obsm_key] = inter_preds
 
         return pred_adata
+
+
+class scCEM(CEM_VAE):
+    def __init__(self, config, decoder_type="skip", **kwargs):
+        if decoder_type == "skip":
+            print("Using Skip Decoder")
+            decoder = SkipDecoderBlock
+        elif decoder_type == "no residual":
+            print("Using No Residual Decoder")
+            decoder = NoResDecoderBlock
+        else:
+            print("Using Residual Decoder")
+            decoder = DecoderBlock
+        super().__init__(config, _decoder=decoder, **kwargs)
+
+    def decode(self, input_concept, unknown, **kwargs):
+        return self._decoder(input_concept, unknown, **kwargs)
