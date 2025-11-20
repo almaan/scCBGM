@@ -173,9 +173,7 @@ class CB_VAE_MIXED(BaseCBVAE):
         input_concept = (
             known_concepts * (1 - mask) + concepts * mask
             if intervene
-            else concepts
-            if concepts is not None
-            else known_concepts
+            else concepts if concepts is not None else known_concepts
         )
 
         h = torch.cat((input_concept, unknown), 1)

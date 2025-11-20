@@ -142,10 +142,10 @@ def main(
     adata.obs["split_col"] = split_col
     adata.obs = pd.concat((adata.obs, adata.obsm[concept_key]), axis=1)
 
-    observed_concept_names = adata.obsm[concept_key].columns.tolist()
+    adata.obsm[concept_key].columns.tolist()
 
     logger.info("Anndata Information")
-    
+
     indicator = adata.uns["concept_indicator"]
     ix_og_concepts = indicator.values == C.Mods.none
     original_concepts = adata.obsm[concept_key].iloc[:, ix_og_concepts].copy()
@@ -169,14 +169,14 @@ def main(
         for ivn_value, intervention_type in enumerate(["Off", "On"]):
 
             # selecting values in the "test" or "val" cfg.model.eval_split
-            source_test_idx = (adata.obs["split_col"].values == cfg.model.eval_split) & (
-                adata.obs[concept_name].values == ivn_value
-            )
-            train_idx = (adata.obs["split_col"].values == "train")
-            
+            source_test_idx = (
+                adata.obs["split_col"].values == cfg.model.eval_split
+            ) & (adata.obs[concept_name].values == ivn_value)
+            train_idx = adata.obs["split_col"].values == "train"
+
             adata_source = adata[source_test_idx + train_idx]
 
-            #Fitting COT on the concept_name (perturbation key)
+            # Fitting COT on the concept_name (perturbation key)
             de = cot.causaleffect(
                 adata_source,
                 pert_key=concept_name,
@@ -186,19 +186,29 @@ def main(
                 smoothness=1e-5,
                 eps=cfg.model.eps,
                 solver="Sinkhorn",
-                )
-            
-            ot_map = de.obsm["ot"] # treatment vs controls
-            adata_control = adata_source[adata_source.obs[concept_name].values == ivn_value]
-            adata_treated = adata_source[adata_source.obs[concept_name].values == 1 - ivn_value]
-            test_controls_idx = (adata_control.obs["split_col"].values == cfg.model.eval_split) & (adata_control.obs[concept_name].values == ivn_value)
-            ot_map_test = ot_map[:,test_controls_idx].T
+            )
+
+            ot_map = de.obsm["ot"]  # treatment vs controls
+            adata_control = adata_source[
+                adata_source.obs[concept_name].values == ivn_value
+            ]
+            adata_treated = adata_source[
+                adata_source.obs[concept_name].values == 1 - ivn_value
+            ]
+            test_controls_idx = (
+                adata_control.obs["split_col"].values == cfg.model.eval_split
+            ) & (adata_control.obs[concept_name].values == ivn_value)
+            ot_map_test = ot_map[:, test_controls_idx].T
             ot_map_test /= ot_map_test.sum(1).mean()
 
-            adata_test_control = adata_control[test_controls_idx] # control units to predict
+            adata_test_control = adata_control[
+                test_controls_idx
+            ]  # control units to predict
 
             adata_test_predicted = adata_control[test_controls_idx].copy()
-            adata_test_predicted.X = ot_map_test @ adata_treated.X # predicted treated units
+            adata_test_predicted.X = (
+                ot_map_test @ adata_treated.X
+            )  # predicted treated units
 
             x_new = adata_test_predicted.to_df()
             x_old = adata_test_control.to_df()
@@ -227,7 +237,7 @@ def main(
             ],
             scores=scores,
         )
-    
+
     for key, val in joint_score.items():
         wandb.log({key.upper(): val})
 

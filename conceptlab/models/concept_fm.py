@@ -74,9 +74,9 @@ class Concept_FM(nn.Module, ABC):
             latent_dim=self.n_unknown,
             n_layers=self.cb_layers,
             dropout=self.dropout,
-            output_activation="hypersphere"
-            if self.unknown_activation == "hypersphere"
-            else "relu",
+            output_activation=(
+                "hypersphere" if self.unknown_activation == "hypersphere" else "relu"
+            ),
         )
 
         # --- VARIATIONAL CHANGE 1: Add layers for mu and logvar ---

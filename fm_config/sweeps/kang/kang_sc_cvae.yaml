@@ -1,9 +1,9 @@
-name: CBMFM_raw_Kang
+name: scCVAE_Kang
 program: benchmark_scdata.py
 method: grid
 parameters:
   model:
-    value: cbmfm_raw
+    value: sc_cvae
   seed:
     values: [13,42,1337,69]
   data/intervention_labels:
@@ -22,10 +22,6 @@ parameters:
     - kang/fcgr3a_0
     - kang/fcgr3a_1
     - kang/nk_0
-  model.edit:
-    values:
-      - True
-      - False
 command:
   - uv
   - run

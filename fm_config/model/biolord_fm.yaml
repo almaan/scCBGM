@@ -1,0 +1,44 @@
+_target_: conceptlab.models.biolord.Biolord
+concept_key: ${data.concept_key}
+concepts_to_flip: ${data.intervention_labels.concepts_to_flip}
+concepts_as_cov: null
+concepts_to_flip_ref: ${data.intervention_labels.reference}
+max_epochs: 100
+num_workers: 4
+n_latent: 32
+target_sum: ${data.target_sum}
+obsm_key: X_pca # not used in BioLoRD - would always work on (normalized - log1p) count space.
+mod_cfg:
+    decoder_width: 1024
+    decoder_depth: 4
+    attribute_nn_width: 512
+    attribute_nn_depth: 2
+    n_latent_attribute_categorical: 4
+    gene_likelihood: normal
+    reconstruction_penalty: 1e2
+    unknown_attribute_penalty: 1e1
+    unknown_attribute_noise_param: 1e-1
+    attribute_dropout_rate: 0.1
+    use_batch_norm: False
+    use_layer_norm: False
+    seed: 42
+trainer_cfg:
+    n_epochs_warmup: 0
+    latent_lr: 1e-4
+    latent_wd: 1e-4
+    decoder_lr: 1e-4
+    decoder_wd: 1e-4
+    attribute_nn_lr: 1e-2
+    attribute_nn_wd: 4e-8
+    step_size_lr: 45
+    cosine_scheduler: true
+    scheduler_final_lr: 1e-5
+fm_mod_cfg:
+  hidden_dim: 1024
+  latent_dim: 128
+  n_layers: 4
+  dropout: 0.1
+  p_uncond: 0.
+  num_epochs: 200
+  batch_size: 128
+  lr: 3e-4

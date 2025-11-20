@@ -24,15 +24,18 @@ class CinemaOT:
         self, adata_inter, hold_out_label, concepts_to_flip, values_to_set=None
     ):
         # Infering the control signature - how to define a control
-
         control_signature = {
-            concept: adata_inter.obsm[self.concept_key][concept].unique()
+            concept: adata_inter.obsm["concepts"][concept].unique()
             for concept in concepts_to_flip
         }
-
         for k, v in control_signature.items():
             assert len(v) == 1
         control_signature = {k: v[0] for k, v in control_signature.items()}
+
+        if values_to_set is not None:
+            values_to_set_dict = {
+                concept: values_to_set[i] for i, concept in enumerate(concepts_to_flip)
+            }
 
         adata_cat = self.adata_train.concatenate(adata_inter)
         # adata_cat.obs["stim"] = adata_cat.obsm["concepts"]["stim"]
@@ -43,7 +46,12 @@ class CinemaOT:
         treated_mask = 1
         non_treated_mask = 1
         for k, v in control_signature.items():
-            treated_mask *= adata_cat.obsm[self.concept_key][k].values == 1 - v
+            if values_to_set is not None:
+                treated_mask *= (
+                    adata_cat.obsm[self.concept_key][k].values == values_to_set_dict[k]
+                )
+            else:  # if we don't have a target we just split the concept
+                treated_mask *= adata_cat.obsm[self.concept_key][k].values == 1 - v
             non_treated_mask *= adata_cat.obsm[self.concept_key][k].values == v
 
         adata_cat.obs["treated"] = treated_mask
