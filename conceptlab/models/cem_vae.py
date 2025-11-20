@@ -166,54 +166,42 @@ class CEM_VAE(BaseCBVAE):
 
         # Generate context and probability for each concept
         for i in range(self.n_concepts):
-            # Generate context
-            context = self.concept_context_generators[i](
-                z
-            )  # shape: [..., 2 * emb_size]
+            # Generate context [..., 2 * emb_size]
+            context = self.concept_context_generators[i](z)
             contexts.append(context)
 
-            # Generate probability from this concept's context
-            prob = self.concept_prob_generators[i](context)  # shape: [..., 1]
+            # Generate probability [..., 1]
+            prob = self.concept_prob_generators[i](context)
             probs.append(prob)
 
         # Stack results
-        contexts = torch.stack(
-            contexts, dim=-2
-        )  # shape: [..., n_concepts, 2 * emb_size]
-        contexts = contexts.unsqueeze(-2) if contexts.ndimension() == 2 else contexts
+        # contexts: [..., n_concepts, 2 * emb_size]
+        contexts = torch.stack(contexts, dim=-2)
 
-        known_concepts = torch.stack(probs, dim=-2).squeeze(
-            -1
-        )  # Ensure shape [..., n_concepts]
-        known_concepts = (
-            known_concepts.unsqueeze(-1)
-            if known_concepts.ndimension() == 1
-            else known_concepts
-        )
+        # probs: list of [..., 1] → [..., n_concepts, 1] → squeeze → [..., n_concepts]
+        known_concepts = torch.stack(probs, dim=-2).squeeze(-1)
 
-        pos_context = contexts[..., : self.emb_size]  # shape: [..., emb_size]
-        neg_context = contexts[..., self.emb_size :]  # shape: [..., emb_size]
+        # --- Split positive and negative halves ---
+        # [..., n_concepts, emb_size]
+        pos_context = contexts[..., : self.emb_size]
+        neg_context = contexts[..., self.emb_size :]
 
-        # Expand contexts to match number of concepts
-        pos_context = pos_context.unsqueeze(-2).expand(
-            *pos_context.shape[:-1], self.n_concepts, self.emb_size
-        )
-        neg_context = neg_context.unsqueeze(-2).expand(
-            *neg_context.shape[:-1], self.n_concepts, self.emb_size
-        )
-
+        # --- Determine which concept values to use ---
         if intervene:
             input_concept = known_concepts * (1 - mask) + concepts * mask
         else:
-            if concepts == None:
+            if concepts is None:
                 input_concept = known_concepts
             else:
                 input_concept = concepts
 
-        input_concept = input_concept.unsqueeze(-1).expand(
-            *input_concept.shape, self.emb_size
-        )
-        # Weight contexts with probabilities
+        # --- Expand for broadcasting ---
+        # [..., n_concepts, 1]
+        input_concept = input_concept.unsqueeze(-1)
+
+        # --- Weight contexts ---
+        # Broadcasting handles emb_size automatically
+        # [..., n_concepts, emb_size]
         weighted_pos = pos_context * input_concept
         weighted_neg = neg_context * (1 - input_concept)
 
