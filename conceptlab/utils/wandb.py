@@ -12,13 +12,14 @@ def download_wandb_project(project: str, entity: str | None = None):
 
     runs = api.runs(entity + project)
 
-    summary_list, config_list, name_list = [], [], []
+    summary_list, config_list, name_list, sweep_list = [], [], [], []
 
     for run in runs:
         # .summary contains output keys/values for
         # metrics such as accuracy.
         #  We call ._json_dict to omit large files
         summary_list.append(run.summary._json_dict)
+        sweep_list.append(run.sweep.id if run.sweep is not None else None)
 
         # .config contains the hyperparameters.
         #  We remove special values that start with _.
@@ -30,7 +31,12 @@ def download_wandb_project(project: str, entity: str | None = None):
         name_list.append(run.name)
 
     runs_df = pd.DataFrame(
-        {"summary": summary_list, "config": config_list, "name": name_list}
+        {
+            "summary": summary_list,
+            "config": config_list,
+            "name": name_list,
+            "sweep_id": sweep_list,
+        }
     )
 
     df = []
@@ -43,7 +49,9 @@ def download_wandb_project(project: str, entity: str | None = None):
 
         a = pd.Series(row["config"])
 
-        df.append((pd.concat((a, b, c))))
+        d = pd.Series({"sweep_id": row["sweep_id"]})
+
+        df.append((pd.concat((a, b, c, d))))
 
     df = pd.DataFrame(df)
 

@@ -191,8 +191,8 @@ class CEM_VAE(BaseCBVAE):
             else known_concepts
         )
 
-        pos_context = context[..., : self.emb_size]  # shape: [..., emb_size]
-        neg_context = context[..., self.emb_size :]  # shape: [..., emb_size]
+        pos_context = contexts[..., : self.emb_size]  # shape: [..., emb_size]
+        neg_context = contexts[..., self.emb_size :]  # shape: [..., emb_size]
 
         # Expand contexts to match number of concepts
         pos_context = pos_context.unsqueeze(-2).expand(
