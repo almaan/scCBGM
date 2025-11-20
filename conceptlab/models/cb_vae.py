@@ -522,19 +522,17 @@ class CBM_MetaTrainer:
 
         inter_preds = inter_preds["x_pred"].cpu().numpy()
 
-        # TODO: what is this?
+        pred_adata = adata_inter.copy()
+
         if self.obsm_key != "X":
             x_inter_preds = np.zeros_like(adata_inter.X)
+            pred_adata.obsm[self.obsm_key] = inter_preds
         else:
             x_inter_preds = inter_preds
 
-        pred_adata = adata_inter.copy()
         pred_adata.X = x_inter_preds
         pred_adata.obs["ident"] = "intervened on"
         pred_adata.obs["cell_stim"] = hold_out_label + "*"
-
-        if self.obsm_key != "X":
-            pred_adata.obsm[self.obsm_key] = inter_preds
 
         return pred_adata
 
