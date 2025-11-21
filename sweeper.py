@@ -83,6 +83,11 @@ if __name__ == "__main__":
         type=int,
         default=8,
     )
+    slurm_parser.add_argument(
+        "--qos",
+        type=str,
+        default=None,
+    )
 
     slurm_parser.add_argument(
         "--cpus_per_task",
@@ -171,6 +176,9 @@ if __name__ == "__main__":
 
         if args.job_name is not None:
             cmd += ["-J", args.job_name]
+
+        if args.qos is not None:
+            cmd += ["--qos", args.qos]
 
     cmd += ["wandb", "agent", args.sweep_id]
     if args.max_count is not None:

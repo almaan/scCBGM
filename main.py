@@ -144,8 +144,8 @@ def main(
 
     if align_on is not None:
         print("Aligning on {}".format(align_on))
-        ivn_ix = adata_ivn.obs[align_on].values
-        test_ix = adata_test.obs[align_on].values
+        ivn_ix = np.array(adata_ivn.obs[align_on].values)
+        test_ix = np.array(adata_test.obs[align_on].values)
 
         ivn_order = np.argsort(ivn_ix)
         test_order = np.argsort(test_ix)
@@ -210,15 +210,6 @@ def main(
         wandb.log({"MSE_intervened": mse_ivn})
         wandb.log({"cosine_sim_intervened": cosine_sim_ivn})
         wandb.log({"corr_intervened": corr_ivn})
-
-    # baselines
-
-    print("ivn")
-    print(x_train)
-    print("true")
-    print(x_test)
-    print("pred")
-    print(x_test_pred)
 
     mean_ivn = np.mean(x_ivn, axis=0, keepdims=True)
     mean_train = np.mean(x_train, axis=0, keepdims=True)

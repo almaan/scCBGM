@@ -1,4 +1,4 @@
-type: scCEM
+type: CEM_VAE
 
 input_dim: null
 n_concepts: null
