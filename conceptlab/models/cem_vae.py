@@ -41,7 +41,7 @@ class CEM_VAE(BaseCBVAE):
         )
 
         self.dropout = config.get("dropout", 0.0)
-        self.use_cosine_loss = config.get("use_cosine_loss", False)
+        self.use_cosine_loss = config.get("use_cosine_loss", True)
         # Encoder
 
         self._encoder = _encoder(
@@ -579,7 +579,10 @@ class CEM_MetaTrainer:
 
 
 class scCEM(CEM_VAE):
-    def __init__(self, config, decoder_type="skip", **kwargs):
+    def __init__(self, config, **kwargs):
+
+        decoder_type = config.get("decoder_type", "skip")
+
         if decoder_type == "skip":
             print("Using Skip Decoder")
             decoder = SkipDecoderBlock
