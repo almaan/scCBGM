@@ -9,8 +9,6 @@ import trvaep
 class trVAE:
     def __init__(
         self,
-        max_epochs=1000,
-        batch_size=128,
         lr=0.001,
         concept_key="concepts",
         concepts_to_flip: list = [],
@@ -34,8 +32,7 @@ class trVAE:
         - zscore: whether to whiten the data
         - raw: whether to use "CellFlow" style - using only raw concepts
         """
-        self.max_epochs = max_epochs
-        self.batch_size = batch_size
+
         self.lr = lr
         self.concept_key = concept_key
         self.train_frac = train_frac
