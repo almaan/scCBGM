@@ -1,5 +1,5 @@
-# optimal hp values from scCBGM sweep
-type: scCBGM
+# optimal hp values for CBGM from sweep
+type: scCEM
 
 input_dim: null
 n_concepts: null
@@ -10,10 +10,10 @@ lr: 0.0005
 beta: 0.0001
 n_layers: 2
 concepts_hp: 0.005
-hidden_dim: 128
+hidden_dim: 256
 min_bottleneck_size: 128
 latent_dim: 64
 orthogonality_hp: 0.05
-decoder_type: 'skip'
+decoder_type: 'no residual'
 use_soft_concepts: False
-use_cosine_loss: False
+use_cosine_loss: True

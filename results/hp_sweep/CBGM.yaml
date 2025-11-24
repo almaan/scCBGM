@@ -1,8 +1,8 @@
-lr: 5e-4
-beta: 1e-4
-n_layers: 2
-concepts_hp: 0.1
-hidden_dim: 128
-min_bottleneck_size: 128
-latent_dim: 64
-orthogonality_hp: 0.2
+lr: 0.0005
+beta: 0.0001
+n_layers: 2.0
+concepts_hp: 0.005
+hidden_dim: 256.0
+min_bottleneck_size: 128.0
+latent_dim: 64.0
+orthogonality_hp: 0.05

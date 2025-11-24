@@ -5,28 +5,24 @@ metric:
   name: MSE_intervention
 parameters:
   constants.seed:
-    values: [13,1337]
+    # values: [13, 42]
+    values: [13]
   model:
     values: [scCBGM, scCEM]
   model.decoder_type:
     values: ['skip','no residual']
   modify:
-    values: [default, add, noise, drop, duplicate]
-  modify.params.n_mod:
-    values: [1.0, 3.0]
+    values: [default]
   model.orthogonality_hp:
-    value: 0.05
+    values: [0.0,0.5, 1]
   model.use_cosine_loss:
     values: [False, True]
   dataset:
-    values: [synthetic_1, synthetic_2]
+    value: synthetic_1
   intervention:
     values:
       - synthetic/intervention_0
       - synthetic/intervention_1
-      - synthetic/intervention_2
-      - synthetic/intervention_3
-      - synthetic/intervention_4
 
 
 command:

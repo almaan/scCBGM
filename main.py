@@ -83,6 +83,18 @@ def main(
     logger.info("using concept key: {}".format(concept_key))
     concepts = adata.obsm[concept_key].copy()
 
+    include_background_concept = cfg.dataset.get("include_background_concept", False)
+    if include_background_concept:
+        print("including bg concepts")
+        for bg_concept_name in cfg.dataset.background_concept:
+            bg_concept = adata.obs[bg_concept_name].copy()
+            n_uniq = len(bg_concept.unique())
+            bg_concept = pd.get_dummies(bg_concept).astype(np.float32)
+            if n_uniq == 2:
+                bg_concept.drop(columns=[bg_concept.columns[-1]], inplace=True)
+            concepts = pd.concat([concepts, bg_concept], axis=1)
+        adata.obsm[concept_key] = concepts
+
     mod = cfg.modify.mod
     if mod != "identity":
         mod_fun = MODS[mod]
@@ -111,10 +123,8 @@ def main(
 
     n_obs, n_vars = adata_train.shape
     n_concepts = adata_train.obsm[concept_key].shape[1]
-    print(adata_train)
-    print(adata_train.obsm[concept_key])
 
-    cfg.model.input_dim = n_vars
+    cfg.model.input_dim = n_vars if not cfg.use_pca else cfg.pca_n_components
     cfg.model.n_concepts = n_concepts
 
     try:
@@ -140,7 +150,7 @@ def main(
 
     logger.info("Activate Eval Mode and move to CPU")
 
-    align_on = cfg.dataset.get("align_on", None)
+    align_on = cfg.intervention.get("align_on", None)
 
     if align_on is not None:
         print("Aligning on {}".format(align_on))
@@ -156,6 +166,16 @@ def main(
     x_ivn = adata_ivn.X.astype(np.float32).copy()
     x_test = adata_test.X.astype(np.float32).copy()
     x_train = adata_train.X.astype(np.float32).copy()
+
+    if cfg.use_pca:
+        from sklearn.decomposition import PCA
+
+        logger.info("Computing PCA")
+        pca_train = PCA(n_components=cfg.pca_n_components)
+        pca_train.fit(adata_train.X)
+
+        x_train = pca_train.transform(x_train)
+        x_ivn = pca_train.transform(x_ivn)
 
     c_ivn = adata_ivn.obsm[concept_key].values.copy().astype(np.float32)
     c_test = adata_test.obsm[concept_key].values.copy().astype(np.float32)
@@ -182,10 +202,16 @@ def main(
         x_ivn,
         x_ivn_pred,
     )
+
+    mse_rec_non_zero = gen.mse_loss(
+        x_ivn, x_ivn_pred, mask=(x_ivn != 0).astype(np.float32)
+    )
+
     cosine_sim_rec = gen.cosine_similarity(x_ivn, x_ivn_pred)
     corr_rec = gen.rowwise_correlation(x_ivn, x_ivn_pred)
 
     wandb.log({"MSE_reconstructed": mse_rec})
+    wandb.log({"MSE_reconstructed_nonzero": mse_rec_non_zero})
     wandb.log({"cosine_sim_reconstructed": cosine_sim_rec})
     wandb.log({"corr_reconstructed": corr_rec})
 
@@ -203,22 +229,45 @@ def main(
             concept_ix=concept_ix,
             reference_value=cfg.intervention.reference_value,
         )
+
+        if cfg.use_pca:
+            x_test_pred = pca_train.inverse_transform(x_test_pred)
+
+        print("PRED ivn")
+        print(x_test_pred)
+        print("TRUE ivn")
+        print(x_test)
+        print("PRE inv")
+        if cfg.use_pca:
+            x_ivn_og = pca_train.inverse_transform(x_ivn)
+            print(x_ivn_og)
+        else:
+            x_ivn_og = x_ivn
+
         mse_ivn = gen.mse_loss(x_test, x_test_pred)
+        mse_ivn_non_zero = gen.mse_loss(
+            x_test, x_test_pred, mask=(x_test != 0).astype(np.float32)
+        )
+
         cosine_sim_ivn = gen.cosine_similarity(x_test, x_test_pred)
         corr_ivn = gen.rowwise_correlation(x_test, x_test_pred)
 
+        corr_ivn_og = gen.rowwise_correlation(x_ivn_og, x_test)
+
         wandb.log({"MSE_intervened": mse_ivn})
+        wandb.log({"MSE_intervened_nonzero": mse_ivn_non_zero})
         wandb.log({"cosine_sim_intervened": cosine_sim_ivn})
         wandb.log({"corr_intervened": corr_ivn})
+        wandb.log({"corr_intervened_vs_ivn_original": corr_ivn_og})
 
-    mean_ivn = np.mean(x_ivn, axis=0, keepdims=True)
-    mean_train = np.mean(x_train, axis=0, keepdims=True)
+    # mean_ivn = np.mean(x_ivn, axis=0, keepdims=True)
+    # mean_train = np.mean(x_train, axis=0, keepdims=True)
 
-    mse_mean_ivn = gen.mse_loss(x_test, mean_ivn)
-    mse_mean_train = gen.mse_loss(x_test, mean_train)
+    # mse_mean_ivn = gen.mse_loss(x_test, mean_ivn)
+    # mse_mean_train = gen.mse_loss(x_test, mean_train)
 
-    wandb.log({"MSE_baseline_mean_intervention_set": mse_mean_ivn})
-    wandb.log({"MSE_baseline_mean_train_set": mse_mean_train})
+    # wandb.log({"MSE_baseline_mean_intervention_set": mse_mean_ivn})
+    # wandb.log({"MSE_baseline_mean_train_set": mse_mean_train})
 
     wandb.finish()
 

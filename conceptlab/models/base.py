@@ -53,9 +53,9 @@ class BaseCBVAE(nn.Module, ABC):
 
     def reparametrize(self, mu, logvar, **kwargs):
 
-        if(logvar is None):
+        if logvar is None:
             return dict(z=mu)
-        
+
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return dict(z=mu + eps * std)
