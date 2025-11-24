@@ -1,17 +1,17 @@
-import pertpy as pt
 import scanpy as sc
-import scvi
 import hydra
 import numpy as np
 import trvaep
 
+# based on: https://nbviewer.org/github/theislab/trvaep/blob/master/example/sample_notebook.ipynb
 
-class scGEN:
+
+class trVAE:
     def __init__(
         self,
         max_epochs=1000,
         batch_size=128,
-        lr=3e-4,
+        lr=0.001,
         concept_key="concepts",
         concepts_to_flip: list = [],
         concepts_as_cov="",
@@ -19,7 +19,9 @@ class scGEN:
         ct_key="",
         num_workers=0,
         target_sum=1000,
+        train_frac=0.85,
         obsm_key="X",  # for consistency with other models (e.g. in evaluation)
+        seed: int = 0,
     ):
         """
         Class to train and predict interventions with a scVIDR model
@@ -36,6 +38,8 @@ class scGEN:
         self.batch_size = batch_size
         self.lr = lr
         self.concept_key = concept_key
+        self.train_frac = train_frac
+        self.seed = seed
 
         self.num_workers = num_workers
         self.concepts_to_flip = concepts_to_flip
@@ -44,6 +48,7 @@ class scGEN:
         self.ct_key = ct_key
 
         self.target_sum = target_sum
+        self.obsm_key = obsm_key
 
     def train(self, adata_train):
 
@@ -94,23 +99,21 @@ class scGEN:
             .agg("_".join, axis=1)
         )
 
-        # We can only predict one intervention at a time and one cell type at a time.
         assert adata_inter_.obs["concepts_to_flip"].nunique() == 1
 
         predicted_data = self.model.predict(
             x=adata_inter_.X.A,
             y=adata_inter_.obs["concepts_to_flip"].tolist(),
-            target=concepts_to_flip,
+            target=hold_out_label,
         )
-
-        sc.AnnData(predicted_data)
 
         pred_adata = adata_inter_.copy()
-        pred_adata.X = np.clip(pred.X, a_min=0, a_max=np.inf)
-        sc.pp.log1p(pred_adata)  # because scvi outputs raw counts
-        pred_adata.obsm["X_pca"] = pred_adata.uns["pc_transform"].transform(
-            pred_adata.X
-        )
+
+        if self.obsm_key == "X":
+            pred_adata = adata_inter_.X = predicted_data
+        else:
+            # TODO remove maybe
+            pred_adata.obsm[self.obsm_key] = predicted_data
 
         pred_adata.obs["ident"] = "intervened on"
 
