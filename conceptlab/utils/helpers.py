@@ -580,8 +580,6 @@ def _normalize_counts(x: np.ndarray, total_sum: int) -> np.ndarray:
     x = x / safe_row_sums * total_sum
 
     x = np.log1p(x)
-    # x = np.log(x + 0.1)
-    # x = 2 * np.sqrt(x + 3 / 8)
 
     return x
 
