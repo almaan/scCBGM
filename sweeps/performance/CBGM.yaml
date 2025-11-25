@@ -5,21 +5,15 @@ metric:
   name: MSE_intervention
 parameters:
   constants.seed:
-    values: [13,1337]
+    values: [13,1337, 403]
   model:
-    values: [scCBGM, scCEM]
-  model.decoder_type:
-    values: ['skip','no residual']
+    value: CBGM
   modify:
     values: [default, add, noise, drop, duplicate]
   modify.params.n_mod:
     values: [1.0, 3.0]
-  model.orthogonality_hp:
-    value: 0.05
-  model.use_cosine_loss:
-    values: [False, True]
   dataset:
-    values: [synthetic_1, synthetic_2]
+    values: [synthetic_1,synthetic_2,synthetic_3]
   intervention:
     values:
       - synthetic/intervention_0
@@ -34,6 +28,7 @@ command:
   - python
   - ${program}
   - ${args_no_hyphens}
-  - wandb.entity=andera29
+  - wandb.entity=rb-aiml
   - wandb.project=conceptlab
   - test_intervention=True
+  - save_checkpoints=False

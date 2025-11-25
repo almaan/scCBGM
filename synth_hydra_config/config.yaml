@@ -31,3 +31,6 @@ test_integration: ['modularity']
 save_checkpoints: True
 DEBUG: False
 save_generated_data: False
+
+use_pca: False
+pca_n_components: 250

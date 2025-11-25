@@ -2,4 +2,3 @@
 
 dataset_path: ${oc.env:PROJECT_ROOT}/data/synthetic/synthetic_1.h5ad
 normalize: True
-align_on: 'original_index'

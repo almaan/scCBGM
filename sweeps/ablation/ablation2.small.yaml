@@ -5,7 +5,8 @@ metric:
   name: MSE_intervention
 parameters:
   constants.seed:
-    values: [13,1337]
+    # values: [13,1337]
+    values: [1337]
   model:
     values: [scCBGM, scCEM]
   model.decoder_type:
@@ -19,14 +20,13 @@ parameters:
   model.use_cosine_loss:
     values: [False, True]
   dataset:
-    values: [synthetic_1, synthetic_2]
+    # values: [synthetic_1, synthetic_2, synthetic_3]
+    values: [synthetic_2, synthetic_3]
   intervention:
     values:
       - synthetic/intervention_0
       - synthetic/intervention_1
       - synthetic/intervention_2
-      - synthetic/intervention_3
-      - synthetic/intervention_4
 
 
 command:

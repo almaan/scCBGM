@@ -14,3 +14,4 @@ from .cond_fm import Cond_FM
 from . import scgen
 from . import cinemaot
 from .sc_cvae import scCVAE
+from .trvae import trVAE

@@ -1,3 +1,4 @@
+# this is to complement incorrect runs from ablation2
 program: main.py
 method: grid
 metric:
@@ -9,17 +10,17 @@ parameters:
   model:
     values: [scCBGM, scCEM]
   model.decoder_type:
-    values: ['skip','no residual']
+    values: ['no residual']
   modify:
     values: [default, add, noise, drop, duplicate]
   modify.params.n_mod:
     values: [1.0, 3.0]
   model.orthogonality_hp:
-    value: 0.05
+    values: [0.5]
   model.use_cosine_loss:
     values: [False, True]
   dataset:
-    values: [synthetic_1, synthetic_2]
+    values: [synthetic_1, synthetic_2, synthetic_3]
   intervention:
     values:
       - synthetic/intervention_0

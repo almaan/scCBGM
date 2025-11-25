@@ -69,8 +69,9 @@ if __name__ == "__main__":
     slurm_parser.add_argument(
         "--account",
         type=str,
-        required=True,
+        required=False,
         help="Slurm_Parser.account name (e.g., owner_gred_braid_gpu).",
+        default=None,
     )
     slurm_parser.add_argument(
         "--mem_per_cpu",
@@ -158,8 +159,6 @@ if __name__ == "__main__":
             "sbatch",
             "--partition",
             args.partition,
-            "--account",
-            args.account,
             "--mem-per-cpu",
             args.mem_per_cpu,
             "--ntasks",
@@ -173,6 +172,12 @@ if __name__ == "__main__":
             "--error",
             osp.join(args.out_dir, "stderr.{identifier}.err"),
         ]
+
+        if args.account is not None:
+            cmd += [
+                "--account",
+                args.account,
+            ]
 
         if args.job_name is not None:
             cmd += ["-J", args.job_name]

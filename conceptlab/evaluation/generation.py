@@ -53,9 +53,15 @@ def r2_score(x_true, x_pred):
 def mse_loss(
     x_true,
     x_pred,
+    mask=None,
 ):
 
-    mse = np.mean((x_true - x_pred) ** 2)
+    delta = x_true - x_pred
+    if mask is not None:
+        delta = delta * mask
+        mse = np.sum(delta**2) / np.sum(mask)
+    else:
+        mse = np.mean(delta**2)
 
     return mse
 

@@ -5,7 +5,7 @@ metric:
   name: MSE_intervened
 parameters:
   model:
-    value: scCBGM
+    value: scCEM
   intervention:
     values:
       - synthetic/intervention_0
@@ -35,6 +35,10 @@ parameters:
     values: [256, 128]
   model.n_layers:
     value: 2
+  model.decoder_type:
+    value: 'no residual'
+  model.use_cosine_loss:
+    value: True
 command:
   - ${env}
   - python

@@ -175,6 +175,7 @@ class CB_VAE(BaseCBVAE):
         device = self._encoder.x_embedder.weight.device
 
         enc = self.encode(x.to(device))
+        enc["logvar"] = None
         z = self.reparametrize(**enc)
         cbm = self.cbm(
             **z,
