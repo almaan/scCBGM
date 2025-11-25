@@ -2,6 +2,8 @@ import scanpy as sc
 import hydra
 import numpy as np
 import trvaep
+from torch.cuda import is_available as cuda_is_available
+import torch
 
 # based on: https://nbviewer.org/github/theislab/trvaep/blob/master/example/sample_notebook.ipynb
 
@@ -15,7 +17,7 @@ class trVAE:
         concepts_as_cov="",
         concepts_to_flip_ref: list = [],
         ct_key="",
-        num_workers=0,
+        num_workers=1,
         target_sum=1000,
         train_frac=0.85,
         obsm_key="X",  # for consistency with other models (e.g. in evaluation)
@@ -37,8 +39,8 @@ class trVAE:
         self.concept_key = concept_key
         self.train_frac = train_frac
         self.seed = seed
+        self.n_workers = num_workers
 
-        self.num_workers = num_workers
         self.concepts_to_flip = concepts_to_flip
         self.concepts_to_flip_ref = concepts_to_flip_ref
 
@@ -69,6 +71,11 @@ class trVAE:
             beta=10,
         )
 
+        device = "cuda" if cuda_is_available() else "cpu"
+        self.model = self.model.to(device)
+
+        print(self.model)
+
         trainer = trvaep.Trainer(
             self.model,
             adata_train_,
@@ -76,7 +83,10 @@ class trVAE:
             learning_rate=self.lr,
             train_frac=self.train_frac,
             seed=self.seed,
+            print_every=1,
+            # n_workers = self.n_workers,
         )
+        print(trainer.model.device)
 
         trainer.train_trvae(200, 512, early_patience=30)
         return
