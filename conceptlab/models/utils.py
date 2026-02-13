@@ -4,6 +4,19 @@ import torch
 import ot
 
 
+class SelectiveSigmoid(torch.nn.Module):
+    def __init__(self, mask):
+        super().__init__()
+        # Register as buffer so it moves with the model to GPU/CPU
+        self.register_buffer("mask", torch.tensor(mask, dtype=torch.bool))
+
+    def forward(self, x):
+        # x shape: [batch, n_concepts]
+        out = x.clone()
+        out[:, self.mask] = torch.sigmoid(x[:, self.mask])
+        return out
+
+
 def sigmoid(x, alpha=1):
     return F.sigmoid(alpha * x)
 

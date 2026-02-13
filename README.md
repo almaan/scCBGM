@@ -1,25 +1,22 @@
-# 🌱 conceptlab
+# 🌱 scCBGM
 
-Repository for the ICLR 2026 paper: scCBGM: Single-cell Editing via Concept Bottlenecks
+Repository for `scCBGM` method and accompanying evaluation presented in the manuscript "scCBGM: Single-cell Editing via Concept Bottlenecks".
 
-
-
-### Abstract
-How would a cell behave under different conditions? Counterfactual editing of single cells is essential for understanding biology and designing targeted therapies, yet current scRNA-seq generative methods fall short: disentanglement models rarely support interventions, and most intervention-based approaches perform conditional generation that synthesizes new cells rather than editing existing ones.
-
-We introduce **Single-Cell Concept Bottleneck Generative Models (scCBGMs)**, unifying counterfactual reasoning and generative modeling. scCBGM incorporates decoder skip connections and a cross-covariance penalty to decouple annotated concepts from unannotated sources of variation, enabling robust counterfactuals even under noisy concept annotations.
-
-Using an abduction–action–prediction procedure, we edit cells at the concept level with per-cell precision and generalize zero-shot to unseen concept combinations. Conditioning modern generators (e.g., Flow Matching) on scCBGM embeddings preserves state-of-the-art fidelity while providing precise controllability.
-
-Across three datasets (up to 21 cell types), scCBGM improves counterfactual
-accuracy by up to 4×. It also supports mechanism-of-action analyses by jointly
-editing perturbation and pathway-activity concepts in real scRNA-seq data.
-Together, scCBGM establishes a principled framework for high-fidelity *in
-silico* cellular experimentation and hypothesis testing in single-cell biology.
+In short, scCBGM is a method for that leverages an abduction-action-prediction
+counterfactual generation of scRNA-seq data using a combination of concept
+bottleneck generative models.
 
 
+# 📦 conceptlab Package
 
-# 🚀 Getting Started
+The `conceptlab` package is a comprehensive suite used to produce the results in
+the associated manuscript. While it supports complex workflows — including
+synthetic data generation, hyperparameter sweeps, and benchmarking of different methods —it also
+offers a streamlined, `scanpy`-inspired API for our core model: **scCBGM**.
+
+:alert: If you _are_ looking to use the `scCBGM` model only to analyze your own data, the API is what you're looking for. 
+
+### Installation
 
 Set up the environment (we recommend using `micromamba`, but you can use any package and environment manager):
 
@@ -31,131 +28,78 @@ micromamba activate conceptlab
 Install the package:
 
 ```sh
-poetry install
+pip install
 ```
 
-## 📦 Package
+## 🚀 Quick Start: The scCBGM API
 
-After installation, you can import the package as `conceptlab`.
-It’s designed as an independent package optimized for **CLI applications** (e.g., sweeps) while also offering an API that works seamlessly in notebooks for more targeted analyses.
+The `scCBGM` API is built specifically for `anndata` users, taking care of all
+the annoying stuff (like setting up training loops and formatting or batching
+data).
 
-We provide the following modules:
+### Basic Workflow
+
+```python
+
+import conceptlab.api as cb
+import scanpy as sc
+
+# 1. Setup Data
+adata = sc.read_h5ad('path_to_data.h5ad')
+
+# Use our default normalization or your own preferred strategy
+cb.pp.norm.default_normalization(adata)
+
+# 2. Curate Concepts
+# Supports both categorical and numerical columns in adata.obs
+concept_cols = ['stimulation', 'day'] 
+cb.pp.concepts.curate_concepts(adata, concept_cols=concept_cols, concept_key='concepts')
+
+# 3. Model Training
+model = cb.models.scCBGM()
+model.fit(adata, num_epochs=100, concept_key='concepts')
+
+# 4. Inference & Reconstruction
+# Returns known and unknown concept embeddings (use inplace=True to add to adata)
+known, unknown = model.encode(adata_test) 
+reconstructed = model.reconstruct(adata_test)
+
+# 5. Counterfactual Intervention
+# Define the shift (e.g., changing 'day' from 3 to 9)
+new_concepts = cb.pp.concepts.intervene_on_concepts(
+    adata, 
+    concept_key='concepts', 
+    conditions={'day': {'3': '9'}}
+)
+
+# Generate the counterfactual state
+counterfactual_data = model.intervene(adata, new_concepts, concept_key='concepts')
+
+# 6. Save & Load
+model.save('model.pt')
+model = cb.models.scCBGM.load('model.pt')
+```
+
+Most operations (e.g., `decode`, `encode` , `infer`) have `inplace` options,
+this will update your `anndata` inplace (adding new layers for reconstruction
+and `.obsm` views for concepts).
+
+
+### 📦 Complete suite Suite 
+
+The complete suite of functionality encompass several different modules that all serve a specific purpose; the modules are:
 
 - `datagen` → generation of synthetic data (for evaluation purposes)
 - `data` → dataloaders
 - `evaluation` → evaluation functions
 - `models` → model classes, including our `scCBGM` model and baselines
 - `preprocess` → preprocessing tools
+- `api` - detailed above
 
 Examples of usage can be found in `analysis/notebooks` as well as `main.py`.
 
+## Reproducing Results
+For more information on how to reproduce the results presented in the associated
+manuscript, see of [reproducibility](guides/reproduce.md) page. This leverages the larger suite of modules.
 
 
-## 📂 Data Access
-
-Data is available at: [OSF link](https://osf.io/kfqj8/?view_only=02cfaddc86da47d5b8fca0577628ddf7)
-
-To run existing scripts and notebooks, please:
-- Extract `real.zip` into `data/real`
-- Extract `synthetic.zip` into `data/synthetic`
-
-
-
-## 📊 Reproducing Results (ICLR 2026)
-
-We’ve aimed to make our analysis **fully reproducible**:
-
-- Fixed results (e.g., sweeps) are located in `results/`
-- Analysis notebooks are available in `notebooks/analysis/`
-  - File names are self-explanatory and aligned with their respective analyses
-- Sweep configs for re-running experiments can be found in `sweeps/` (see instructions below)
-
-
-
-## 🔄 Making Sweeps
-
-### 🧪 Real Data Benchmark
-See detailed instructions here: [Benchmarking Sweeps](scBenchmark.md).
-
-### 🧪 Synthetic Data with Noisy Concepts
-We use config files in `synth_hydra_config` for this.
-
-Our code supports sweeps using a combination of **wandb** and **hydra**.
-Official `wandb` documentation can be found [here](https://wandb.ai/adrishd/hydra-example/reports/Configuring-W-B-Projects-with-Hydra--VmlldzoxNTA2MzQw), though we also provide a more minimal and focused guide below.
-
-
-**1️⃣ Setting up a sweep config**
-Prepare a config file compatible with `wandb sweep`.
-A demo is available at `sweeps/sweep_demo.yaml`.
-
-
-**2️⃣ Creating a sweep agent**
-Run the following in the repo root:
-
-```sh
-wandb sweep sweeps/sweep_demo.yaml
-```
-
-This will generate a sweep ID and output something like:
-
-```sh
-$ wandb: Creating sweep from: sweeps/sweep_demo.yaml
-$ wandb: Creating sweep with ID: wuw4xyb0
-$ wandb: View sweep at: https://xxx.wandb.io/user/conceptlab
-$ wandb: Run sweep agent with: wandb agent user/conceptlab/wuw4xyb0
-```
-
-
-**3️⃣ Launching the sweep**
-To launch, simply run:
-
-```sh
-wandb agent user/conceptlab/wuw4xyb0
-```
-
-This must be executed on a GPU session.
-
-For large sweeps, you may want to distribute runs across multiple GPUs. `wandb agents` make this easy—multiple jobs can connect to the same agent.
-
-We also provide a CLI tool to automate launching sweep agents via schedulers (currently **LSF**, with **SLURM** support possible on request).
-
-Run it from the repo root:
-
-```sh
-python jobs/sweeper.py --sweep_id SWEEP_AGENT --num_jobs NUM_JOBS lsf
-```
-
-Where:
-- `SWEEP_AGENT` = sweep ID from `wandb sweep`
-- `NUM_JOBS` = number of GPU jobs to distribute across
-
-Example (10 jobs):
-
-```sh
-python jobs/sweeper.py --sweep_id user/conceptlab/wuw4xyb0 --num_jobs 10 lsf
-```
-
-
-⚙️ **Scheduler Options**
-
-We support both **LSF** and **SLURM**. For LSF, extra options are available:
-
-```sh
-$ python jobs/sweeper.py lsf --help
-usage: sweeper.py lsf [-h] [--memory MEMORY] [--num_cores NUM_CORES] [--sla SLA] [--queue QUEUE] [--job_name JOB_NAME] [--out_dir OUT_DIR]
-
-options:
-  -h, --help            Show this help message and exit
-  --memory MEMORY       Memory required (in GB)
-  --num_cores NUM_CORES Number of CPU cores required
-  --sla SLA             Service Level Agreement (SLA) name
-  --queue QUEUE         Queue name
-  --job_name JOB_NAME   Shared job name
-  --out_dir OUT_DIR     Output directory
-```
-
-Example run:
-
-```sh
-python jobs/sweeper.py --num_jobs 20 --sweep_id user/conceptlab/wuw4xyb0 lsf --sla gpu_gold --job_name sweep
-```

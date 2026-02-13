@@ -12,7 +12,7 @@ from scipy.sparse import csr_array, issparse
 from tqdm import tqdm
 
 from .base import BaseCBVAE
-from .utils import sigmoid
+from .utils import sigmoid, SelectiveSigmoid
 from .encoder import EncoderBlock
 from .decoder import DecoderBlock, SkipDecoderBlock, NoResDecoderBlock
 
@@ -41,6 +41,9 @@ class CB_VAE(BaseCBVAE):
 
         self.dropout = config.get("dropout", 0.0)
         self.variational = config.get("variational", True)
+
+
+        self.sigmoid_mask = config.get("sigmoid_mask", [True] * self.n_concepts)
 
         # Encoder
         self._encoder = _encoder(
@@ -84,7 +87,14 @@ class CB_VAE(BaseCBVAE):
             cb_unk_layers += layer_k
 
         cb_concepts_layers.append(nn.Linear(self.latent_dim, self.n_concepts))
-        cb_concepts_layers.append(nn.Sigmoid())
+        # Use selective activation based on config
+        if all(self.sigmoid_mask):
+            cb_concepts_layers.append(nn.Sigmoid())
+        elif not any(self.sigmoid_mask):
+            pass # Keep linear (or add ReLU if concepts are non-negative)
+        else:
+            # Mixed case: we use a custom module to sigmoid only specific indices
+            cb_concepts_layers.append(SelectiveSigmoid(self.sigmoid_mask))
 
         cb_unk_layers.append(nn.Linear(self.latent_dim, n_unknown))
         cb_unk_layers.append(nn.ReLU())
