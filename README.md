@@ -62,7 +62,10 @@ model.fit(adata, num_epochs=100, concept_key='concepts')
 # 4. Inference & Reconstruction
 # Returns known and unknown concept embeddings (use inplace=True to add to adata)
 known, unknown = model.encode(adata_test) 
+reconstructed = model.decode(known, unknown)
+# to reconstruct in one step
 reconstructed = model.reconstruct(adata_test)
+
 
 # 5. Counterfactual Intervention
 # Define the shift (e.g., changing 'day' from 3 to 9)
