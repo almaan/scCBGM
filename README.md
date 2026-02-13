@@ -14,7 +14,7 @@ the associated manuscript. While it supports complex workflows — including
 synthetic data generation, hyperparameter sweeps, and benchmarking of different methods —it also
 offers a streamlined, `scanpy`-inspired API for our core model: **scCBGM**.
 
-:alert: If you _are_ looking to use the `scCBGM` model only to analyze your own data, the API is what you're looking for. 
+⭐ **If you _are_ looking to use the `scCBGM` model only to analyze your own data, the API is what you're looking for.**
 
 ### Installation
 
