@@ -4,3 +4,4 @@ from conceptlab import models
 from conceptlab import utils
 from conceptlab import preprocess as pp
 from conceptlab import evaluation
+from conceptlab import api
