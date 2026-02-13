@@ -12,6 +12,7 @@ from conceptlab.models.cb_vae import scCBGM as scCBGMModel
 from .base import APIModelBase
 from .utils import prepare_tensors, to_tensor, OptionalDataset
 
+
 class scCBGM(APIModelBase):
     """
     scCBGM API Wrapper for single-cell Concept Bottleneck Generative Modeling.
@@ -145,21 +146,19 @@ class scCBGM(APIModelBase):
                     if mode == "encode":
                         results.append(
                             cbm_dict.get(
-                                "pred_concepts", torch.zeros(batch_x.size(0), 0)
+                                "pred_concept", torch.zeros(batch_x.size(0), 0)
                             ).cpu()
                         )
                         u_results.append(
                             cbm_dict.get(
-                                "unknown_concepts", torch.zeros(batch_x.size(0), 0)
+                                "unknown", torch.zeros(batch_x.size(0), 0)
                             ).cpu()
                         )
                         continue
 
                     out = self._model.decode(cbm_dict)
 
-                recon_batch = (
-                    out["x_recon"] if "x_recon" in out else out.get("x_pred", out)
-                )
+                recon_batch = out["x_pred"]
                 results.append(recon_batch.cpu())
 
         if mode == "encode":
@@ -309,7 +308,10 @@ class scCBGM(APIModelBase):
 
         final_k, final_u = self._run_inference(loader, "encode")
         if inplace:
-            adata.obsm["known_concepts"], adata.obsm["unknown_concepts"] = (
+            (
+                adata.obsm[f"{self.concept_key}_known_concepts"],
+                adata.obsm[f"{self.concept_key}_unknown_concepts"],
+            ) = (
                 final_k,
                 final_u,
             )
@@ -351,7 +353,7 @@ class scCBGM(APIModelBase):
 
         recon = self._run_inference(loader, "reconstruct")
         if inplace:
-            adata.layers["reconstruction"] = recon
+            adata.layers[f"{self.concept_key}_reconstruction"] = recon
             return None
         return recon
 
@@ -362,6 +364,7 @@ class scCBGM(APIModelBase):
         concept_key: Optional[str] = None,
         predict_concepts: bool = False,
         batch_size: int = 128,
+        inplace: bool = False,
     ) -> np.ndarray:
         """
         Perform a concept-based intervention to generate counterfactual reconstructions.
@@ -378,10 +381,12 @@ class scCBGM(APIModelBase):
             Whether to derive masks based on predicted instead of stored concepts.
         batch_size : int, default=128
             Batch size for inference.
+        inplace : bool, default=False
+            If True, saves the intervention results to `adata.layers["intervention"]`.
 
         Returns
         -------
-        np.ndarray
+        np.ndarray | None
             The reconstructed data matrix reflecting the interventions.
         """
         key = None if predict_concepts else (concept_key or self.concepts_key)
@@ -435,3 +440,40 @@ class scCBGM(APIModelBase):
                 recon_batch = out.get("x_pred", out) if isinstance(out, dict) else out
                 reconstructions.append(recon_batch.cpu())
         return torch.cat(reconstructions).numpy()
+
+    def save(self, path: str):
+        """
+        Saves the model weights and the configuration to a file.
+        """
+        if self._model is None:
+            raise ValueError("Model has not been initialized or fitted yet.")
+
+        state = {
+            "config": OmegaConf.to_container(self._config),
+            "model_state_dict": self._model.state_dict(),
+            "concept_key": self._concept_key,
+            "history": self.history,
+        }
+        torch.save(state, path)
+        print(f"Model saved to {path}")
+
+    @classmethod
+    def load(cls, path: str, device: Optional[str] = None):
+        """
+        Loads a saved model and initializes the API wrapper.
+        """
+        device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        state = torch.load(path, map_location=device)
+
+        instance = cls(**state["config"])
+        instance.device = torch.device(device)
+        instance._concept_key = state["concept_key"]
+        instance.history = state["history"]
+
+        instance._model = scCBGMModel(OmegaConf.create(state["config"]))
+        instance._model.load_state_dict(state["model_state_dict"])
+        instance._model.to(instance.device)
+        instance._model.eval()
+
+        print(f"Model loaded successfully from: {path}")
+        return instance
