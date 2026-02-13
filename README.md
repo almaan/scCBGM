@@ -2,12 +2,12 @@
 
 Repository for `scCBGM` method and accompanying evaluation presented in the manuscript "scCBGM: Single-cell Editing via Concept Bottlenecks".
 
-In short, scCBGM is a method for that leverages an abduction-action-prediction
-counterfactual generation of scRNA-seq data using a combination of concept
-bottleneck generative models.
+In short, scCBGM is a method that leverages an abduction-action-prediction
+to achieve counterfactual generation of scRNA-seq data using an expanded concept
+bottleneck generative models framework.
 
 
-# 📦 conceptlab Package
+# 📦 conceptlab package
 
 The `conceptlab` package is a comprehensive suite used to produce the results in
 the associated manuscript. While it supports complex workflows — including
@@ -85,7 +85,7 @@ this will update your `anndata` inplace (adding new layers for reconstruction
 and `.obsm` views for concepts).
 
 
-### 📦 Complete suite Suite 
+### 📦 conceptlab complete suite 
 
 The complete suite of functionality encompass several different modules that all serve a specific purpose; the modules are:
 
